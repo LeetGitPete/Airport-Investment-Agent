@@ -17,7 +17,7 @@ from airport_agent.contracts import (
 from airport_agent.contracts.data_service import DataService
 from airport_agent.scoring.calculators import distance_bands as _bands
 from airport_agent.scoring.calculators import long_haul_share as _lhs
-from airport_agent.scoring.explain import Evidence, explain_compare, explain_rank
+from airport_agent.scoring.explain import Evidence, explain_compare, explain_diagnose, explain_rank, fmt_value
 from airport_agent.scoring.presets import Preset, load_presets
 from airport_agent.scoring.scorer import Scorer, ScoringResult
 
@@ -25,6 +25,11 @@ UNIVERSE_LIMIT = 600
 LONGHAUL_CONVENTION = ("Long-haul convention: routes >= 1,500 statute miles (bands short<500, medium 500-1500, "
                        "long 1500-3000, ultra>3000); passenger and freight computed separately")
 SPILL_CONVENTION = "Load factor is interpreted via the spill model (with spill_proxy), not an absolute cutoff"
+
+DIAGNOSE_IDS = ["load_factor", "spill_proxy", "seats_per_dep_trend", "pct_arr_delay_gt15", "avg_dep_delay_min",
+                "nas_delay_share", "taxi_out_p80_min", "npias_capacity_label", "slot_or_cap_flag",
+                "peak_hour_ops_ratio", "imc_capacity_ratio", "taf_vs_actual_gap", "taf_cagr_10y"]
+LABELS = {0: "none", 1: "congested", 2: "constrained_2033", 3: "constrained_2028", 4: "severe_2033"}
 
 
 class Analyst:
@@ -201,3 +206,77 @@ class Analyst:
                         freight: bool = False) -> Metric:
         return _lhs(self.data.get_routes(iata, horizon=horizon, top_n=1000), threshold_mi=threshold_mi,
                     freight=freight, horizon=horizon)
+
+    def _signals(self, iata: str, ev: Evidence, pcts: dict[str, dict[str, float | None]]
+                 ) -> list[tuple[str, bool, str]]:
+        def val(m: str) -> float | None:
+            x = ev.get((iata, m))
+            return None if x is None else x.value
+
+        def pct(m: str) -> float | None:
+            return pcts.get(m, {}).get(iata)
+
+        def fv(m: str) -> str:
+            return fmt_value(self.by_id[m], val(m))
+
+        def fp(m: str) -> str:
+            p = pct(m)
+            return "n/a" if p is None else f"{p:.2f}"
+
+        def ge(x: float | None, t: float) -> bool:
+            return x is not None and x >= t
+
+        def le(x: float | None, t: float) -> bool:
+            return x is not None and x <= t
+
+        delay_metric = "avg_dep_delay_min" if ge(pct("avg_dep_delay_min"), 0.75) else "pct_arr_delay_gt15"
+        label = val("npias_capacity_label")
+        return [
+            ("lf_spill", ge(pct("load_factor"), 0.75) and ge(pct("spill_proxy"), 0.5),
+             f"high load factor with variable demand (spill likely): LF {fv('load_factor')} "
+             f"(pct {fp('load_factor')}), spill proxy {fv('spill_proxy')} (pct {fp('spill_proxy')})"),
+            ("upgauge", ge(pct("seats_per_dep_trend"), 0.75),
+             "upgauging trend in top quartile (airlines add seats per departure — proxy for slot/runway "
+             "constraint)"),
+            ("delay", ge(pct("avg_dep_delay_min"), 0.75) or ge(pct("pct_arr_delay_gt15"), 0.75),
+             f"delay in top quartile of peers ({self.by_id[delay_metric].name} {fv(delay_metric)})"),
+            ("nas", ge(pct("nas_delay_share"), 0.75), "high systemic (NAS) delay share"),
+            ("taxi", ge(pct("taxi_out_p80_min"), 0.75), "surface congestion: taxi-out p80 in top quartile"),
+            ("npias", ge(label, 2),
+             f"FAA NPIAS lists the airport as capacity constrained (label "
+             f"{LABELS.get(int(label), label) if label is not None else 'n/a'})"),
+            ("legal_cap", val("slot_or_cap_flag") == 1,
+             "legal capacity constraint in force (slot level / hourly cap)"),
+            ("peak", ge(val("peak_hour_ops_ratio"), 0.9), "peak-hour operations at ≥90% of declared VMC rate"),
+            ("imc", le(val("imc_capacity_ratio"), 0.8), "weather fragility: IMC rate ≤80% of VMC rate"),
+            ("taf_gap", ge(val("taf_vs_actual_gap"), 1.03),
+             "FAA forecast runs ≥3% above latest actuals (forecast optimism / suppressed demand)"),
+        ]
+
+    def diagnose(self, req: AnalysisRequest) -> DeterministicReport:
+        if not req.horizons:
+            raise ValueError("horizons must not be empty")
+        horizon: Horizon = req.horizons[0]
+        preset = self._preset(req.scoring_preset or "congestion_relief")
+        peer_group: PeerGroup = req.peer_group or "hub_class"
+        targets = self._resolve_airports(req)
+        scoreable = self.scorer.scoreable_ids(preset, DIAGNOSE_IDS)
+        res, n_uni = self._score_targets(targets, scoreable, horizon, peer_group, preset)
+        evidence, ev, facts = self._evidence(targets, DIAGNOSE_IDS, horizon)
+        comparison = {m: {i: (ev[(i, m)].value if (i, m) in ev else None) for i in targets} for m in DIAGNOSE_IDS}
+        explanation = " | ".join(explain_diagnose(i, self._signals(i, ev, res.percentiles)) for i in targets)
+        caveats = self._caveats(scoreable, peer_group, n_uni)
+        for c in ("Signals are heuristics over percentiles within hub class (thresholds: top quartile = "
+                 "pct ≥ 0.75); they indicate, not prove, unmet demand",
+                 "NPIAS constraint labels are partly circular for slot-controlled airports"):
+            if c not in caveats:
+                caveats.append(c)
+        if any(comparison[m][i] is not None for m in ("peak_hour_ops_ratio", "imc_capacity_ratio")
+              for i in targets):
+            c = "Declared VMC/IMC capacities come from FAA Capacity Profiles 2014–2019 (curated)"
+            if c not in caveats:
+                caveats.append(c)
+        return DeterministicReport(
+            question_type=req.question_type, preset=preset.name, weights=res.weights, horizon=horizon,
+            peer_group=peer_group, rows=res.rows, comparison=comparison, evidence=evidence,
+            explanation=explanation, caveats=caveats, curated_facts=facts, percentiles=res.percentiles)
