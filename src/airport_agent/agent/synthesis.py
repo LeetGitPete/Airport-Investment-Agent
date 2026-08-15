@@ -44,6 +44,8 @@ MAX_SYNTHESIS_TOOL_CHARS = 2000
 FALLBACK_NOTE = "synthesis text unavailable — showing raw report"
 FALLBACK_HEADLINE = "Results below."
 FALLBACK_FOLLOW_UPS = ["Show the metrics that were hidden?", "Try another horizon?", "Try another preset?"]
+BASELINE_ASSUMPTION = ("Every number shown comes from a cited source at the vintage listed; nothing "
+                       "is estimated or adjusted by the model")
 TIER_ASSUMPTION = "Tier B metrics only where curated data exists; tier C never scored"
 CONVENTION_MARKERS = ("convention", "spill model", "long-haul", "percentile")
 
@@ -181,6 +183,9 @@ class Synthesizer:
             evidence, hidden = evidence_table(deterministic, synthesis.show_metrics, self.by_id)
             if evidence.rows:
                 tables.append(evidence)
+            if tables and deterministic.explanation:
+                # the templated, formula-driven explanation is rendered verbatim with the table it explains
+                tables[0].footnotes.insert(0, deterministic.explanation)
             assumptions.extend(self._report_assumptions(req, deterministic))
             notes.extend(self._report_notes(deterministic))
         elif req is not None:
@@ -211,6 +216,7 @@ class Synthesizer:
                                + ", ".join(f"{k}={v}" for k, v in defaults.items() if v))
         if degraded:
             notes.append(FALLBACK_NOTE)
+        assumptions.append(BASELINE_ASSUMPTION)  # the assumptions block is never empty (product rule)
 
         headline = synthesis.headline.strip()
         if not headline:
