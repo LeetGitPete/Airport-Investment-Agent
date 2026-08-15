@@ -22,6 +22,7 @@ class SourceConfig(BaseModel):
     description: str
     notes: str = ""
     otp_months: int | None = None  # bts_otp only: trailing months of OTP to ingest (human decision 2026-08-15)
+    t100_months: int | None = None  # bts_t100 only: trailing months of T-100 to ingest (design 01 default: 24)
 
 
 def default_sources_path() -> Path:

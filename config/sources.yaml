@@ -56,6 +56,7 @@ bts_t100:
     code not found after a 15-min probe of FIL/FIH/FIS/FIT/FIN/FIQ/FIP/FIO/FIC/FIB/FID/FGH/FGJ-FGQ/FMG (all
     302 to /Homepage.asp, i.e. invalid gnoyr_VQ); bts_socrata's outbound/inbound international totals are
     the fallback (no route-level intl detail). See known-limitations row 2."
+  t100_months: 24
 
 bts_otp:
   kind: bulk
