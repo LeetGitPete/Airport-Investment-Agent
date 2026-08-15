@@ -532,10 +532,13 @@ def test_metric_weight_overrides_change_within_pillar_split(scorer):
     te = load_presets()["terminal_expansion"]
     fm = _fm(["BOS", "LAX"], ["pax_per_gate", "imc_capacity_ratio"], [[400000.0, 0.7], [500000.0, 0.8]])
     res = scorer.score(fm, te)
-    # pax_per_gate relative 3.0 vs imc 1.0 -> LAX gets 0.30 * 3/4 * 1 * 100 from pax_per_gate
+    # only P2 metrics are in the matrix -> P2's effective pillar weight renormalizes to 1.0;
+    # pax_per_gate relative 3.0 vs imc 1.0 -> LAX gets 1.0 * 3/4 * 1 * 100 from pax_per_gate
     lax = next(r for r in res.rows if r.ref.iata == "LAX")
-    assert lax.metric_contrib["pax_per_gate"] == pytest.approx(0.30 * 0.75 * 100)
+    assert lax.metric_contrib["pax_per_gate"] == pytest.approx(75.0)
+    assert lax.metric_contrib["imc_capacity_ratio"] == pytest.approx(0.0)  # direction down: LAX 0.8 > BOS 0.7
     assert res.pillar_scores["LAX"]["P2"] == pytest.approx(75.0)
+    assert res.weights["pax_per_gate"] == pytest.approx(0.75)  # nominal within-pillar weight is unaffected
 
 
 def test_all_none_row_scores_zero_with_zero_coverage(scorer, balanced):
@@ -1597,7 +1600,8 @@ def test_scale_metrics_small_ne_airports_do_not_beat_bos_when_peer_group_all(ana
     rep = analyst.compare(AnalysisRequest(question_type="compare", airports=["BOS", "PVD", "MHT"], horizons=["12m"],
                                           focus_metrics=["cbsa_population", "route_count_nonstop"], peer_group="all"))
     for m in ("cbsa_population", "route_count_nonstop"):
-        assert rep.percentiles[m]["BOS"] == 1.0
+        pct = rep.percentiles[m]
+        assert pct["BOS"] > pct["PVD"] and pct["BOS"] > pct["MHT"]
 
 
 def test_sfo_imc_ratio_below_lax(analyst):

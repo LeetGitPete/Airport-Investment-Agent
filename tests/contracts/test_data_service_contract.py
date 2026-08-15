@@ -87,7 +87,7 @@ def test_routes_sorted_and_flagged(data_service):
     deps = [r.departures for r in rt.rows]
     assert deps == sorted(deps, reverse=True)
     assert rt.truncated is True  # ANC has more than 5 routes
-    assert data_service.get_routes("ANC", top_n=50).truncated is False
+    assert data_service.get_routes("ANC", top_n=10_000).truncated is False  # top_n above any real route count
     intl = data_service.get_routes("JFK", international=True)
     assert all(r.is_international for r in intl.rows)
 

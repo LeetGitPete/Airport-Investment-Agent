@@ -27,7 +27,9 @@ Classification is not a separate model call: the Concierge's first LLM turn *is*
 ## Shared filter vocabulary (all data tools and AnalysisRequest)
 `horizon: 12m|3y|5y|10y` · `region: {state | faa_region | cbsa/metro | airports:[iata]}` · `hub_size` ·
 `metrics: [metric_id]` (from registry) · `top_n` · `international: bool|None`. No free-form SQL or column names.
-Every tool result carries `provenance: [source, vintage]`, `coverage`, `truncated: bool`.
+Every tool result carries `provenance: [source, vintage]` and `truncated: bool`; **analysis-tool results
+additionally carry `coverage`** (the mean `ScoreRow.coverage` of the rows returned) — plain data tools do not,
+since coverage is a property of a scored row set, not of a raw lookup.
 
 ## Contracts (sketch; authoritative in `contracts/`)
 ```
@@ -61,8 +63,8 @@ available (no LLM). Explanations are templated from contributions ("BDL ranks ab
 | Specialist | Owns analyst questions (02) | Metric slice | Allowed tools | Default preset | Built-in caveats |
 |---|---|---|---|---|---|
 | `expansion_analyst` — composite "where to invest" ranking | Q1–2, 7, 21 + composite | all pillars (summary level) | `score_airports`, `get_profile`, `find_airports`, `explain_metric` | `terminal_expansion` / `balanced` | tier-B coverage; hub-class peer group; forecast optimism |
-| `capacity_analyst` — congestion, constraint diagnosis, unmet demand & why | Q6–11, 16 | P2 fully + P1 absorption (LF, spill_proxy, upgauging) + curated capacity facts + NPIAS labels + live status | `compare_airports`, `diagnose_unmet_demand`, `get_profile`, `get_live_status`, `get_route_stats` | `congestion_relief` | spill model not LF cutoff; NPIAS circularity for slot airports; declared capacities from 2014–19 profiles; SNA legal cap |
-| `market_analyst` — traffic mix, network, catchment, financeability | Q3–5, 12–15, 17–20, 22 | P3, P4, P5 | `get_route_stats`, `get_profile`, `compare_airports`, `find_airports` | `market_entry` | CBSA≠catchment; Form 127 unaudited; long-haul = convention; pax vs freight |
+| `capacity_analyst` — congestion, constraint diagnosis, unmet demand & why | Q6–11, 16 | P2 fully + P1 absorption (LF, spill_proxy, upgauging) + curated capacity facts + NPIAS labels + live status | `compare_airports`, `diagnose_unmet_demand`, `get_profile`, `get_live_status`, `get_route_stats`, `explain_metric` | `congestion_relief` | spill model not LF cutoff; NPIAS circularity for slot airports; declared capacities from 2014–19 profiles; SNA legal cap |
+| `market_analyst` — traffic mix, network, catchment, financeability | Q3–5, 12–15, 17–20, 22 | P3, P4, P5 | `get_route_stats`, `get_profile`, `compare_airports`, `find_airports`, `explain_metric`, `get_metric_series` | `market_entry` | CBSA≠catchment; Form 127 unaudited; long-haul = convention; pax vs freight |
 | `general_analyst` — fallback when intent maps to no specialist cleanly | any | full registry | all tools | chosen per request or `balanced` | all of the above, plus "state which specialist lens you adopted" |
 
 **`general_analyst` dispatch is wider but still structured:** `AnalysisRequest.extended = { hint ≤ 600 chars

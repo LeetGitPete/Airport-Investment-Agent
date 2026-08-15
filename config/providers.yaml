@@ -1,0 +1,10 @@
+# Runtime LLM providers (LiteLLM model strings). Decision 2026-08-15: Gemini free tier ONLY for now.
+# Add Groq / NVIDIA NIM later by appending entries; the first entry is primary, later ones are fallbacks.
+providers:
+  - name: gemini
+    model: gemini/gemini-2.5-flash
+    api_key_env: GEMINI_API_KEY
+    rpm: 10
+    max_retries: 2
+    timeout_s: 60
+default_temperature: 0.2
