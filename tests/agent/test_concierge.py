@@ -100,7 +100,7 @@ def test_plan_line_shows_the_resolved_request(fake_data, fake_analyst, specs):
     ans = c.answer("rank New England", SessionState(session_id="s", title="t"),
                    defaults={"horizon": "10y", "scoring_preset": "market_entry", "peer_group": "all"})
     assert "horizon 10y" in ans.plan_line and "preset market_entry" in ans.plan_line
-    assert "peers all" in ans.plan_line and "region ANE" in ans.plan_line
+    assert "peers: all airports" in ans.plan_line and "region ANE" in ans.plan_line
 
 
 def test_every_tool_call_entry_runs_once_in_order(fake_data, fake_analyst, specs):

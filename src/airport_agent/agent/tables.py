@@ -69,13 +69,32 @@ def rank_legend(preset: str | None) -> str:
     return PRESET_LEGENDS.get(preset or "", DEFAULT_LEGEND)
 
 
+#: Unit display: "pct" is the registry's unit for PERCENT (not percentile) — shown as "%".
+UNIT_DISPLAY: dict[str, str] = {"pct": "%"}
+
+#: Peer-group values rendered as prose (QA task 4): "hub_class" is the FAA hub-size class.
+PEER_GROUP_DISPLAY: dict[str, str] = {
+    "hub_class": "airports of the same hub size",
+    "region": "airports in the same FAA region",
+    "all": "all airports",
+}
+
+
+def unit_label(unit: str | None) -> str:
+    return UNIT_DISPLAY.get(unit or "", unit or "")
+
+
+def peer_label(peer_group: str | None) -> str:
+    return PEER_GROUP_DISPLAY.get(peer_group or "", peer_group or "peers")
+
+
 def _metric_name(metric_id: str, specs_by_id: dict[str, MetricSpec]) -> str:
     spec = specs_by_id.get(metric_id)
     return spec.name if spec else metric_id
 
 
 def _metric_row(metric: Metric) -> list[Any]:
-    return [metric.value, metric.unit, metric.horizon, metric.period_end,
+    return [metric.value, unit_label(metric.unit), metric.horizon, metric.period_end,
             source_name(metric.source_id), metric.vintage]
 
 
@@ -87,7 +106,7 @@ def ranking_table(rep: DeterministicReport) -> Table:
             for row in sorted(rep.rows, key=lambda r: r.rank)]
     preset = rep.preset or "engine default"
     return Table(title=f"Ranking — preset {preset}, time period {rep.horizon} "
-                       f"(percentiles within {rep.peer_group})",
+                       f"(percentiles among {peer_label(rep.peer_group)})",
                  columns=columns, rows=rows,
                  footnotes=[rank_legend(rep.preset),
                             "Pillar columns are contributions to the score (weight x percentile x 100)."])
@@ -166,7 +185,7 @@ def comparison_table(rep: DeterministicReport, specs_by_id: dict[str, MetricSpec
             hidden_empty += 1
             continue
         spec = specs_by_id.get(metric_id)
-        row: list[Any] = [_metric_name(metric_id, specs_by_id), spec.unit if spec else ""]
+        row: list[Any] = [_metric_name(metric_id, specs_by_id), unit_label(spec.unit if spec else "")]
         row += airport_values
         if percentiles:
             row += [percentiles.get(metric_id, {}).get(iata) for iata in iatas]
@@ -205,7 +224,7 @@ def _route_tables(result: dict[str, Any]) -> list[Table]:
     bands = result.get("distance_bands") or {}
     band_rows = [[kind, *[(bands.get(kind) or {}).get(band) for band in BANDS]] for kind in bands]
     shares = result.get("long_haul_share") or {}
-    share_rows = [[kind, metric.get("value"), metric.get("unit"), metric.get("period_end"),
+    share_rows = [[kind, metric.get("value"), unit_label(metric.get("unit")), metric.get("period_end"),
                    source_name(metric.get("source_id")), metric.get("vintage")]
                   for kind, metric in shares.items()]
     footnotes = [convention] if convention else []
@@ -223,8 +242,9 @@ def _profile_tables(result: dict[str, Any], specs_by_id: dict[str, MetricSpec]) 
     tables: list[Table] = []
     for horizon, metrics in (result.get("metrics") or {}).items():
         present = [m for m in metrics if m.get("value") is not None]
-        rows = [[_metric_name(m["id"], specs_by_id), m.get("value"), m.get("unit"), m.get("horizon"),
-                 m.get("period_end"), source_name(m.get("source_id")), m.get("vintage")] for m in present]
+        rows = [[_metric_name(m["id"], specs_by_id), m.get("value"), unit_label(m.get("unit")),
+                 m.get("horizon"), m.get("period_end"), source_name(m.get("source_id")),
+                 m.get("vintage")] for m in present]
         missing = len(metrics) - len(present)
         footnotes = [f"{missing} metrics have no value at this airport/horizon."] if missing else []
         tables.append(Table(title=f"Metrics — {iata} ({horizon})",

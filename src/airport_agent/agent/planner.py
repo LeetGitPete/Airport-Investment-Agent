@@ -15,6 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from airport_agent.agent.tables import PEER_GROUP_DISPLAY as PEER_GROUP_PROSE
 from airport_agent.agent.tools.registry import ToolRegistry
 from airport_agent.contracts import (
     MAX_HINT_CHARS,
@@ -422,7 +423,8 @@ class Planner:
             return (f"How I'm approaching this: {plan.intent} · {req.question_type} · "
                     f"{_request_targets(req)} · horizon {', '.join(req.horizons) or '-'} · "
                     f"preset {req.scoring_preset or 'engine default'} · "
-                    f"peers {req.peer_group or 'hub_class'} · engines: {engines}")
+                    f"peers: {PEER_GROUP_PROSE.get(req.peer_group or 'hub_class', req.peer_group)} · "
+                    f"engines: {engines}")
         return (f"How I'm approaching this: {plan.intent} · {filters.question_type or 'lookup'} · "
                 f"{_targets(filters)} · horizon {', '.join(filters.horizons) or '-'} · "
                 f"preset {filters.scoring_preset or '-'} · engines: {engines}")
