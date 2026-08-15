@@ -112,7 +112,8 @@ class FakeAnalyst:
                 num = sum(r.departures for r in valid if lo <= r.distance_mi < hi)
             return (num / total) if total else 0.0
 
-        return {"short_haul": share(0, 500), "medium_haul": share(500, 1500), "long_haul": share(1500, float("inf"))}
+        return {"short": share(0, 500), "medium": share(500, 1500), "long": share(1500, 3000),
+                "ultra": share(3000, float("inf"))}
 
     def long_haul_share(self, iata: str, threshold_mi: float = 1500, horizon: Horizon = "12m",
                          freight: bool = False) -> Metric:

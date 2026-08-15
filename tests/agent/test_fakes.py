@@ -25,3 +25,9 @@ def test_fake_analyst_reports_are_valid_and_carry_provenance(fake_analyst):
     cmp_ = fake_analyst.compare(AnalysisRequest(question_type="compare", airports=["LAX", "SNA"], horizons=["12m"]))
     assert cmp_.comparison["avg_dep_delay_min"] == {"LAX": 12.9, "SNA": 13.9}
     assert fake_analyst.long_haul_share("ANC", freight=True).value > fake_analyst.long_haul_share("ANC").value
+
+
+def test_fake_analyst_distance_bands_four_keys_and_anc_freight_skews_ultra(fake_analyst):
+    bands = fake_analyst.distance_bands("ANC", freight=True)
+    assert set(bands) == {"short", "medium", "long", "ultra"}
+    assert bands["ultra"] + bands["long"] > 0.9
