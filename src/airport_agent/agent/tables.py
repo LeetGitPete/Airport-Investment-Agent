@@ -49,6 +49,26 @@ def source_name(source_id: str | None) -> str:
     return SOURCE_DISPLAY.get(source_id or "", source_id or "")
 
 
+#: What rank 1 / a high score MEANS under each preset (QA task 2). Percentiles are
+#: direction-adjusted per metric, so a higher score is always "stronger case for the
+#: preset's objective" — these spell that out per preset so no table needs decoding.
+PRESET_LEGENDS: dict[str, str] = {
+    "balanced": "Rank 1 = strongest overall investment candidate under balanced pillar weights.",
+    "terminal_expansion": ("Rank 1 = strongest terminal-expansion candidate — the most gate/terminal "
+                           "pressure relative to peers, i.e. the most to gain from new terminal capacity."),
+    "congestion_relief": ("Rank 1 = strongest congestion-relief candidate — the most airfield congestion "
+                          "relative to peers, i.e. the most to gain from added runway/airfield capacity."),
+    "market_entry": ("Rank 1 = strongest market-entry candidate — the most attractive market "
+                     "fundamentals for a new entrant or route."),
+}
+DEFAULT_LEGEND = ("Rank 1 = highest score under this preset; a higher score always means a stronger "
+                  "case for the preset's objective (each metric's direction is already accounted for).")
+
+
+def rank_legend(preset: str | None) -> str:
+    return PRESET_LEGENDS.get(preset or "", DEFAULT_LEGEND)
+
+
 def _metric_name(metric_id: str, specs_by_id: dict[str, MetricSpec]) -> str:
     spec = specs_by_id.get(metric_id)
     return spec.name if spec else metric_id
@@ -69,7 +89,8 @@ def ranking_table(rep: DeterministicReport) -> Table:
     return Table(title=f"Ranking — preset {preset}, time period {rep.horizon} "
                        f"(percentiles within {rep.peer_group})",
                  columns=columns, rows=rows,
-                 footnotes=["Pillar columns are contributions to the score (weight x percentile x 100)."])
+                 footnotes=[rank_legend(rep.preset),
+                            "Pillar columns are contributions to the score (weight x percentile x 100)."])
 
 
 def _provenance_by_id(rep: DeterministicReport) -> dict[str, list[str]]:
@@ -151,7 +172,10 @@ def comparison_table(rep: DeterministicReport, specs_by_id: dict[str, MetricSpec
             row += [percentiles.get(metric_id, {}).get(iata) for iata in iatas]
         row += provenance.get(metric_id, [rep.horizon, "", "", ""])
         rows.append(row)
-    footnotes = ["Percentiles are within the peer group (0 = lowest, 1 = highest)."] if percentiles else []
+    footnotes = [("Percentiles are within the peer group and direction-adjusted per metric: "
+                  "1.0 always means the strongest case for investment on that metric "
+                  "(e.g. most delay for a congestion metric, lowest cost for a cost metric).")] \
+        if percentiles else []
     if hidden_empty:
         footnotes.append(f"{hidden_empty} metrics have no value for these airports and are not shown.")
     return Table(title=f"Comparison — time period {rep.horizon}",
@@ -166,7 +190,8 @@ def specialist_ranking_table(rep: SpecialistReport) -> Table | None:
             for item in sorted(rep.ranking, key=lambda i: i.rank)]
     return Table(title=f"Analyst ranking — {rep.specialist}",
                  columns=["rank", "airport", "rationale", "confidence"], rows=rows,
-                 footnotes=["The analyst's ordering and confidence, not the formula's."])
+                 footnotes=["Rank 1 = the analyst's strongest candidate for the question asked.",
+                            "The analyst's ordering and confidence, not the formula's."])
 
 
 def _report_from_dict(result: dict[str, Any]) -> DeterministicReport:

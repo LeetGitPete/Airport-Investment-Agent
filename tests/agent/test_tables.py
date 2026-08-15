@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from airport_agent.agent.tables import (
@@ -45,6 +47,23 @@ def test_ranking_table_row_per_report_row_with_pillar_columns(fake_analyst):
     assert scores == {r.ref.iata: r.score for r in rep.rows}  # verbatim, not reformatted
     ranks = [row[table.columns.index("rank")] for row in table.rows]
     assert ranks == sorted(ranks)
+
+
+def test_ranking_table_states_what_rank_1_means(fake_analyst):
+    rep = _rank_report(fake_analyst)
+    table = ranking_table(rep)
+    assert any(note.startswith("Rank 1 =") for note in table.footnotes)
+
+
+def test_every_preset_has_a_rank_legend():
+    import yaml
+
+    from airport_agent.agent.tables import PRESET_LEGENDS, rank_legend
+    presets = yaml.safe_load(
+        (Path(__file__).parents[2] / "config" / "scoring_presets.yaml").read_text(encoding="utf-8")
+    )["presets"]
+    assert set(presets) == set(PRESET_LEGENDS)  # a new preset must bring its legend
+    assert rank_legend("unknown_preset").startswith("Rank 1 =")
 
 
 def test_evidence_table_is_empty_for_multi_airport_reports_but_still_reports_hidden(fake_analyst, by_id):
