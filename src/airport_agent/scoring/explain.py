@@ -6,7 +6,13 @@ from airport_agent.scoring.scorer import ScoringResult
 
 Evidence = dict[tuple[str, str], Metric]  # (iata, metric_id) -> Metric
 
-_THOUSANDS_UNITS = ("count", "ops", "seats", "persons", "pax", "trips", "index")
+# Count-like units: whole quantities (persons, seats, ops) -> thousands-separated integers.
+_THOUSANDS_UNITS = ("count", "ops", "seats", "persons", "pax", "index", "days", "sqft")
+# Small-magnitude ratio-like units -> 2 decimals, no thousands separator. "trips" here is a rate
+# (enplanements per resident, e.g. pax_per_capita ~0.3-12), not a count -- thousands-int would collapse it.
+_RATIO_UNITS = ("ratio", "trips")
+# Discrete label-coded units -> plain integer, no decimals, no thousands separator.
+_INTEGER_UNITS = ("flag", "ordinal")
 
 
 def fmt_value(spec: MetricSpec, value: float | None) -> str:
@@ -15,7 +21,7 @@ def fmt_value(spec: MetricSpec, value: float | None) -> str:
     unit = spec.unit
     if unit == "pct":
         return f"{value * 100:.1f}%"
-    if unit == "ratio":
+    if unit in _RATIO_UNITS:
         return f"{value:.2f}"
     if unit == "min":
         return f"{value:.1f} min"
@@ -23,6 +29,8 @@ def fmt_value(spec: MetricSpec, value: float | None) -> str:
         return f"${value:,.2f}"
     if unit == "turns":
         return f"{value:.1f}"
+    if unit in _INTEGER_UNITS:
+        return f"{value:.0f}"
     if unit in _THOUSANDS_UNITS:
         return f"{value:,.0f}"
     return f"{value:g}"

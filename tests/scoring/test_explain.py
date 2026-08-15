@@ -27,6 +27,22 @@ def test_fmt_value_turns_one_decimal(by_id):
     assert fmt_value(by_id["deps_per_gate_day"], 8.3) == "8.3"
 
 
+def test_fmt_value_trips_is_rate_not_count(by_id):
+    # pax_per_capita (unit "trips") is enplanements per resident, typically 0.3-12 -- must NOT
+    # collapse to a thousands-separated integer ("0"/"1"); format like a ratio.
+    assert fmt_value(by_id["pax_per_capita"], 4.1) == "4.10"
+
+
+def test_fmt_value_flag_and_ordinal_are_plain_integers(by_id):
+    assert fmt_value(by_id["slot_or_cap_flag"], 1.0) == "1"
+    assert fmt_value(by_id["npias_capacity_label"], 3.0) == "3"
+
+
+def test_fmt_value_days_and_sqft_are_thousands_ints(by_id):
+    assert fmt_value(by_id["days_cash"], 245.0) == "245"
+    assert fmt_value(by_id["terminal_sqft_per_nbeg"], 125000.0) == "125,000"
+
+
 def test_explain_rank_names_pillar_metric_and_source(specs, by_id):
     fm = FeatureMatrix(airports=[REFS["BDL"], REFS["PVD"]], metric_ids=["enpl_cagr_5y", "load_factor"], horizon="5y",
                        values=[[0.061, 0.83], [0.023, 0.84]], peer_group="hub_class")
