@@ -3,14 +3,15 @@
 The `FakeApp` instance is stashed in `st.session_state` so it survives across `AppTest` reruns (each
 `.run()` re-executes the whole script from scratch; only `session_state` persists between runs).
 
-Note on duplicate-titled chats: `AppTest`'s `Radio.set_value()` round-trips a *raw* value through
-`format_func` to find its position in the widget's already-rendered (formatted) `options` list
-(`streamlit.testing.v1.element_tree.Radio.index`). When two options format to the same label (e.g. two
-"New chat" conversations), that reverse lookup returns the *first* match — a limitation of the test
-harness's simulated click, not of `sidebar.py` (a real browser click is positional, not text-matched, so
-production behavior is unaffected). `test_duplicate_titles_keep_their_own_identity` below instead seeds
-`session_state` before the very first `.run()` (i.e. before the radio widget has ever been instantiated,
-so there is no widget history to round-trip through) to verify id-based — not title-based — selection.
+Note on duplicate-titled chats: `st.radio` (`streamlit/elements/widgets/radio.py`) registers its widget
+value as `value_type="string_value"` and deserializes a click via
+`options_selector_utils.formatted_option_to_option_index`, which resolves the *formatted display label*
+back to an option index — "if formatted labels are duplicated, the last one wins" (per that function's own
+docstring). So two conversations that both format to "New chat" are genuinely ambiguous to a click *by
+Streamlit's own protocol*, not merely to the `AppTest` harness — selecting the first of two identically
+labeled options would land on the last. `sidebar._display_labels` therefore appends a short id suffix to
+any title shared by more than one conversation so every on-screen label is unique; see
+`test_duplicate_titles_get_unique_labels_and_select_correctly` below.
 """
 from __future__ import annotations
 
@@ -38,18 +39,6 @@ def _run() -> AppTest:
     return at
 
 
-def _fresh(app: FakeApp, session_id: str) -> AppTest:
-    """A brand-new `AppTest` landing directly on `session_id` (no prior radio interaction — avoids the
-    `set_value()`/`format_func` round-trip limitation described in the module docstring)."""
-    at = AppTest.from_function(_sidebar_script)
-    at.session_state["app"] = app
-    at.session_state["session_id"] = session_id
-    at.session_state[_RADIO_KEY] = session_id
-    at.run()
-    assert not at.exception
-    return at
-
-
 def _app(at: AppTest) -> FakeApp:
     return at.session_state["app"]
 
@@ -65,20 +54,23 @@ def test_new_chat_is_created_and_selected():
     assert at.radio(key=_RADIO_KEY).value == newest.session_id
 
 
-def test_duplicate_titles_keep_their_own_identity():
-    app = FakeApp()
-    # Two conversations that both default to the title "New chat" — must remain independently
-    # selectable by id despite the identical on-screen label.
+def test_duplicate_titles_get_unique_labels_and_select_correctly():
+    at = _run()
+    app = _app(at)
+    # Three conversations that all default to the title "New chat".
     first = app.sessions.new()
     second = app.sessions.new()
+    third = app.sessions.new()
+    at.run()
 
-    at_first = _fresh(app, first.session_id)
-    assert at_first.session_state["session_id"] == first.session_id
-    assert at_first.radio(key=_RADIO_KEY).value == first.session_id
+    labels = at.radio(key=_RADIO_KEY).options
+    assert len(labels) == len(set(labels))  # every on-screen label is unique
 
-    at_second = _fresh(app, second.session_id)
-    assert at_second.session_state["session_id"] == second.session_id
-    assert at_second.radio(key=_RADIO_KEY).value == second.session_id
+    for target in (first, second, third):
+        at.radio(key=_RADIO_KEY).set_value(target.session_id).run()
+        assert not at.exception
+        assert at.session_state["session_id"] == target.session_id
+        assert at.radio(key=_RADIO_KEY).value == target.session_id
 
 
 def test_rename_targets_the_currently_selected_chat():
@@ -103,6 +95,20 @@ def test_rename_targets_the_currently_selected_chat():
     assert app.sessions.load(a.session_id).title == "Chat A"  # untouched
 
 
+def test_rename_ignores_blank_title():
+    at = _run()
+    app = _app(at)
+    a = app.sessions.new(title="Chat A")
+    at.run()
+
+    at.radio(key=_RADIO_KEY).set_value(a.session_id).run()
+    at.text_input(key=_RENAME_KEY).set_value("   ").run()
+    at.button(key=_RENAME_BUTTON_KEY).click().run()
+
+    assert not at.exception
+    assert app.sessions.load(a.session_id).title == "Chat A"  # unchanged
+
+
 def test_delete_selects_the_newest_remaining_chat():
     at = _run()
     app = _app(at)
@@ -118,3 +124,20 @@ def test_delete_selects_the_newest_remaining_chat():
     assert newer.session_id not in remaining_ids
     assert at.session_state["session_id"] == older.session_id
     assert at.radio(key=_RADIO_KEY).value == older.session_id
+
+
+def test_delete_ignores_a_pending_id_that_no_longer_exists():
+    at = _run()
+    app = _app(at)
+    other = app.sessions.new(title="Other")
+    at.run()
+
+    at.radio(key=_RADIO_KEY).set_value(other.session_id).run()
+    at.button(key=_DELETE_KEY).click()
+
+    # Simulate the pending session having vanished before the deferred delete runs (e.g. deleted
+    # elsewhere) — the sidebar must skip it silently rather than raise.
+    app.sessions.delete(other.session_id)
+    at.run()
+
+    assert not at.exception
