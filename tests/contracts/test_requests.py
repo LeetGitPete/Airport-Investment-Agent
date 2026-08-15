@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from airport_agent.contracts.conversation import Answer, ChatMessage, Plan, SessionState, Table
+from airport_agent.contracts.models import CuratedFact
 from airport_agent.contracts.reports import DeterministicReport, ScoreRow, SpecialistReport
 from airport_agent.contracts.requests import (
     MAX_HINT_CHARS,
@@ -54,6 +55,25 @@ def test_truncated_hint_round_trips_through_validation():
 def test_custom_requires_general_specialist():
     with pytest.raises(ValidationError):
         AnalysisRequest(question_type="custom", airports=["DEN"], specialist="capacity_analyst")
+
+
+def test_analysis_request_peer_group():
+    assert AnalysisRequest(question_type="rank", airports=["BOS"]).peer_group is None  # None = impl default
+    assert AnalysisRequest(question_type="rank", airports=["BOS"], peer_group="region").peer_group == "region"
+    with pytest.raises(ValidationError):
+        AnalysisRequest(question_type="rank", airports=["BOS"], peer_group="galaxy")
+
+
+def test_deterministic_report_curated_facts_and_percentiles_round_trip():
+    fact = CuratedFact(iata="SFO", category="slot_level", text="IATA Level 2 schedule-facilitated", value=2,
+                       source_url="https://www.faa.gov/slot_administration", as_of="2026-06", expires=None)
+    d = DeterministicReport(question_type="rank", preset=None, weights={"P1": 0.35, "load_factor": 0.1}, horizon="5y",
+                            peer_group="hub_class", rows=[], comparison=None, evidence=[], explanation="…",
+                            caveats=[], curated_facts=[fact],
+                            percentiles={"load_factor": {"SFO": 0.42, "BOS": 0.77, "ANC": None}})
+    restored = DeterministicReport.model_validate(d.model_dump(mode="json"))
+    assert restored.curated_facts[0].iata == "SFO"
+    assert restored.percentiles["load_factor"]["BOS"] == 0.77 and restored.percentiles["load_factor"]["ANC"] is None
 
 
 def test_reports_construct():

@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from airport_agent.contracts.models import AirportRef, Horizon, Metric, PeerGroup
+from airport_agent.contracts.models import AirportRef, CuratedFact, Horizon, Metric, PeerGroup
 from airport_agent.contracts.requests import QuestionType
 
 
@@ -25,6 +25,8 @@ class DeterministicReport(BaseModel):
     report_type: Literal["deterministic"] = "deterministic"
     question_type: QuestionType
     preset: str | None
+    # pillar and metric weights, keyed by pillar id (P1..P5) and metric id;
+    # ScoreRow.metric_contrib = w_m x percentile x 100
     weights: dict[str, float]
     horizon: Horizon
     peer_group: PeerGroup
@@ -33,6 +35,9 @@ class DeterministicReport(BaseModel):
     evidence: list[Metric]
     explanation: str  # templated, formula-driven
     caveats: list[str]
+    curated_facts: list[CuratedFact] = Field(default_factory=list)
+    # metric_id -> {iata: percentile within peer_group, 0..1}
+    percentiles: dict[str, dict[str, float | None]] | None = None
 
 
 class RankedItem(BaseModel):

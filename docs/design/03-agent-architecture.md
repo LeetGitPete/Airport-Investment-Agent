@@ -32,10 +32,12 @@ Every tool result carries `provenance: [source, vintage]`, `coverage`, `truncate
 ## Contracts (sketch; authoritative in `contracts/`)
 ```
 Plan { intent, engines: [deterministic|specialist:<name>|tools], filters, tools_to_call, presentation_notes }
-AnalysisRequest { question_type: rank|compare|diagnose, airports|region filter, horizons, scoring_preset|None,
+AnalysisRequest { question_type: rank|compare|diagnose, airports|region filter, horizons, peer_group|None (None =
+                  default hub_class), scoring_preset|None,
                   focus_metrics|None, hint: str  # truncated to MAX_HINT_CHARS (default 200); hint_truncated flag returned }
 DeterministicReport { preset, weights, horizon, peer_group, table: [ref, score, rank, pillar & metric contributions,
-                      coverage], explanation (templated, formula-driven), evidence: [Metric], caveats }
+                      coverage], percentiles (metric_id -> {iata: 0..1 within peer_group}), curated_facts: [CuratedFact],
+                      explanation (templated, formula-driven), evidence: [Metric], caveats }
 SpecialistReport { specialist, ranking/comparison view, narrative, evidence: [Metric], agreements/disagreements
                    with DeterministicReport (if provided), confidence, assumptions, caveats }
 Answer { text, tables, citations, assumptions, uncertainty_notes, plan_shown, tool_trace }

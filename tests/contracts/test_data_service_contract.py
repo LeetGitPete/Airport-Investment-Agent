@@ -3,8 +3,7 @@ import pytest
 from airport_agent.contracts import AirportFilter, DataService, FeatureMatrix, load_registry
 
 NE = {"BOS", "BDL", "PVD", "MHT", "PWM"}
-# Registry-declared optional metrics (caveat says the value may be absent, e.g. od_share / DB1B adapter).
-MAY_BE_ABSENT = {s.id for s in load_registry() if any("absent" in c.lower() for c in s.caveats)}
+ATTEMPT_IDS = {"od_share"}  # tier-A ids that may legitimately be absent (timeboxed adapters)
 
 
 def test_is_data_service(data_service):
@@ -40,17 +39,18 @@ def test_feature_matrix_conforms_to_registry(data_service):
     for j, spec in enumerate(specs):
         column = [fm.values[i][j] for i in range(len(fm.airports))]
         if {"5y", "static", "forecast"} & set(spec.horizons):
-            if spec.tier == "A" and spec.id not in MAY_BE_ABSENT:  # tier B is curated majors only
+            if spec.tier == "A" and spec.id not in ATTEMPT_IDS:  # tier B is curated majors only
                 assert all(v is not None for v in column), f"{spec.id}: tier-A gap at 5y"
         else:
             assert all(v is None for v in column), f"{spec.id}: value invented for an undeclared horizon"
 
 
 def test_feature_matrix_12m_covers_tier_a(data_service):
-    specs = [s for s in load_registry() if s.tier == "A" and "12m" in s.horizons and s.id not in MAY_BE_ABSENT]
+    specs = [s for s in load_registry() if s.tier == "A" and "12m" in s.horizons and s.id not in ATTEMPT_IDS]
     fm = data_service.get_feature_matrix(["BOS", "SFO", "ANC"], [s.id for s in specs], "12m")
     for j, spec in enumerate(specs):
         assert all(fm.values[i][j] is not None for i in range(3)), f"{spec.id}: tier-A gap at 12m"
+    assert 0.5 < fm.coverage() <= 1.0
 
 
 def test_feature_matrix_rejects_unknown_metric(data_service):

@@ -27,6 +27,7 @@ class AnalysisRequest(BaseModel):
     airports: list[str] | None = None
     filter: AirportFilter | None = None
     horizons: list[Horizon] = Field(default_factory=lambda: ["5y"])
+    peer_group: PeerGroup | None = None  # None => implementation default ("hub_class")
     scoring_preset: str | None = None
     focus_metrics: list[str] | None = None
     hint: str = ""
