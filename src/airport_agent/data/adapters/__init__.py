@@ -16,7 +16,6 @@ def register(cls: type) -> type:
 
 
 # --- adapter modules (import for registration side effect) -----------------
-# Later tasks append one import per adapter here, e.g.:
-#     from airport_agent.data.adapters import ourairports as _ourairports  # noqa: F401
-# None exist yet.
+# Later tasks append one import per adapter here.
+from airport_agent.data.adapters import ourairports as _ourairports  # noqa: E402, F401
 # -----------------------------------------------------------------------------
