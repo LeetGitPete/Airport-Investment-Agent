@@ -27,7 +27,9 @@ def test_synthesize_analytical_structure_and_no_altered_numbers(fake_analyst, sp
                                              deterministic=det, specialist=spec, tool_results=[], trace=[], defaults=None)
     assert isinstance(ans, Answer) and ans.headline == SYN["headline"] and ans.plan_line.startswith("How I'm")
     titles = [t.title for t in ans.evidence_tables]
-    assert any(t.startswith("Ranking") for t in titles) and any(t.startswith("Evidence") for t in titles)
+    assert any(t.startswith("Ranking") for t in titles)
+    # multi-airport report: evidence carries no airport, so no Evidence table is rendered
+    assert not any(t.startswith("Evidence") for t in titles)
     rank_tbl = next(t for t in ans.evidence_tables if t.title.startswith("Ranking"))
     scores = {row[rank_tbl.columns.index("airport")]: row[rank_tbl.columns.index("score")] for row in rank_tbl.rows}
     assert scores == {r.ref.iata: r.score for r in det.rows}  # numbers verbatim from the report
@@ -91,6 +93,8 @@ def test_defaults_and_hidden_metrics_are_disclosed(fake_analyst, specs):
         message="q", plan=_plan(), plan_line="pl", req=req, deterministic=det, specialist=None,
         tool_results=[], trace=[], defaults={"horizon": "12m", "peer_group": "all"})
     assert any(a.startswith("UI defaults applied") for a in ans.assumptions)
-    hidden_note = next(u for u in ans.uncertainty_notes if "collapsed" in u)
-    assert "avg_dep_delay_min" in hidden_note and "delay metrics collapsed" in hidden_note
+    hidden_note = next(u for u in ans.uncertainty_notes if "not shown" in u)
+    # the disclosure uses user-facing metric names, never internal ids
+    assert "Mean departure delay" in hidden_note and "avg_dep_delay_min" not in hidden_note
+    assert "delay metrics collapsed" in hidden_note  # the LLM's stated reason is kept verbatim
     assert ans.analyst_view is None and ans.agreement_line is None

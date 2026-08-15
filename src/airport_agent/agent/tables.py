@@ -18,18 +18,45 @@ from airport_agent.contracts import (
 
 PILLARS = ["P1", "P2", "P3", "P4", "P5"]
 BANDS = ["short", "medium", "long", "ultra"]
-METRIC_PROVENANCE_COLUMNS = ["value", "unit", "horizon", "period_end", "source", "vintage"]
+#: Presentation standard (QA 2026-08-16): user-facing labels only. "time period" = analysis
+#: window (12m/3y/5y/10y); "data as of" = the data's own date (period end / source-file date),
+#: NOT the moment we fetched it.
+METRIC_PROVENANCE_COLUMNS = ["value", "unit", "time period", "period end", "source", "data as of"]
 #: Tool results that are DeterministicReport dumps.
 REPORT_TOOLS = ("score_airports", "compare_airports", "diagnose_unmet_demand")
 
+#: User-facing source names. Fallback is the raw id, so an unmapped source stays visible.
+SOURCE_DISPLAY: dict[str, str] = {
+    "ourairports": "OurAirports",
+    "faa_taf": "FAA Terminal Area Forecast",
+    "faa_npias": "FAA NPIAS 2025-2029",
+    "bts_socrata": "BTS T-100 airport totals",
+    "bts_t100": "BTS T-100 route segments",
+    "bts_otp": "BTS On-Time Performance",
+    "bts_delay_cause": "BTS delay causes",
+    "census_cbsa": "Census metro population",
+    "bea_msa": "BEA metro GDP",
+    "faa_cats": "FAA airport financials (Form 127)",
+    "faa_aip": "FAA AIP grants",
+    "faa_nasstatus": "FAA NAS Status (live)",
+    "curated": "Curated airport facts",
+    "bts_db1b": "BTS DB1B O&D survey",
+}
 
-def _label(metric_id: str, specs_by_id: dict[str, MetricSpec]) -> str:
+
+def source_name(source_id: str | None) -> str:
+    """User-facing name for a source id (the id itself when unmapped or empty)."""
+    return SOURCE_DISPLAY.get(source_id or "", source_id or "")
+
+
+def _metric_name(metric_id: str, specs_by_id: dict[str, MetricSpec]) -> str:
     spec = specs_by_id.get(metric_id)
-    return f"{metric_id} ({spec.name})" if spec else metric_id
+    return spec.name if spec else metric_id
 
 
 def _metric_row(metric: Metric) -> list[Any]:
-    return [metric.value, metric.unit, metric.horizon, metric.period_end, metric.source_id, metric.vintage]
+    return [metric.value, metric.unit, metric.horizon, metric.period_end,
+            source_name(metric.source_id), metric.vintage]
 
 
 def ranking_table(rep: DeterministicReport) -> Table:
@@ -39,61 +66,96 @@ def ranking_table(rep: DeterministicReport) -> Table:
              row.low_confidence, *[row.pillar_contrib.get(p) for p in PILLARS]]
             for row in sorted(rep.rows, key=lambda r: r.rank)]
     preset = rep.preset or "engine default"
-    return Table(title=f"Ranking — preset {preset}, horizon {rep.horizon} "
+    return Table(title=f"Ranking — preset {preset}, time period {rep.horizon} "
                        f"(percentiles within {rep.peer_group})",
                  columns=columns, rows=rows,
                  footnotes=["Pillar columns are contributions to the score (weight x percentile x 100)."])
 
 
+def _provenance_by_id(rep: DeterministicReport) -> dict[str, list[str]]:
+    """Per metric id: [time period, period end, source, data as of], distinct values joined by ' / '.
+
+    Evidence entries for one id normally share provenance (same source and window per airport); when
+    they genuinely differ, every distinct value is shown rather than picking one.
+    """
+    fields: dict[str, list[list[str]]] = {}
+    for metric in rep.evidence:
+        slots = fields.setdefault(metric.id, [[], [], [], []])
+        values = [metric.horizon, metric.period_end, source_name(metric.source_id), metric.vintage]
+        for slot, value in zip(slots, values, strict=True):
+            text = "" if value is None else str(value)
+            if text and text not in slot:
+                slot.append(text)
+    return {mid: [" / ".join(slot) for slot in slots] for mid, slots in fields.items()}
+
+
 def evidence_table(rep: DeterministicReport, show: list[str],
                    specs_by_id: dict[str, MetricSpec]) -> tuple[Table, list[str]]:
-    """Provenance for the metrics behind the report. Returns (table, hidden metric ids).
+    """Provenance for the metrics behind a SINGLE-airport report. Returns (table, hidden metric ids).
 
-    A `Metric` carries no airport, so the airport column appears only when the report covers exactly one
-    airport. With several airports use `comparison_table` for per-airport values — guessing which metric
-    belongs to which airport would be inventing data.
+    A `Metric` carries no airport, so per-metric value rows are only honest when the report covers
+    exactly one airport. Multi-airport reports get their values AND provenance from
+    `comparison_table` (one row per metric, one column per airport) — this returns an empty table
+    for them so nothing ambiguous is ever rendered.
     """
     order: list[str] = []
     for metric in rep.evidence:
         if metric.id not in order:
             order.append(metric.id)
     matched = [m for m in show if m in order]
-    unmatched = [m for m in show if m not in order]
     shown = matched or list(order)  # ids we do not have must never collapse the evidence to nothing
     hidden = [m for m in order if m not in shown]
-    single = rep.rows[0].ref.iata if len(rep.rows) == 1 else None
-    columns = ["metric", *(["airport"] if single else []), *METRIC_PROVENANCE_COLUMNS]
-    rows = [[_label(metric.id, specs_by_id), *([single] if single else []), *_metric_row(metric)]
-            for metric_id in shown for metric in rep.evidence if metric.id == metric_id]
-    footnotes = [] if single else ["Values are per metric across the airports in the report; see the "
-                                   "comparison table for per-airport values."]
+    if len(rep.rows) != 1:
+        return Table(title="Evidence", columns=[], rows=[], footnotes=[]), hidden
+    single = rep.rows[0].ref.iata
+    rows = [[_metric_name(metric.id, specs_by_id), *_metric_row(metric)]
+            for metric_id in shown for metric in rep.evidence
+            if metric.id == metric_id and metric.value is not None]
+    skipped = sum(1 for metric_id in shown for m in rep.evidence
+                  if m.id == metric_id and m.value is None)
+    footnotes = []
     if hidden:
-        footnotes.append(f"{len(hidden)} further metrics collected but not shown: {', '.join(hidden)}.")
-    if unmatched:
-        footnotes.append(f"Requested metrics not in this report, so everything is shown: "
-                         f"{', '.join(unmatched)}.")
-    return Table(title=f"Evidence — {len(shown)} of {len(order)} metrics", columns=columns, rows=rows,
-                 footnotes=footnotes), hidden
+        footnotes.append(f"{len(hidden)} further metrics were collected but are not shown.")
+    if skipped:
+        footnotes.append(f"{skipped} metrics have no value for this airport and are not shown.")
+    return Table(title=f"Evidence — {single}", columns=["metric", *METRIC_PROVENANCE_COLUMNS],
+                 rows=rows, footnotes=footnotes), hidden
 
 
 def comparison_table(rep: DeterministicReport, specs_by_id: dict[str, MetricSpec]) -> Table:
-    """Side-by-side values per airport, plus the percentile within the peer group when the report has it."""
+    """One row per metric, one value column per airport, with provenance on every row.
+
+    Rows where no airport has a value are hidden (counted in a footnote). Percentile columns appear
+    when the report carries them.
+    """
     comparison = rep.comparison or {}
     iatas = [row.ref.iata for row in sorted(rep.rows, key=lambda r: r.rank)]
     if not iatas:
         iatas = sorted({iata for values in comparison.values() for iata in values})
     percentiles = rep.percentiles or {}
-    columns = ["metric", "name", "unit", *iatas, *([f"pct {i}" for i in iatas] if percentiles else [])]
+    provenance = _provenance_by_id(rep)
+    columns = ["metric", "unit", *iatas,
+               *([f"percentile {i}" for i in iatas] if percentiles else []),
+               "time period", "period end", "source", "data as of"]
     rows = []
+    hidden_empty = 0
     for metric_id, values in comparison.items():
+        airport_values = [values.get(iata) for iata in iatas]
+        if all(v is None for v in airport_values):
+            hidden_empty += 1
+            continue
         spec = specs_by_id.get(metric_id)
-        row: list[Any] = [metric_id, spec.name if spec else metric_id, spec.unit if spec else ""]
-        row += [values.get(iata) for iata in iatas]
+        row: list[Any] = [_metric_name(metric_id, specs_by_id), spec.unit if spec else ""]
+        row += airport_values
         if percentiles:
             row += [percentiles.get(metric_id, {}).get(iata) for iata in iatas]
+        row += provenance.get(metric_id, [rep.horizon, "", "", ""])
         rows.append(row)
-    return Table(title=f"Comparison — horizon {rep.horizon} (percentiles within {rep.peer_group})",
-                 columns=columns, rows=rows, footnotes=[])
+    footnotes = ["Percentiles are within the peer group (0 = lowest, 1 = highest)."] if percentiles else []
+    if hidden_empty:
+        footnotes.append(f"{hidden_empty} metrics have no value for these airports and are not shown.")
+    return Table(title=f"Comparison — time period {rep.horizon}",
+                 columns=columns, rows=rows, footnotes=footnotes)
 
 
 def specialist_ranking_table(rep: SpecialistReport) -> Table | None:
@@ -119,13 +181,14 @@ def _route_tables(result: dict[str, Any]) -> list[Table]:
     band_rows = [[kind, *[(bands.get(kind) or {}).get(band) for band in BANDS]] for kind in bands]
     shares = result.get("long_haul_share") or {}
     share_rows = [[kind, metric.get("value"), metric.get("unit"), metric.get("period_end"),
-                   metric.get("source_id"), metric.get("vintage")] for kind, metric in shares.items()]
+                   source_name(metric.get("source_id")), metric.get("vintage")]
+                  for kind, metric in shares.items()]
     footnotes = [convention] if convention else []
     return [
         Table(title=f"Distance bands — {iata} ({horizon})", columns=["kind", *BANDS], rows=band_rows,
               footnotes=list(footnotes)),
         Table(title=f"Long-haul share — {iata} ({horizon})",
-              columns=["kind", "share", "unit", "period_end", "source", "vintage"], rows=share_rows,
+              columns=["kind", "share", "unit", "period end", "source", "data as of"], rows=share_rows,
               footnotes=list(footnotes)),
     ]
 
@@ -135,8 +198,8 @@ def _profile_tables(result: dict[str, Any], specs_by_id: dict[str, MetricSpec]) 
     tables: list[Table] = []
     for horizon, metrics in (result.get("metrics") or {}).items():
         present = [m for m in metrics if m.get("value") is not None]
-        rows = [[_label(m["id"], specs_by_id), m.get("value"), m.get("unit"), m.get("horizon"),
-                 m.get("period_end"), m.get("source_id"), m.get("vintage")] for m in present]
+        rows = [[_metric_name(m["id"], specs_by_id), m.get("value"), m.get("unit"), m.get("horizon"),
+                 m.get("period_end"), source_name(m.get("source_id")), m.get("vintage")] for m in present]
         missing = len(metrics) - len(present)
         footnotes = [f"{missing} metrics have no value at this airport/horizon."] if missing else []
         tables.append(Table(title=f"Metrics — {iata} ({horizon})",
@@ -159,15 +222,18 @@ def _airports_table(result: dict[str, Any]) -> Table:
                         a.get("hub_size")] for a in airports], footnotes=footnotes)
 
 
-def _simple_tables(tool: str, result: dict[str, Any]) -> list[Table]:
+def _simple_tables(tool: str, result: dict[str, Any],
+                   specs_by_id: dict[str, MetricSpec]) -> list[Table]:
     if tool == "find_airports":
         return [_airports_table(result)]
     if tool == "get_metric_series":
         series = result.get("series") or []
-        title = f"Series — {result.get('iata', '?')} {result.get('metric_id', '?')}"
-        return [Table(title=title, columns=["period_end", "value", "unit", "horizon", "source", "vintage"],
+        title = f"Series — {result.get('iata', '?')} {_metric_name(result.get('metric_id', '?'), specs_by_id)}"
+        return [Table(title=title,
+                      columns=["period end", "value", "unit", "time period", "source", "data as of"],
                       rows=[[m.get("period_end"), m.get("value"), m.get("unit"), m.get("horizon"),
-                             m.get("source_id"), m.get("vintage")] for m in series], footnotes=[])]
+                             source_name(m.get("source_id")), m.get("vintage")] for m in series],
+                      footnotes=[])]
     if tool == "get_live_status":
         rows = [["delay programs", ", ".join(result.get("delay_programs") or []) or "none"],
                 ["ground stop", result.get("ground_stop")], ["closure", result.get("closure")],
@@ -186,9 +252,10 @@ def _simple_tables(tool: str, result: dict[str, Any]) -> list[Table]:
         rows = []
         for source in sources:
             period = f"{source.get('period_start') or '?'} to {source.get('period_end') or '?'}"
-            rows.append([source.get("source_id"), source.get("description"), period, source.get("fetched_at")])
+            rows.append([source_name(source.get("source_id")), source.get("description"), period,
+                         source.get("fetched_at")])
         return [Table(title=f"Sources ({len(sources)})",
-                      columns=["source_id", "description", "period", "fetched_at"], rows=rows, footnotes=[])]
+                      columns=["source", "description", "period", "fetched at"], rows=rows, footnotes=[])]
     scalars = [[k, v] for k, v in result.items()
                if k not in ("provenance", "truncated")
                and isinstance(v, str | int | float | bool | type(None))]
@@ -215,7 +282,7 @@ def tool_result_tables(tool: str, result: dict[str, Any],
         return _route_tables(result)
     if tool == "get_profile":
         return _profile_tables(result, specs_by_id)
-    return _simple_tables(tool, result)
+    return _simple_tables(tool, result, specs_by_id)
 
 
 def citations_from(metrics: list[Metric], provenance: list[dict]) -> list[Citation]:

@@ -2,7 +2,9 @@
 # Add Groq / NVIDIA NIM later by appending entries; the first entry is primary, later ones are fallbacks.
 providers:
   - name: gemini
-    model: gemini/gemini-2.5-flash
+    # gemini-2.5-flash was retired for new accounts (404, verified 2026-08-16); the -latest
+    # alias is Google-maintained and always points at a currently-served flash model.
+    model: gemini/gemini-flash-latest
     api_key_env: GEMINI_API_KEY
     rpm: 10
     max_retries: 2

@@ -183,9 +183,8 @@ class Synthesizer:
             evidence, hidden = evidence_table(deterministic, synthesis.show_metrics, self.by_id)
             if evidence.rows:
                 tables.append(evidence)
-            if tables and deterministic.explanation:
-                # the templated, formula-driven explanation is rendered verbatim with the table it explains
-                tables[0].footnotes.insert(0, deterministic.explanation)
+            # QA 2026-08-16: the templated explanation is no longer appended below the first table
+            # (poor placement); it still backs the fallback headline and the LLM synthesis input.
             assumptions.extend(self._report_assumptions(req, deterministic))
             notes.extend(self._report_notes(deterministic))
         elif req is not None:
@@ -210,7 +209,8 @@ class Synthesizer:
 
         if hidden:
             reason = synthesis.hidden_reason or "not central to the question"
-            notes.append(f"{len(hidden)} metrics collapsed ({', '.join(hidden)}): {reason}")
+            names = ", ".join(self.by_id[m].name if m in self.by_id else m for m in hidden)
+            notes.append(f"{len(hidden)} metrics not shown ({names}): {reason}")
         if defaults:
             assumptions.append("UI defaults applied: "
                                + ", ".join(f"{k}={v}" for k, v in defaults.items() if v))

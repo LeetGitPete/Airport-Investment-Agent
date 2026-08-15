@@ -47,34 +47,44 @@ def test_ranking_table_row_per_report_row_with_pillar_columns(fake_analyst):
     assert ranks == sorted(ranks)
 
 
-def test_evidence_table_keeps_show_order_and_reports_hidden(fake_analyst, by_id):
+def test_evidence_table_is_empty_for_multi_airport_reports_but_still_reports_hidden(fake_analyst, by_id):
+    # A multi-airport evidence Metric carries no airport: values+provenance render via the
+    # comparison table instead, so nothing ambiguous is ever shown (QA standard 2026-08-16).
     rep = _rank_report(fake_analyst)
     table, hidden = evidence_table(rep, ["taxi_out_p80_min", "load_factor"], by_id)
-    shown = [row[table.columns.index("metric")] for row in table.rows]
-    assert shown[0].startswith("taxi_out_p80_min") and any(s.startswith("load_factor") for s in shown)
+    assert table.rows == []
     assert "avg_dep_delay_min" in hidden and "load_factor" not in hidden
-    assert "airport" not in table.columns  # three airports: no airport column (evidence carries no iata)
-    for column in ("value", "unit", "horizon", "period_end", "source", "vintage"):
-        assert column in table.columns
 
 
-def test_evidence_table_labels_the_airport_when_report_has_one(fake_analyst, by_id):
+def test_evidence_table_single_airport_uses_user_names_and_labels(fake_analyst, by_id):
     req = AnalysisRequest(question_type="diagnose", airports=["SFO"], horizons=["12m"])
     rep = fake_analyst.diagnose(req)
     table, _ = evidence_table(rep, [], by_id)
-    assert "airport" in table.columns
-    assert {row[table.columns.index("airport")] for row in table.rows} == {"SFO"}
+    assert table.title == "Evidence — SFO"
+    for column in ("value", "unit", "time period", "period end", "source", "data as of"):
+        assert column in table.columns
+    names = [row[table.columns.index("metric")] for row in table.rows]
+    assert names and all("_" not in n for n in names)  # user-facing names, never internal ids
+    assert all(row[table.columns.index("value")] is not None for row in table.rows)
 
 
-def test_comparison_table_has_a_column_per_airport_with_report_values(fake_analyst, by_id):
+def test_comparison_table_row_per_metric_with_airport_columns_and_provenance(fake_analyst, by_id):
     rep = _compare_report(fake_analyst)
     table = comparison_table(rep, by_id)
     for iata in ("SFO", "LAX"):
-        assert iata in table.columns and f"pct {iata}" in table.columns
+        assert iata in table.columns and f"percentile {iata}" in table.columns
+    for column in ("time period", "source", "data as of"):
+        assert column in table.columns
+    names = {by_id[m].name: m for m in rep.comparison}
     for row in table.rows:
-        metric_id = row[table.columns.index("metric")]
+        metric_id = names[row[table.columns.index("metric")]]  # user-facing name resolves to an id
         for iata in ("SFO", "LAX"):
             assert row[table.columns.index(iata)] == rep.comparison[metric_id][iata]
+    shown_ids = {names[row[table.columns.index("metric")]] for row in table.rows}
+    all_none = {m for m, values in rep.comparison.items() if all(v is None for v in values.values())}
+    assert shown_ids == set(rep.comparison) - all_none  # all-None rows are hidden, not silently lost
+    if all_none:
+        assert any("not shown" in note for note in table.footnotes)
 
 
 def test_route_stats_gives_bands_and_long_haul_tables(registry, by_id):
