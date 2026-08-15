@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from airport_agent.contracts.models import AirportFilter, Horizon, PeerGroup
 
@@ -33,6 +33,13 @@ class AnalysisRequest(BaseModel):
     specialist: SpecialistName | None = None
     extended: ExtendedOptions | None = None
 
+    @field_validator("airports", mode="before")
+    @classmethod
+    def _upper_airports(cls, v: list[str] | None) -> list[str] | None:
+        if not isinstance(v, list):
+            return v
+        return [s.strip().upper() if isinstance(s, str) else s for s in v]
+
     @model_validator(mode="after")
     def _target(self) -> AnalysisRequest:
         if not self.airports and self.filter is None:
@@ -53,4 +60,6 @@ def truncate_hint(req: AnalysisRequest) -> tuple[AnalysisRequest, bool]:
     limit = hint_limit(req)
     if len(req.hint) <= limit:
         return req, False
+    # model_copy(update=...) does not re-run validators. That is acceptable here because
+    # no validator on AnalysisRequest depends on `hint` (only on airports/filter/question_type).
     return req.model_copy(update={"hint": req.hint[:limit]}), True

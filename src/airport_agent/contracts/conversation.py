@@ -1,7 +1,7 @@
 """Concierge-facing types: Plan, Answer, session memory."""
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -77,4 +77,6 @@ class SessionState(BaseModel):
     last_airports: list[str] = Field(default_factory=list)
     last_filters: dict[str, Any] = Field(default_factory=dict)
     last_preset: str | None = None
-    last_reports: dict[str, DeterministicReport | SpecialistReport] = Field(default_factory=dict)
+    last_reports: dict[
+        str, Annotated[DeterministicReport | SpecialistReport, Field(discriminator="report_type")]
+    ] = Field(default_factory=dict)

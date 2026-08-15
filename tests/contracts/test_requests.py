@@ -17,6 +17,16 @@ def test_analysis_request_defaults():
     assert r.horizons == ["5y"] and r.hint == "" and r.specialist is None and r.extended is None
 
 
+def test_analysis_request_normalizes_airports():
+    r = AnalysisRequest(question_type="rank", airports=["bos", " sfo "])
+    assert r.airports == ["BOS", "SFO"]
+
+
+def test_analysis_request_airports_rejects_non_string_items():
+    with pytest.raises(ValidationError):
+        AnalysisRequest(question_type="rank", airports=[None])
+
+
 def test_analysis_request_needs_airports_or_filter():
     with pytest.raises(ValidationError):
         AnalysisRequest(question_type="compare")
@@ -31,6 +41,14 @@ def test_hint_truncation_default_and_general():
     assert cut2 and len(r2.hint) == MAX_HINT_CHARS_GENERAL
     r3, cut3 = truncate_hint(AnalysisRequest(question_type="rank", airports=["BOS"], hint="short"))
     assert not cut3 and r3.hint == "short"
+
+
+def test_truncated_hint_round_trips_through_validation():
+    long = "x" * 1000
+    r, cut = truncate_hint(AnalysisRequest(question_type="diagnose", airports=["SFO"], hint=long))
+    assert cut
+    round_tripped = AnalysisRequest.model_validate(r.model_dump())
+    assert len(round_tripped.hint) == MAX_HINT_CHARS
 
 
 def test_custom_requires_general_specialist():
@@ -64,3 +82,17 @@ def test_plan_answer_session():
     s = SessionState(session_id="s1", title="test")
     s.messages.append(ChatMessage(role="user", content="hi"))
     assert a.headline and s.last_reports == {} and s.messages[0].role == "user"
+
+
+def test_session_state_last_reports_discriminates_report_types():
+    d = DeterministicReport(question_type="rank", preset=None, weights={"P1": 0.35}, horizon="5y",
+                            peer_group="hub_class", rows=[], comparison=None, evidence=[], explanation="…",
+                            caveats=[])
+    s = SpecialistReport(specialist="expansion_analyst", question_type="rank", ranking=[], narrative="…",
+                         evidence=[], agreement=None, disagreements=[], confidence=0.6, assumptions=[], caveats=[],
+                         hint_truncated=False)
+    session = SessionState(session_id="s1", title="test", last_reports={"deterministic": d, "specialist": s})
+    dumped = session.model_dump(mode="json")
+    restored = SessionState.model_validate(dumped)
+    assert isinstance(restored.last_reports["deterministic"], DeterministicReport)
+    assert isinstance(restored.last_reports["specialist"], SpecialistReport)

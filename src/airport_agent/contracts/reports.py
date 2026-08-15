@@ -1,6 +1,8 @@
 """Outputs of the two analytical engines."""
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from airport_agent.contracts.models import AirportRef, Horizon, Metric, PeerGroup
@@ -20,6 +22,7 @@ class ScoreRow(BaseModel):
 
 class DeterministicReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    report_type: Literal["deterministic"] = "deterministic"
     question_type: QuestionType
     preset: str | None
     weights: dict[str, float]
@@ -42,6 +45,7 @@ class RankedItem(BaseModel):
 
 class SpecialistReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    report_type: Literal["specialist"] = "specialist"
     specialist: str
     question_type: QuestionType
     ranking: list[RankedItem] | None
