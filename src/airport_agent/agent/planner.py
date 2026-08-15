@@ -135,6 +135,15 @@ class PlannedToolCall(BaseModel):
     tool: str
     args_json: str = "{}"
 
+    def args(self) -> dict[str, Any]:
+        """This call's arguments. Unparseable or non-object JSON yields {} — the tool then reports the
+        missing required argument itself, which is how the model self-corrects."""
+        try:
+            parsed = json.loads(self.args_json)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+
 
 class PlanFilters(BaseModel):
     """Validated view of `Plan.filters` (which the frozen contract types as a plain dict)."""
@@ -160,16 +169,10 @@ class PlanFilters(BaseModel):
         return [s.strip().upper() if isinstance(s, str) else s for s in v]
 
     def args_for(self, tool: str) -> dict[str, Any]:
-        """Arguments planned for `tool`. Unparseable or non-object JSON yields {} — the tool then reports the
-        missing required argument itself, which is how the model self-corrects."""
+        """Arguments planned for the first call of `tool` ({} when it was not planned or the JSON was bad)."""
         for call in self.tool_calls:
-            if call.tool != tool:
-                continue
-            try:
-                args = json.loads(call.args_json)
-            except json.JSONDecodeError:
-                return {}
-            return args if isinstance(args, dict) else {}
+            if call.tool == tool:
+                return call.args()
         return {}
 
 
@@ -178,17 +181,28 @@ def _unset(value: Any) -> str | None:
     return None if value in (None, "", NONE) else str(value)
 
 
-def _targets(filters: PlanFilters) -> str:
-    if filters.airports:
-        return ", ".join(filters.airports)
+def _target_text(airports: list[str], states: list[str], faa_regions: list[str],
+                 hub_sizes: list[str]) -> str:
+    if airports:
+        return ", ".join(airports)
     parts = []
-    if filters.faa_regions:
-        parts.append("region " + ",".join(filters.faa_regions))
-    if filters.states:
-        parts.append("states " + ",".join(filters.states))
-    if filters.hub_sizes:
-        parts.append("hub " + ",".join(filters.hub_sizes))
+    if faa_regions:
+        parts.append("region " + ",".join(faa_regions))
+    if states:
+        parts.append("states " + ",".join(states))
+    if hub_sizes:
+        parts.append("hub " + ",".join(hub_sizes))
     return " ".join(parts) or "—"
+
+
+def _targets(filters: PlanFilters) -> str:
+    return _target_text(filters.airports, filters.states, filters.faa_regions, list(filters.hub_sizes))
+
+
+def _request_targets(req: AnalysisRequest) -> str:
+    f = req.filter
+    return _target_text(list(req.airports or []), list(f.states) if f else [],
+                        list(f.faa_regions) if f else [], list(f.hub_sizes) if f else [])
 
 
 def _default_horizon(question_type: QuestionType, preset: str | None) -> Horizon:
@@ -397,8 +411,18 @@ class Planner:
                                hint=filters.hint, specialist=plan.specialist)
 
     @staticmethod
-    def plan_line(plan: Plan, filters: PlanFilters) -> str:
-        """The one-line plan shown to the user before execution (design 03 §Presentation)."""
+    def plan_line(plan: Plan, filters: PlanFilters, req: AnalysisRequest | None = None) -> str:
+        """The one-line plan shown to the user before execution (design 03 §Presentation).
+
+        With a resolved `AnalysisRequest` the line shows what will actually run (horizon, preset and peer
+        group after defaults and engine rules), so the user is never shown a plan the engines did not get.
+        """
+        engines = ", ".join(plan.engines) or "none"
+        if req is not None:
+            return (f"How I'm approaching this: {plan.intent} · {req.question_type} · "
+                    f"{_request_targets(req)} · horizon {', '.join(req.horizons) or '-'} · "
+                    f"preset {req.scoring_preset or 'engine default'} · "
+                    f"peers {req.peer_group or 'hub_class'} · engines: {engines}")
         return (f"How I'm approaching this: {plan.intent} · {filters.question_type or 'lookup'} · "
                 f"{_targets(filters)} · horizon {', '.join(filters.horizons) or '-'} · "
-                f"preset {filters.scoring_preset or '-'} · engines: {', '.join(plan.engines) or 'none'}")
+                f"preset {filters.scoring_preset or '-'} · engines: {engines}")

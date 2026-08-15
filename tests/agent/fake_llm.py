@@ -16,6 +16,9 @@ from airport_agent.contracts import LLMResult
 class ScriptedLLM:
     """contracts.LLMClient double driven by a fixed script of responses."""
 
+    #: LiteLLMClient exposes the active provider; callers (Concierge trace) read it, so the double has one.
+    provider_name = "fake"
+
     def __init__(self, script: list[LLMResult | dict | str | Exception]) -> None:
         self._script = list(script)
         self.calls: list[dict[str, Any]] = []
