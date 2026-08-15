@@ -1,0 +1,72 @@
+<!-- DTD for the testfly.faa.gov XML Airport Status page, which is available at                  -->
+        <!-- http://testfly.faa.gov/flyfaa/xmlAirportStatus.jsp                                          -->
+        <!-- 2.2  12/16/13 Corrected spec for FCA_Data element (1 per CTOP) and added FCA element        -->
+        <!-- 2.2           FCA element quantity is 1 or more; FCA_Name added in FCA element              -->
+        <!-- 2.1  11/19/12 Moved the CTOP Avg to the CTOP element                                        -->
+        <!-- 2.0  11/12/12 Added CTOP as a Delay_type                                                    -->
+        <!-- 1.2  03/30/06 Lat and Long made into attributes of the Point and Center tags.               -->
+        <!-- 1.1  03/15/06 Added the Delay_type called Airspace_Flow_List per ETMS 8.2 AFP Requirements  -->
+        <!-- 1.0  06/09/03 Created                                                                       -->
+
+        <!ELEMENT AIRPORT_STATUS_INFORMATION (Update_Time, Dtd_File, Delay_type*)>
+        <!ELEMENT Delay_type (Name,(CTOP_List|Airport_Closure_List|Ground_Stop_List|Ground_Delay_List|Airspace_Flow_List|Arrival_Departure_Delay_List))>
+
+        <!ELEMENT CTOP_List                    (CTOP+)>
+        <!ELEMENT CTOP                         (Program_Name, Reason, CTOP_Start_Time, CTOP_End_Time, Avg, FCA_Data)>
+        <!ELEMENT FCA_Data                     (FCA+)>
+        <!ELEMENT FCA                          (FCA_Name, FCA_Start_DateTime, FCA_End_DateTime, (Line|Polygon|Circle), Floor, Ceiling)>
+
+        <!ELEMENT Airport_Closure_List         (Airport*)>
+        <!ELEMENT Airport                      (ARPT, Reason, Start, Reopen)>
+
+        <!ELEMENT Ground_Stop_List             (Program*)>
+        <!ELEMENT Program                      (ARPT, Reason, End_Time)>
+
+        <!ELEMENT Ground_Delay_List            (Ground_Delay*)>
+        <!ELEMENT Ground_Delay                 (ARPT, Reason, Avg, Max)>
+
+        <!ELEMENT Airspace_Flow_List           (Airspace_Flow*)>
+        <!ELEMENT Airspace_Flow                (CTL_Element, Reason, FCA_Start_DateTime, FCA_End_DateTime, AFP_StartTime, AFP_EndTime, (Line|Polygon|Circle), Avg, Floor, Ceiling)>
+
+        <!ELEMENT Line                         (Point,Point+)>
+        <!ELEMENT Polygon                      (PointsList)>
+        <!ELEMENT Circle                       (Center)>
+        <!ELEMENT PointsList                   (Point,Point+)>
+        <!ELEMENT Center                       EMPTY>
+        <!ELEMENT Point                        EMPTY>
+        <!ATTLIST Point Lat                    CDATA #REQUIRED>
+        <!ATTLIST Point Long                   CDATA #REQUIRED>
+        <!ATTLIST Center Lat                   CDATA #REQUIRED>
+        <!ATTLIST Center Long                  CDATA #REQUIRED>
+        <!ATTLIST Circle Radius                CDATA #REQUIRED>
+
+        <!ELEMENT Arrival_Departure_Delay_List (Delay*)>
+        <!ELEMENT Delay                        (ARPT, Reason, Arrival_Departure, Arrival_Departure?)>
+
+        <!ELEMENT Arrival_Departure            (Min, Max, Trend)>
+        <!ATTLIST Arrival_Departure Type       (Arrival|Departure) #REQUIRED>
+
+        <!ELEMENT Update_Time                  (#PCDATA)>
+        <!ELEMENT Dtd_File                     (#PCDATA)>
+
+        <!ELEMENT AFP_EndTime                  (#PCDATA)>
+        <!ELEMENT AFP_StartTime                (#PCDATA)>
+        <!ELEMENT ARPT                         (#PCDATA)>
+        <!ELEMENT Avg                          (#PCDATA)>
+        <!ELEMENT Ceiling                      (#PCDATA)>
+        <!ELEMENT CTL_Element                  (#PCDATA)>
+        <!ELEMENT CTOP_End_Time                (#PCDATA)>
+        <!ELEMENT CTOP_Start_Time              (#PCDATA)>
+        <!ELEMENT End_Time                     (#PCDATA)>
+        <!ELEMENT FCA_End_DateTime             (#PCDATA)>
+        <!ELEMENT FCA_Name                     (#PCDATA)>
+        <!ELEMENT FCA_Start_DateTime           (#PCDATA)>
+        <!ELEMENT Floor                        (#PCDATA)>
+        <!ELEMENT Max                          (#PCDATA)>
+        <!ELEMENT Min                          (#PCDATA)>
+        <!ELEMENT Name                         (#PCDATA)>
+        <!ELEMENT Program_Name                 (#PCDATA)>
+        <!ELEMENT Reason                       (#PCDATA)>
+        <!ELEMENT Reopen                       (#PCDATA)>
+        <!ELEMENT Start                        (#PCDATA)>
+        <!ELEMENT Trend                        (#PCDATA)>

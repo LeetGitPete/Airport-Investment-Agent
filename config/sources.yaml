@@ -1,0 +1,137 @@
+# Source registry for the data layer. Verified URLs per
+# docs/research/2026-08-15-us-aviation-data-sources.md (2026-08-15).
+# `kind: live` = queried live by DuckDBDataService at read time (with fallback to
+# the snapshot); `kind: bulk` = downloaded/refreshed into the snapshot by
+# `python -m airport_agent.data refresh`.
+# `cadence_days` = expected publication cadence, used by `refresh --check` staleness.
+
+ourairports:
+  kind: bulk
+  url: https://davidmegginson.github.io/ourairports-data/airports.csv
+  cadence_days: 1
+  description: OurAirports airports + runways (public domain, rebuilt nightly)
+  notes: "Runways file: https://davidmegginson.github.io/ourairports-data/runways.csv"
+
+faa_taf:
+  kind: bulk
+  url: https://taf.faa.gov/Downloads/APO100_TAF_Final_2025.zip
+  cadence_days: 365
+  description: FAA Terminal Area Forecast — Enplanements.xlsx, AirportsOperations.xlsx, Airports.xlsx (1976-2055)
+  notes: "Verified 2026-08-15: `scenario` 0 = actual (<= 2024), 1 = forecast (>= 2025, the TAF 2025 base year). Enplanements.xlsx has no total column — total = aac+aat+commuter+us_flag+frgn_flag. ops_total = itn_Ac+itn_at+itn_ga+itn_mil+loc_ga+loc_mil (tot_overs = overflights, excluded). HUB_SIZE is numeric 3/2/1/0 = large/medium/small/nonhub; `locid` is space-padded to 4 chars. Operations start in 1990, enplanements in 1976."
+
+faa_npias:
+  kind: bulk
+  url: https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/npias/current/ARP-NPIAS-2025-2029-AppendixA.xlsx
+  cadence_days: 730
+  description: FAA NPIAS 2025-2029 Appendix A — hub class, enplanements, 5y development estimate
+  notes: "Verified 2026-08-15: sheet `All NPIAS Airports` (3,287 x 11); headers contain embedded newlines (`Hub
+(FY25)`, `Enplaned
+(CY23/FY25)`, `Development
+Estimate
+2025-2029`) - collapse whitespace before lookup. `Hub (FY25)` is L/M/S/N for 390 primary airports, empty for the rest. Capacity labels are NOT in Appendix A: they come from data/curated/npias_capacity_lists.yaml (Figure 1 of ARP-NPIAS-2025-2029-Narrative.pdf, p.9). Page has a malformed href with leading space - strip whitespace if scraping."
+
+bts_socrata:
+  kind: bulk
+  url: https://data.bts.gov/resource/r495-tyji.json
+  cadence_days: 30
+  description: BTS Socrata REST API — T-100 Segment Summary by Origin Airport (monthly, 2014-present)
+  notes: "Verified 2026-08-15: all numerics stored as text regardless of SoQL cast (Socrata always
+    JSON-serializes numbers as strings) - normalize always re-casts client-side. Real field names differ
+    from the research note: origin_airport_code, year, reporting_month (calendar_date), total_departures,
+    total_passengers, total_seats, domestic_passengers, outbound_international_1 (= outbound intl
+    passengers), inbound_international_1 (= inbound intl passengers). load_factor is computed as
+    total_passengers/total_seats, not read from the vendor's total_load_factor column. min(year)=2014,
+    max(year)=2026 (2026-04 latest), ~131,700 rows, 3 pages at $limit=50000."
+
+bts_t100:
+  kind: bulk
+  url: https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FIM&QO_fu146_anzr=Nv4%20Pn44vr45
+  cadence_days: 90
+  description: BTS T-100 Domestic Segment (form POST; FIM = Domestic Segment) — route-level, all carriers incl. cargo
+  notes: "Verified 2026-08-16: ASP.NET form works as documented (GET for __VIEWSTATE/__VIEWSTATEGENERATOR/
+    __EVENTVALIDATION, POST back to the same URL with cboGeography=All, cboYear, cboPeriod (month 1-12 or
+    'All'), chkAllVars=on, chkDownloadZip=on, btnDownload=Download) - the ASP.NET session cookie from the
+    GET MUST be replayed on the POST (reuse one httpx.Client) or the POST just re-renders the form page.
+    Publication lag ~3 months (2026-05 latest as of 2026-08-16). Domestic only: International Segment table
+    code not found after a 15-min probe of FIL/FIH/FIS/FIT/FIN/FIQ/FIP/FIO/FIC/FIB/FID/FGH/FGJ-FGQ/FMG (all
+    302 to /Homepage.asp, i.e. invalid gnoyr_VQ); bts_socrata's outbound/inbound international totals are
+    the fallback (no route-level intl detail). See known-limitations row 2."
+
+bts_otp:
+  kind: bulk
+  url: https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_{YYYY}_{M}.zip
+  cadence_days: 60
+  description: BTS On-Time Performance monthly zip — delay, taxi, cancellation, and delay-cause minutes
+  notes: "RESCOPE 2026-08-16: otp_months=12 (trailing 12 months only, not 36) so the 3y/5y delay
+    horizons (pct_arr_delay_gt15, avg_dep_delay_min) are None rather than dishonestly labelled.
+    Verified 2026-08-16: every column name matches the research note exactly; Cancelled/Diverted/
+    ArrDel15 are 0.0/1.0 floats; CRSDepTime/CRSArrTime are HHMM ints (range 1-2359, no 2400 seen);
+    TaxiOut and the delay-cause columns are NaN for cancelled flights. Publication lag ~2 months
+    (2026-06 latest as of 2026-08-16); covers passenger carriers >=0.5% of domestic revenue,
+    contiguous-48 only (undercounts ANC and cargo). Aggregated to airport-month at ingest; no
+    row-level data is stored."
+  otp_months: 12
+
+bts_delay_cause:
+  kind: bulk
+  url: https://www.transtats.bts.gov/OT_Delay/ot_delaycause1.asp
+  cadence_days: 60
+  description: BTS Airline On-Time Statistics and Delay Causes — airport x carrier monthly delay-cause minutes, 2003-present
+  notes: "Download Raw Data form; timeboxed automation attempt (Task 9)"
+
+census_cbsa:
+  kind: bulk
+  url: https://www2.census.gov/programs-surveys/popest/datasets/2020-2025/metro/totals/cbsa-est2025-alldata.csv
+  cadence_days: 365
+  description: Census Bureau CBSA population estimates (metro area population by year)
+  notes: "RESCOPE 2026-08-16: population + gazetteer centroids only, no BEA (cbsa_population/
+    cbsa_pop_cagr_5y metrics only; catchment.gdp_real_usd is always None). Verified 2026-08-16:
+    2025 path confirmed live (200); also fetches the non-overlapping 2010-2019 vintage
+    (cbsa-est2019-alldata.csv) for history. latin-1 encoded. LSAD=='Metropolitan Statistical
+    Area' alone is not enough to isolate one row per metro - a Metropolitan Division sub-row
+    shares the same LSAD and CBSA code as its parent; filter on MDIV.isna() too. Centroids:
+    https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/2024_Gaz_cbsa_national.zip
+    (tab-separated; CBSA_TYPE==1 for Metro, 2 for Micro; GEOID matches the population file's
+    CBSA code). Airport->CBSA: nearest metro centroid within 100mi (see known-limitations row 32)."
+
+bea_msa:
+  kind: bulk
+  url: https://apps.bea.gov/regional/zip/MARPP.zip
+  cadence_days: 365
+  description: BEA MSA regional economic accounts (real GDP by MSA) bulk zip, keyless
+  notes: "Verify contains real GDP (chained $) by MSA, not personal income; else use MAGDP family at https://apps.bea.gov/regional/zip/"
+
+faa_cats:
+  kind: bulk
+  url: https://cats.airports.faa.gov/reports/form_127_all_airports/?year=&hub_size=
+  cadence_days: 365
+  description: FAA CATS Form 127 — airport financials (CPE line 16.5, non-aero revenue, enplanements), self-reported/unaudited
+  notes: "Queryable per year/hub_size (L/M/S/N); verify HTML/CSV/xlsx response format"
+
+faa_aip:
+  kind: bulk
+  url: https://www.faa.gov/airports/aip/grant_histories
+  cadence_days: 365
+  description: FAA Airport Improvement Program grant histories (per-FY xlsx, LocID + Total Amount)
+  notes: "FY2021+ URLs must be scraped from this listing page (undated paths); e.g. FY_2025_AIP_Grants.xlsx"
+
+faa_nasstatus:
+  kind: live
+  url: https://nasstatus.faa.gov/api/airport-status-information
+  cadence_days: 0
+  description: FAA NAS Status — live ground stops/ground delays/closures (XML, no auth)
+  notes: "3s timeout; error/timeout -> None with a data-quality note. Sibling /ground-stops, /ground-delays endpoints 503."
+
+curated:
+  kind: bulk
+  url: data/curated/airport_facts.yaml
+  cadence_days: 0
+  description: Hand-curated per-airport facts and tier-B inputs (gates, declared VMC/IMC rates, slot/cap flags, projects)
+  notes: "Local YAML, not a network source; each fact/input carries its own source_url + as_of. cadence_days=0 = refreshed only on manual edit."
+
+bts_db1b:
+  kind: bulk
+  url: https://www.bts.gov/topics/airlines-and-airports/origin-and-destination-survey-data-product
+  cadence_days: 90
+  description: BTS DB1B / OD-40 Origin & Destination Survey — O&D vs connecting passenger share
+  notes: "Timeboxed attempt (design 01 open item); form POST, large quarterly files, one recent year. If it does not land, od_share is left absent and logged in known-limitations-and-tradeoffs.md."
