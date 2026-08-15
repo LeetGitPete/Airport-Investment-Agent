@@ -1,0 +1,105 @@
+# Source registry for the data layer. Verified URLs per
+# docs/research/2026-08-15-us-aviation-data-sources.md (2026-08-15).
+# `kind: live` = queried live by DuckDBDataService at read time (with fallback to
+# the snapshot); `kind: bulk` = downloaded/refreshed into the snapshot by
+# `python -m airport_agent.data refresh`.
+# `cadence_days` = expected publication cadence, used by `refresh --check` staleness.
+
+ourairports:
+  kind: bulk
+  url: https://davidmegginson.github.io/ourairports-data/airports.csv
+  cadence_days: 1
+  description: OurAirports airports + runways (public domain, rebuilt nightly)
+  notes: "Runways file: https://davidmegginson.github.io/ourairports-data/runways.csv"
+
+faa_taf:
+  kind: bulk
+  url: https://taf.faa.gov/Downloads/APO100_TAF_Final_2025.zip
+  cadence_days: 365
+  description: FAA Terminal Area Forecast — Enplanements.xlsx, AirportsOperations.xlsx, Airports.xlsx (1976-2055)
+  notes: ""
+
+faa_npias:
+  kind: bulk
+  url: https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/npias/current/ARP-NPIAS-2025-2029-AppendixA.xlsx
+  cadence_days: 730
+  description: FAA NPIAS 2025-2029 Appendix A — hub class, enplanements, 5y development estimate
+  notes: "Page has a malformed href with leading space — strip whitespace if scraping"
+
+bts_socrata:
+  kind: bulk
+  url: https://data.bts.gov/resource/r495-tyji.json
+  cadence_days: 30
+  description: BTS Socrata REST API — T-100 Segment Summary by Origin Airport (monthly, 2014-present)
+  notes: "All numerics stored as text — cast in SoQL (e.g. total_passengers::number)"
+
+bts_t100:
+  kind: bulk
+  url: https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FIM&QO_fu146_anzr=Nv4%20Pn44vr45
+  cadence_days: 90
+  description: BTS T-100 Domestic Segment (form POST; FIM = Domestic Segment) — route-level, all carriers incl. cargo
+  notes: "ASP.NET form: GET page for __VIEWSTATE/__VIEWSTATEGENERATOR/__EVENTVALIDATION then POST. International Segment table code unverified (FIK/FIJ/FII 404)."
+
+bts_otp:
+  kind: bulk
+  url: https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_{YYYY}_{M}.zip
+  cadence_days: 60
+  description: BTS On-Time Performance monthly zip — delay, taxi, cancellation, and delay-cause minutes
+  notes: "otp_months: 36. Publication lag ~2 months; covers passenger carriers >=0.5% of domestic revenue, contiguous-48 only (undercounts ANC and cargo)."
+  otp_months: 36
+
+bts_delay_cause:
+  kind: bulk
+  url: https://www.transtats.bts.gov/OT_Delay/ot_delaycause1.asp
+  cadence_days: 60
+  description: BTS Airline On-Time Statistics and Delay Causes — airport x carrier monthly delay-cause minutes, 2003-present
+  notes: "Download Raw Data form; timeboxed automation attempt (Task 9)"
+
+census_cbsa:
+  kind: bulk
+  url: https://www2.census.gov/programs-surveys/popest/datasets/2020-2025/metro/totals/cbsa-est2025-alldata.csv
+  cadence_days: 365
+  description: Census Bureau CBSA population estimates (metro area population by year)
+  notes: "Verify exact 2025 path; fallback 2020-2024/.../cbsa-est2024-alldata.csv. Centroids: https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/2024_Gaz_cbsa_national.zip"
+
+bea_msa:
+  kind: bulk
+  url: https://apps.bea.gov/regional/zip/MARPP.zip
+  cadence_days: 365
+  description: BEA MSA regional economic accounts (real GDP by MSA) bulk zip, keyless
+  notes: "Verify contains real GDP (chained $) by MSA, not personal income; else use MAGDP family at https://apps.bea.gov/regional/zip/"
+
+faa_cats:
+  kind: bulk
+  url: https://cats.airports.faa.gov/reports/form_127_all_airports/?year=&hub_size=
+  cadence_days: 365
+  description: FAA CATS Form 127 — airport financials (CPE line 16.5, non-aero revenue, enplanements), self-reported/unaudited
+  notes: "Queryable per year/hub_size (L/M/S/N); verify HTML/CSV/xlsx response format"
+
+faa_aip:
+  kind: bulk
+  url: https://www.faa.gov/airports/aip/grant_histories
+  cadence_days: 365
+  description: FAA Airport Improvement Program grant histories (per-FY xlsx, LocID + Total Amount)
+  notes: "FY2021+ URLs must be scraped from this listing page (undated paths); e.g. FY_2025_AIP_Grants.xlsx"
+
+faa_nasstatus:
+  kind: live
+  url: https://nasstatus.faa.gov/api/airport-status-information
+  cadence_days: 0
+  description: FAA NAS Status — live ground stops/ground delays/closures (XML, no auth)
+  notes: "3s timeout; error/timeout -> None with a data-quality note. Sibling /ground-stops, /ground-delays endpoints 503."
+
+curated:
+  kind: bulk
+  url: data/curated/airport_facts.yaml
+  cadence_days: 0
+  description: Hand-curated per-airport facts and tier-B inputs (gates, declared VMC/IMC rates, slot/cap flags, projects)
+  notes: "Local YAML, not a network source; each fact/input carries its own source_url + as_of. cadence_days=0 = refreshed only on manual edit."
+
+bts_db1b:
+  kind: bulk
+  url: https://www.bts.gov/topics/airlines-and-airports/origin-and-destination-survey-data-product
+  cadence_days: 90
+  description: BTS DB1B / OD-40 Origin & Destination Survey — O&D vs connecting passenger share
+  notes: "Timeboxed attempt (design 01 open item); form POST, large quarterly files, one recent year. If it does not land, od_share is left absent and logged in known-limitations-and-tradeoffs.md."

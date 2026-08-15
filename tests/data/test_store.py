@@ -1,0 +1,207 @@
+"""Task 1: paths, sources config, Store schema."""
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+import pandas as pd
+import pytest
+
+from airport_agent.contracts.models import SourceVintage
+from airport_agent.data import paths
+from airport_agent.data.geo import haversine_mi
+from airport_agent.data.sources_config import SourceConfig, load_sources
+from airport_agent.data.store import TABLE_NAMES, Store
+
+# --- paths ---------------------------------------------------------------
+
+
+def test_default_snapshot_path_is_under_repo_root() -> None:
+    snap = paths.default_snapshot_path()
+    assert snap == paths.repo_root() / "data" / "snapshot" / "airports.duckdb"
+
+
+def test_raw_cache_dir_and_curated_dir_under_repo_root() -> None:
+    assert paths.raw_cache_dir() == paths.repo_root() / "data" / "raw"
+    assert paths.curated_dir() == paths.repo_root() / "data" / "curated"
+
+
+# --- store schema ----------------------------------------------------------
+
+
+def test_ensure_schema_creates_all_tables(tmp_store: Store) -> None:
+    existing = {
+        row[0]
+        for row in tmp_store.con.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+        ).fetchall()
+    }
+    for table in TABLE_NAMES:
+        assert table in existing, f"missing table {table}"
+
+
+def test_table_names_matches_schema() -> None:
+    assert set(TABLE_NAMES) == {
+        "airports",
+        "runways",
+        "airport_month",
+        "airport_year",
+        "routes_month",
+        "otp_taxi_hist",
+        "otp_peak",
+        "taf_history",
+        "taf_forecast",
+        "npias",
+        "aip_grants",
+        "catchment",
+        "financials",
+        "od_share",
+        "curated_facts",
+        "curated_inputs",
+        "source_vintage",
+        "airport_metrics",
+    }
+
+
+def test_replace_rows_is_idempotent_for_same_where(tmp_store: Store) -> None:
+    df1 = pd.DataFrame(
+        {
+            "iata": ["BOS"],
+            "period": ["2026-05"],
+            "measure": ["total_passengers"],
+            "value": [1_000_000.0],
+            "source_id": ["bts_otp"],
+            "vintage": ["2026-05"],
+        }
+    )
+    where = {"source_id": "bts_otp", "period": "2026-05"}
+    tmp_store.replace_rows("airport_month", df1, where=where)
+    tmp_store.replace_rows("airport_month", df1, where=where)
+
+    rows = tmp_store.con.execute(
+        "SELECT iata, value FROM airport_month WHERE source_id = 'bts_otp' AND period = '2026-05'"
+    ).fetchall()
+    assert rows == [("BOS", 1_000_000.0)]
+
+
+def test_replace_rows_only_touches_matching_where(tmp_store: Store) -> None:
+    df_may = pd.DataFrame(
+        {
+            "iata": ["BOS"],
+            "period": ["2026-05"],
+            "measure": ["total_passengers"],
+            "value": [1.0],
+            "source_id": ["bts_otp"],
+            "vintage": ["2026-05"],
+        }
+    )
+    df_june = pd.DataFrame(
+        {
+            "iata": ["BOS"],
+            "period": ["2026-06"],
+            "measure": ["total_passengers"],
+            "value": [2.0],
+            "source_id": ["bts_otp"],
+            "vintage": ["2026-06"],
+        }
+    )
+    tmp_store.replace_rows("airport_month", df_may, where={"source_id": "bts_otp", "period": "2026-05"})
+    tmp_store.replace_rows("airport_month", df_june, where={"source_id": "bts_otp", "period": "2026-06"})
+
+    count = tmp_store.con.execute("SELECT count(*) FROM airport_month").fetchone()[0]
+    assert count == 2
+
+    # Re-running May should not disturb June's row.
+    tmp_store.replace_rows("airport_month", df_may, where={"source_id": "bts_otp", "period": "2026-05"})
+    count = tmp_store.con.execute("SELECT count(*) FROM airport_month").fetchone()[0]
+    assert count == 2
+
+
+def test_replace_rows_unknown_table_raises(tmp_store: Store) -> None:
+    with pytest.raises(ValueError):
+        tmp_store.replace_rows("not_a_table", pd.DataFrame({"a": [1]}))
+
+
+def test_upsert_vintage_overwrites(tmp_store: Store) -> None:
+    v1 = SourceVintage(
+        source_id="ourairports",
+        description="OurAirports airports+runways",
+        period_start="2026-08",
+        period_end="2026-08",
+        fetched_at=datetime(2026, 8, 1, tzinfo=UTC).isoformat(),
+        url="https://davidmegginson.github.io/ourairports-data/airports.csv",
+    )
+    tmp_store.upsert_vintage(v1)
+    v2 = v1.model_copy(update={"fetched_at": datetime(2026, 8, 15, tzinfo=UTC).isoformat()})
+    tmp_store.upsert_vintage(v2)
+
+    vintages = tmp_store.vintages()
+    assert len(vintages) == 1
+    assert vintages[0].source_id == "ourairports"
+    assert vintages[0].fetched_at == v2.fetched_at
+
+
+def test_table_names_returns_list(tmp_store: Store) -> None:
+    assert tmp_store.table_names() == list(TABLE_NAMES)
+
+
+# --- geo ---------------------------------------------------------------
+
+BOS = (42.3656, -71.0096)
+JFK = (40.6413, -73.7781)
+
+
+def test_haversine_bos_jfk_within_tolerance() -> None:
+    dist = haversine_mi(*BOS, *JFK)
+    assert 184 <= dist <= 190
+
+
+# --- sources config ----------------------------------------------------
+
+EXPECTED_CADENCE_DAYS = {
+    "ourairports": 1,
+    "faa_taf": 365,
+    "faa_npias": 730,
+    "bts_socrata": 30,
+    "bts_t100": 90,
+    "bts_otp": 60,
+    "bts_delay_cause": 60,
+    "census_cbsa": 365,
+    "bea_msa": 365,
+    "faa_cats": 365,
+    "faa_aip": 365,
+    "faa_nasstatus": 0,
+    "curated": 0,
+    "bts_db1b": 90,
+}
+
+
+def test_load_sources_has_expected_ids_and_cadences() -> None:
+    sources = load_sources()
+    assert set(sources.keys()) == set(EXPECTED_CADENCE_DAYS.keys())
+    for source_id, cadence in EXPECTED_CADENCE_DAYS.items():
+        cfg = sources[source_id]
+        assert isinstance(cfg, SourceConfig)
+        assert cfg.id == source_id
+        assert cfg.cadence_days == cadence
+        assert cfg.url
+        assert cfg.kind in ("bulk", "live")
+
+
+def test_load_sources_faa_nasstatus_is_live() -> None:
+    sources = load_sources()
+    assert sources["faa_nasstatus"].kind == "live"
+
+
+def test_load_sources_from_explicit_path(tmp_path) -> None:
+    p = tmp_path / "sources.yaml"
+    p.write_text(
+        "demo:\n"
+        "  kind: bulk\n"
+        "  url: https://example.com/data.csv\n"
+        "  cadence_days: 7\n"
+        "  description: demo source\n",
+        encoding="utf-8",
+    )
+    sources = load_sources(p)
+    assert list(sources.keys()) == ["demo"]
+    assert sources["demo"].notes == ""
