@@ -1,0 +1,39 @@
+# Scoring presets — the ONLY source of weights (design 02). Pillar weights are absolute and sum to 1.
+# metric_weights are relative within a pillar (unlisted metric = 1.0); the scorer renormalizes over the
+# metrics actually available for an airport. excluded_metrics are never scored under that preset.
+presets:
+  balanced:
+    description: Registry default pillar weights; all tier A/B metrics weighted equally within pillars.
+    pillars: {P1: 0.30, P2: 0.25, P3: 0.15, P4: 0.15, P5: 0.15}
+    metric_weights: {}
+    excluded_metrics: [aip_per_enpl_10y]
+  terminal_expansion:
+    description: Terminal/gate capacity focus — gate and passenger-side metrics up-weighted vs runway/delay.
+    pillars: {P1: 0.35, P2: 0.30, P3: 0.15, P4: 0.10, P5: 0.10}
+    metric_weights:
+      pax_per_gate: 3.0
+      deps_per_gate_day: 3.0
+      peak_hour_ops_ratio: 1.5
+      load_factor: 2.0
+      seats_per_dep_trend: 2.0
+      taxi_out_p80_min: 0.5
+      ops_per_runway: 0.5
+    excluded_metrics: [aip_per_enpl_10y]
+  congestion_relief:
+    description: Runway/airfield congestion focus — delay, taxi-out, NAS share, airfield intensity up-weighted.
+    pillars: {P2: 0.50, P1: 0.25, P3: 0.10, P4: 0.05, P5: 0.10}
+    metric_weights:
+      pct_arr_delay_gt15: 2.0
+      avg_dep_delay_min: 2.0
+      taxi_out_p80_min: 2.0
+      nas_delay_share: 2.0
+      ops_per_runway: 2.0
+      npias_capacity_label: 2.0
+      pax_per_gate: 0.5
+      deps_per_gate_day: 0.5
+    excluded_metrics: [aip_per_enpl_10y]
+  market_entry:
+    description: Market quality and economic base focus for new-entrant/route investment.
+    pillars: {P3: 0.35, P4: 0.30, P1: 0.20, P2: 0.05, P5: 0.10}
+    metric_weights: {}
+    excluded_metrics: [aip_per_enpl_10y]
