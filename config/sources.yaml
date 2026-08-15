@@ -84,7 +84,15 @@ census_cbsa:
   url: https://www2.census.gov/programs-surveys/popest/datasets/2020-2025/metro/totals/cbsa-est2025-alldata.csv
   cadence_days: 365
   description: Census Bureau CBSA population estimates (metro area population by year)
-  notes: "Verify exact 2025 path; fallback 2020-2024/.../cbsa-est2024-alldata.csv. Centroids: https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/2024_Gaz_cbsa_national.zip"
+  notes: "RESCOPE 2026-08-16: population + gazetteer centroids only, no BEA (cbsa_population/
+    cbsa_pop_cagr_5y metrics only; catchment.gdp_real_usd is always None). Verified 2026-08-16:
+    2025 path confirmed live (200); also fetches the non-overlapping 2010-2019 vintage
+    (cbsa-est2019-alldata.csv) for history. latin-1 encoded. LSAD=='Metropolitan Statistical
+    Area' alone is not enough to isolate one row per metro - a Metropolitan Division sub-row
+    shares the same LSAD and CBSA code as its parent; filter on MDIV.isna() too. Centroids:
+    https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/2024_Gaz_cbsa_national.zip
+    (tab-separated; CBSA_TYPE==1 for Metro, 2 for Micro; GEOID matches the population file's
+    CBSA code). Airport->CBSA: nearest metro centroid within 100mi (see known-limitations row 32)."
 
 bea_msa:
   kind: bulk
