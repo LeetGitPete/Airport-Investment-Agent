@@ -71,3 +71,50 @@ highlighting in the final deliverable; `[AI]` = where/how AI was used; `[COURSE-
 - Runtime LLM: **Gemini free tier only** for now; Groq/NIM fail-over deferred to end-of-project if time remains
   (LiteLLM router keeps it a config change). No silent degradation; no cross-request caching.
 - Design docs 00–06 + limitations log committed and pushed; design phase closed pending human review.
+
+## 2026-08-15 — Plan 1: skeleton, contracts, freeze (`contracts-v1`)
+
+*`docs/process-log.raw.jsonl` is empty for this window — the scribe hooks were created during this session and only
+start emitting events next session start. This entry is compiled from `git log cad08e2..18e2a5e` (19 commits), the
+orchestration ledger (`.superpowers/sdd/2026-08-15-plan1-skeleton-and-contracts/progress.md`), and the orchestrator's
+verbal report.*
+
+### Subagent-driven build, 10 tasks `[AI]` `[KEY]`
+- Fresh implementer subagent per task: haiku (pure transcription — subagent specs/skills), sonnet (code from
+  complete specs — contracts, hooks, tooling), opus (judgement — `FakeDataService`, whole-branch freeze review).
+  A task reviewer ran after every task; scoped re-reviews after fix rounds.
+- 6/10 tasks needed exactly one fix round; findings were mostly **plan defects** caught by review, not typos:
+  import-linter missing an agent-layer rule, a "monkey" ALLOW bypass in the secrets guard, before-validators
+  crashing on `None`, a no-op test assertion, a fixture-params snapshot silently breaking the `DataService`
+  factory-extension mechanism, and `get_feature_matrix` horizon semantics left undefined (the fake was inventing
+  horizon variants). All fixed same-session; minors deferred and logged.
+- The project's own subagent roster (`.claude/agents`) went live mid-session and was used for Tasks 6–10.
+
+### `[COURSE-CORRECTION]` `[DECISION]` Freeze-gate NOT READY
+- Whole-branch freeze review (opus) returned **NOT READY**: `peer_group` missing from `AnalysisRequest`;
+  `curated_facts`/`percentiles` missing from `DeterministicReport` — relayed to the human verbatim, no AI guess.
+  Human decision: **amend now, then freeze**. Two fix waves + a docstring-only pass followed; orchestrator verified
+  the final frozen-surface diff by inspection before tagging.
+- Result: 57 tests, ruff clean, import-linter's 4 contracts kept, `.contracts-frozen` marker, tag `contracts-v1`,
+  ff-merged to `main`; freeze hook verified to both block and unblock correctly. Limitations log rows 17–21 added
+  (registry I/O exception, hint limits, tier-C gaps, freeze process, horizon no-relabel rule).
+
+### Where/how AI is used
+
+**Runtime** (per `docs/design/03-*.md`)
+| Component | Model/tech | Role |
+|---|---|---|
+| Concierge (conversational agent) | LLM + tools, Gemini free tier via LiteLLM | Intent → `Plan`, tool/specialist dispatch, presentation |
+| Deterministic Analyst | Code only, no LLM | `rank`/`compare`/`diagnose`, transparent formula (assignment-required) |
+| LLM Specialists (`expansion_analyst`, `capacity_analyst`, `market_analyst`, `general_analyst`) | LLM + scoped tool subset, Gemini | Judgement, causal narrative, agreement/disagreement with the deterministic view |
+| Provider chain | Gemini free tier only (Groq/NIM fail-over deferred, config change via LiteLLM) | No silent degradation, no cross-request caching |
+
+**Dev-time** (Plan 1, this session)
+| Built | Model | Agent role | Review gate |
+|---|---|---|---|
+| Subagent specs & skills | Haiku | Pure transcription | Task reviewer + fix round (description suffixes) |
+| Contracts, hooks, tooling (domain models, requests/reports, guards, import-linter) | Sonnet | Code from complete specs | Task reviewer after each task; fix rounds on 5/9 |
+| `FakeDataService` | Opus | Judgement (horizon semantics, factory extension) | Task reviewer; fix round |
+| Whole-branch freeze gate | Opus | Judgement (contract completeness) | NOT READY → human `[DECISION]` → scoped re-review → pass |
+
+<!-- scribe-cursor: 2026-08-15T18:00:00 -->
