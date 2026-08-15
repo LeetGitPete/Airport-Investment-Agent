@@ -1,0 +1,2 @@
+Contracts (src/airport_agent/contracts/) and config/metrics.yaml frozen 2026-08-15 at tag contracts-v1.
+Changes need a human decision + CONTRACTS_UNFROZEN=1 + rebase of all open worktrees (see CLAUDE.md, design 05 §5.6).
