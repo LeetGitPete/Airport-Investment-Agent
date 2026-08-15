@@ -31,12 +31,11 @@ forbidden_modules =
     airport_agent.llm
 
 [importlinter:contract:lower-layers-do-not-import-agent]
-name = data / scoring / llm / ui never import the composition root
+name = data / scoring / llm never import the composition root (ui may: design 04)
 type = forbidden
 source_modules =
     airport_agent.data
     airport_agent.scoring
     airport_agent.llm
-    airport_agent.ui
 forbidden_modules =
     airport_agent.agent
