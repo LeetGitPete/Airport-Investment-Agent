@@ -1,0 +1,119 @@
+# Metric registry — single source of truth for scorer, LLM prompts, UI tooltips.
+# direction: up = higher value raises expansion attractiveness. tier: A dataset-computable for all airports;
+# B needs curated YAML (majors only); C documented gap (never scored). horizons: which are supported.
+pillars:
+  P1: {name: Demand Pressure, default_weight: 0.30}
+  P2: {name: Congestion & Physical Constraint, default_weight: 0.25}
+  P3: {name: Market Quality, default_weight: 0.15}
+  P4: {name: Economic Base, default_weight: 0.15}
+  P5: {name: Financeability & Pipeline, default_weight: 0.15, normalize_within: hub_class}
+metrics:
+  # ---------- P1 Demand Pressure ----------
+  - {id: enpl_cagr_3y, name: Enplanement growth (3y), definition: Compound annual growth of enplanements over 3 years,
+     formula: "(E_t/E_{t-3})^(1/3) - 1", unit: pct, direction: up, pillar: P1, tier: A,
+     sources: [bts_socrata, faa_taf], horizons: [3y]}
+  - {id: enpl_cagr_5y, name: Enplanement growth (5y), definition: Compound annual growth of enplanements over 5 years,
+     formula: "(E_t/E_{t-5})^(1/5) - 1", unit: pct, direction: up, pillar: P1, tier: A,
+     sources: [bts_socrata, faa_taf], horizons: [5y]}
+  - {id: enpl_cagr_10y, name: Enplanement growth (10y), definition: Compound annual growth of enplanements over 10 years,
+     formula: "(E_t/E_{t-10})^(1/10) - 1", unit: pct, direction: up, pillar: P1, tier: A,
+     sources: [bts_socrata, faa_taf], horizons: [10y],
+     caveats: ["Spans the COVID collapse; interpret with 3y/5y"]}
+  - {id: taf_cagr_10y, name: FAA forecast growth (10y), definition: FAA Terminal Area Forecast enplanement CAGR over next 10 years,
+     formula: "(TAF_{t+10}/TAF_t)^(1/10) - 1", unit: pct, direction: up, pillar: P1, tier: A,
+     sources: [faa_taf], horizons: [forecast]}
+  - {id: taf_vs_actual_gap, name: Forecast optimism gap, definition: TAF forecast for latest year divided by latest actual enplanements,
+     formula: "TAF_t / actual_t", unit: ratio, direction: up, pillar: P1, tier: A, sources: [faa_taf, bts_socrata], horizons: [12m]}
+  - {id: load_factor, name: Load factor, definition: Passengers divided by seats on departing flights,
+     formula: "passengers / seats", unit: ratio, direction: up, pillar: P1, tier: A, sources: [bts_t100, bts_socrata],
+     horizons: [12m, 3y, 5y, 10y],
+     caveats: ["No authoritative capacity cutoff; interpret with spill_proxy (spill model), not an absolute threshold"]}
+  - {id: spill_proxy, name: Demand variability (spill proxy), definition: Dispersion of monthly load factor around its mean (route-weighted),
+     formula: "std(monthly LF) / mean(monthly LF)", unit: ratio, direction: up, pillar: P1, tier: A, sources: [bts_t100], horizons: [12m, 3y]}
+  - {id: seats_per_dep_trend, name: Upgauging trend, definition: Change in average seats per departure over 5 years,
+     formula: "(seats/dep)_t / (seats/dep)_{t-5} - 1", unit: pct, direction: up, pillar: P1, tier: A, sources: [bts_t100], horizons: [5y],
+     caveats: ["Rising gauge with flat departures is a proxy for slot/runway constraint"]}
+  - {id: pax_per_capita, name: Propensity to fly, definition: Annual enplanements per resident of the airport's CBSA,
+     formula: "enplanements / cbsa_population", unit: trips, direction: up, pillar: P1, tier: A, sources: [bts_socrata, census_cbsa],
+     horizons: [12m], caveats: ["CBSA is a proxy for catchment"]}
+  # ---------- P2 Congestion & Physical Constraint ----------
+  - {id: pct_arr_delay_gt15, name: Late arrival rate, definition: Share of arrivals 15+ minutes late (14 CFR 234 definition),
+     formula: "arrivals_late15 / arrivals", unit: pct, direction: up, pillar: P2, tier: A, sources: [bts_otp], horizons: [12m, 3y]}
+  - {id: avg_dep_delay_min, name: Mean departure delay, definition: Mean departure delay in minutes,
+     formula: "mean(DepDelayMinutes)", unit: min, direction: up, pillar: P2, tier: A, sources: [bts_otp], horizons: [12m, 3y]}
+  - {id: nas_delay_share, name: Systemic (NAS) delay share, definition: NAS-attributed delay minutes as share of total delay minutes,
+     formula: "nas_delay_min / total_delay_min", unit: pct, direction: up, pillar: P2, tier: A, sources: [bts_delay_cause],
+     horizons: [12m, 3y, 5y, 10y]}
+  - {id: taxi_out_p80_min, name: Surface congestion (taxi-out p80), definition: 80th percentile taxi-out time,
+     formula: "p80(TaxiOut)", unit: min, direction: up, pillar: P2, tier: A, sources: [bts_otp], horizons: [12m]}
+  - {id: ops_per_runway, name: Airfield intensity, definition: Annual operations per runway,
+     formula: "annual_ops / runway_count", unit: ops, direction: up, pillar: P2, tier: A, sources: [faa_taf, ourairports], horizons: [12m]}
+  - {id: npias_capacity_label, name: FAA capacity constraint status, definition: FAA NPIAS 2025–29 published label,
+     formula: "ordinal: none=0, congested=1, constrained_2033=2, constrained_2028=3, severe_2033=4", unit: ordinal, direction: up,
+     pillar: P2, tier: A, sources: [faa_npias], horizons: [forecast],
+     caveats: ["Partly circular for slot-controlled airports (Level 2/3 are constrained by definition)"]}
+  - {id: peak_hour_ops_ratio, name: Peak demand/capacity, definition: Peak-hour operations divided by declared VMC called rate,
+     formula: "peak_hour_ops / declared_rate_vmc", unit: ratio, direction: up, pillar: P2, tier: B, sources: [bts_otp, curated], horizons: [12m],
+     caveats: ["Declared capacities from FAA Capacity Profiles 2014–2019"]}
+  - {id: pax_per_gate, name: Gate intensity, definition: Annual total passengers per gate,
+     formula: "annual_passengers / gates", unit: pax, direction: up, pillar: P2, tier: B, sources: [bts_socrata, curated], horizons: [12m],
+     caveats: ["Gate counts curated from FAA Competition Plans / master plans"]}
+  - {id: deps_per_gate_day, name: Gate turns per day, definition: Daily departures per gate (ACRP planning range 5.0–6.5),
+     formula: "departures / gates / 365", unit: turns, direction: up, pillar: P2, tier: B, sources: [bts_t100, curated], horizons: [12m]}
+  - {id: imc_capacity_ratio, name: Weather fragility, definition: Instrument-conditions called rate divided by visual-conditions rate,
+     formula: "rate_imc / rate_vmc", unit: ratio, direction: down, pillar: P2, tier: B, sources: [curated], horizons: [static]}
+  - {id: slot_or_cap_flag, name: Legal capacity constraint, definition: "Slot level 2/3, hourly cap or settlement cap in force (with expiry)",
+     formula: "1 if any legal cap else 0", unit: flag, direction: up, pillar: P2, tier: B, sources: [curated], horizons: [static]}
+  # ---------- P3 Market Quality ----------
+  - {id: carrier_hhi, name: Carrier concentration (HHI), definition: Herfindahl index of carrier passenger shares,
+     formula: "sum(share_i^2) * 10000", unit: index, direction: down, pillar: P3, tier: A, sources: [bts_t100], horizons: [12m, 5y]}
+  - {id: top_carrier_share, name: Anchor carrier dependence, definition: Largest carrier's share of passengers,
+     formula: "max(carrier_pax) / total_pax", unit: pct, direction: down, pillar: P3, tier: A, sources: [bts_t100], horizons: [12m, 5y]}
+  - {id: intl_pax_share, name: International mix, definition: International passengers as share of total,
+     formula: "intl_pax / total_pax", unit: pct, direction: up, pillar: P3, tier: A, sources: [bts_socrata], horizons: [12m, 3y, 5y, 10y]}
+  - {id: longhaul_dep_share, name: Long-haul mix, definition: "Departures with distance >= 1,500 statute miles as share of total (our convention; bands short<500, medium 500–1500, long 1500–3000, ultra>3000)",
+     formula: "departures(distance>=1500) / departures", unit: pct, direction: up, pillar: P3, tier: A, sources: [bts_t100], horizons: [12m, 5y],
+     caveats: ["No ICAO/IATA long-haul standard; threshold is a stated convention", "Passenger and freight variants computed separately"]}
+  - {id: route_count_nonstop, name: Network breadth, definition: Distinct nonstop destinations served,
+     formula: "count(distinct dest with departures>0)", unit: count, direction: up, pillar: P3, tier: A, sources: [bts_t100], horizons: [12m, 5y]}
+  - {id: competing_seats_100mi, name: Local competition, definition: Departing seats at other commercial airports within 100 miles,
+     formula: "sum(seats at airports within 100mi)", unit: seats, direction: down, pillar: P3, tier: A, sources: [bts_t100, ourairports], horizons: [12m],
+     caveats: ["Proxy for leakage; true leakage needs ticket-level data"]}
+  - {id: od_share, name: O&D share, definition: Origin-destination passengers as share of total (1 - connecting share),
+     formula: "od_pax / total_pax", unit: pct, direction: up, pillar: P3, tier: A, sources: [bts_db1b], horizons: [12m],
+     caveats: ["Requires BTS DB1B/OD-40 adapter (timeboxed attempt); absent if the adapter did not land"]}
+  # ---------- P4 Economic Base ----------
+  - {id: cbsa_population, name: Market size, definition: CBSA population estimate,
+     formula: "cbsa_population", unit: persons, direction: up, pillar: P4, tier: A, sources: [census_cbsa], horizons: [12m], caveats: ["CBSA ≠ catchment"]}
+  - {id: cbsa_pop_cagr_5y, name: Market growth, definition: 5-year CBSA population CAGR,
+     formula: "(P_t/P_{t-5})^(1/5) - 1", unit: pct, direction: up, pillar: P4, tier: A, sources: [census_cbsa], horizons: [5y]}
+  - {id: msa_gdp_per_capita, name: Market wealth, definition: MSA GDP per capita,
+     formula: "msa_gdp / population", unit: usd, direction: up, pillar: P4, tier: A, sources: [bea_msa], horizons: [12m]}
+  - {id: msa_gdp_cagr_5y, name: Economic momentum, definition: 5-year real MSA GDP CAGR,
+     formula: "(G_t/G_{t-5})^(1/5) - 1", unit: pct, direction: up, pillar: P4, tier: A, sources: [bea_msa], horizons: [5y]}
+  # ---------- P5 Financeability & Pipeline (normalize within hub class) ----------
+  - {id: npias_dev_per_enpl, name: Identified capital need, definition: NPIAS 5-year development estimate per enplanement,
+     formula: "npias_dev_2025_2029 / enplanements", unit: usd, direction: up, pillar: P5, tier: A, sources: [faa_npias], horizons: [forecast]}
+  - {id: aip_per_enpl_10y, name: Federal grant support, definition: AIP grants over 10 years per enplanement,
+     formula: "sum(aip_10y) / enplanements", unit: usd, direction: up, pillar: P5, tier: A, sources: [faa_aip], horizons: [10y],
+     caveats: ["Treated as informational context in presets (weight may be 0)"]}
+  - {id: cpe_usd, name: Airline cost per enplanement, definition: FAA CATS Form 127 line 16.5 airline cost per enplanement,
+     formula: "form127_line_16_5", unit: usd, direction: down, pillar: P5, tier: A, sources: [faa_cats], horizons: [12m],
+     caveats: ["Self-reported and unaudited; non-uniform accounting basis across airports", "Compare within hub class only"]}
+  - {id: nonaero_rev_per_enpl, name: Non-aeronautical yield, definition: Non-aeronautical operating revenue per enplanement,
+     formula: "nonaero_revenue / enplanements", unit: usd, direction: up, pillar: P5, tier: A, sources: [faa_cats], horizons: [12m],
+     caveats: ["Inverts with hub size — compare within hub class only", "Per enplanement, not per passenger (ACI World unit trap)"]}
+  # ---------- Tier C: documented gaps, never scored ----------
+  - {id: asv_utilization, name: Annual Service Volume utilization, definition: Ops as share of ASV (FAA Order 5090.5 60%/80% planning triggers),
+     formula: "annual_ops / ASV", unit: pct, direction: up, pillar: P2, tier: C, sources: [none_public], horizons: [static],
+     caveats: ["ASV not published per airport; doctrine only"]}
+  - {id: terminal_sqft_per_nbeg, name: Terminal area per NBEG, definition: Terminal square feet per narrow-body-equivalent gate (ACRP 25),
+     formula: "terminal_sqft / nbeg", unit: sqft, direction: down, pillar: P2, tier: C, sources: [none_public], horizons: [static]}
+  - {id: dscr, name: Debt service coverage, definition: Net revenues divided by debt service,
+     formula: "net_revenue / debt_service", unit: ratio, direction: up, pillar: P5, tier: C, sources: [faa_cats], horizons: [12m],
+     caveats: ["Debt service weakly reported in Form 127"]}
+  - {id: days_cash, name: Days cash on hand, definition: Unrestricted cash × 365 / operating expenses,
+     formula: "cash*365/opex", unit: days, direction: up, pillar: P5, tier: C, sources: [faa_cats], horizons: [12m],
+     caveats: ["Cash lines inconsistently reported"]}
+  - {id: use_agreement_type, name: Airline use agreement type, definition: Residual / compensatory / hybrid,
+     formula: "categorical", unit: category, direction: up, pillar: P5, tier: C, sources: [bond_official_statements], horizons: [static]}
