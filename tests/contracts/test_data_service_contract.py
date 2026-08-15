@@ -3,7 +3,11 @@ import pytest
 from airport_agent.contracts import AirportFilter, DataService, FeatureMatrix, load_registry
 
 NE = {"BOS", "BDL", "PVD", "MHT", "PWM"}
-ATTEMPT_IDS = {"od_share"}  # tier-A ids that may legitimately be absent (timeboxed adapters)
+# Tier-A ids that may legitimately be absent from a real implementation: od_share (DB1B timeboxed) plus the
+# sources cut by the human RESCOPE decision of 2026-08-15 (Delay Cause, CATS, AIP, BEA) — see
+# docs/superpowers/plans/2026-08-15-plan2a-data.md "RESCOPE" and the limitations log. The fake still provides them.
+ATTEMPT_IDS = {"od_share", "nas_delay_share", "cpe_usd", "nonaero_rev_per_enpl", "aip_per_enpl_10y",
+               "msa_gdp_per_capita", "msa_gdp_cagr_5y"}
 
 
 def test_is_data_service(data_service):
