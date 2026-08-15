@@ -31,6 +31,13 @@ Assignment-first; Python 3.12 + pydantic v2 + DuckDB + LiteLLM (**Gemini free ti
 - Commit early/often to `main` (git identity: `-c user.name="Pete" -c user.email="Itamarr@voyager-labs.com"`); update the limitations log whenever a constraint/decision is made; run `/log-progress` at milestones.
 - Windows host: use forward slashes; `PYTHONIOENCODING=utf-8 uv run lint-imports` (rich chokes on cp1252 when redirected).
 
+## Phase 2 status (updated 2026-08-15, after plans were written)
+- Four plans written and committed (fc9cb7b): `docs/superpowers/plans/2026-08-15-plan2{a-data,b-scoring,c-agent,d-ui}.md`.
+- Human decisions 2026-08-15: OTP window 36 months; all 13 adapters, STOP per blocked source (no pre-approved fallbacks); `custom` ⇒ deterministic compare (airports) / rank (filter); Gemini key provided in `.env` (gitignored; copied to ../aa-agent/.env).
+- Worktrees (branches off main @ fc9cb7b): `../aa-data feature/data`, `../aa-scoring feature/scoring`, `../aa-agent feature/agent`, `../aa-ui feature/ui`. Each has its own SDD ledger at `<worktree>/.superpowers/sdd/<plan-basename>/progress.md` (gitignored) — trust ledger + `git log` in the worktree.
+- SDD scripts must be run with cwd = the worktree (they resolve the workspace from `git rev-parse --show-toplevel`). Every review dispatch includes reviewer Step 0 (frozen-surface git check).
+- Known merge nit: every plan appends rows to `docs/design/known-limitations-and-tradeoffs.md`; expect trivial append conflicts at Phase 3 merge (renumber rows sequentially).
+
 ## NEXT STEPS (Phase 2)
 1. **Write four Phase 2 plans** (superpowers `writing-plans` skill), one file each under `docs/superpowers/plans/`, quoting the FROZEN signatures verbatim from `src/airport_agent/contracts/` (do not paraphrase from memory):
    - `2026-08-15-plan2a-data.md` — adapters (design 01 table incl. T-100 dom+intl, OTP, Delay Cause, Socrata, TAF, NPIAS, AIP, OurAirports, Census/BEA, CATS Form 127, nasstatus live, curated YAML; DB1B timeboxed), DuckDB store + `build_derived()` per registry, `DuckDBDataService`, refresh CLI + `--check`, snapshot (≤100MB), fixtures, `tests/data/conftest_plugin.py` registering the DuckDB factory + root `conftest.py` `pytest_plugins`. Note the fake's known deviations (horizon rule now honoured; unknown iata → KeyError; static/forecast series → []).
@@ -43,3 +50,6 @@ Assignment-first; Python 3.12 + pydantic v2 + DuckDB + LiteLLM (**Gemini free ti
 
 ## Memory
 `C:\Users\palis\.claude\projects\C--Users-palis-Desktop-soft-projects-airport-agent\memory\` has `working-style-escalate-dont-improvise.md` and `airport-agent-methodology.md`; keep them current.
+
+## Controller docs follow-ups to apply on main at Phase 3 merge (from task reviews)
+- limitations rows: OurAirports `icao_code→ident→gps_code`; identity placeholders (hub_size/faa_region/commercial) until TAF/Socrata overwrite; vintage = newest raw-file mtime (mtime-as-vintage proxy); analysis-tool results carry `coverage` (data tools do not) — amend design 03:30; roster allowed_tools now include explain_metric (capacity/market) + get_metric_series (market) — amend design 03 roster; low_confidence rule (absent-by-design pillars ⇒ no flag + caveat with forgone weight).
