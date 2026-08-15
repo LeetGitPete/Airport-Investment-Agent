@@ -1,0 +1,31 @@
+[importlinter]
+root_package = airport_agent
+
+[importlinter:contract:contracts-are-pure]
+name = contracts imports nothing from the app
+type = forbidden
+source_modules = airport_agent.contracts
+forbidden_modules =
+    airport_agent.data
+    airport_agent.scoring
+    airport_agent.llm
+    airport_agent.agent
+    airport_agent.ui
+
+[importlinter:contract:workstreams-independent]
+name = data / scoring / llm / ui do not import each other
+type = independence
+modules =
+    airport_agent.data
+    airport_agent.scoring
+    airport_agent.llm
+    airport_agent.ui
+
+[importlinter:contract:ui-only-via-agent]
+name = ui may import only agent and contracts
+type = forbidden
+source_modules = airport_agent.ui
+forbidden_modules =
+    airport_agent.data
+    airport_agent.scoring
+    airport_agent.llm
