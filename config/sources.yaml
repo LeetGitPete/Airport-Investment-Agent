@@ -35,7 +35,13 @@ bts_socrata:
   url: https://data.bts.gov/resource/r495-tyji.json
   cadence_days: 30
   description: BTS Socrata REST API — T-100 Segment Summary by Origin Airport (monthly, 2014-present)
-  notes: "All numerics stored as text — cast in SoQL (e.g. total_passengers::number)"
+  notes: "Verified 2026-08-15: all numerics stored as text regardless of SoQL cast (Socrata always
+    JSON-serializes numbers as strings) - normalize always re-casts client-side. Real field names differ
+    from the research note: origin_airport_code, year, reporting_month (calendar_date), total_departures,
+    total_passengers, total_seats, domestic_passengers, outbound_international_1 (= outbound intl
+    passengers), inbound_international_1 (= inbound intl passengers). load_factor is computed as
+    total_passengers/total_seats, not read from the vendor's total_load_factor column. min(year)=2014,
+    max(year)=2026 (2026-04 latest), ~131,700 rows, 3 pages at $limit=50000."
 
 bts_t100:
   kind: bulk
