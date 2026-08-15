@@ -21,6 +21,7 @@ class SourceConfig(BaseModel):
     cadence_days: int
     description: str
     notes: str = ""
+    otp_months: int | None = None  # bts_otp only: trailing months of OTP to ingest (human decision 2026-08-15)
 
 
 def default_sources_path() -> Path:

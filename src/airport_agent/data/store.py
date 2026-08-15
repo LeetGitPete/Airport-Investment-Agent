@@ -271,20 +271,41 @@ class Store:
         return list(TABLE_NAMES)
 
     def replace_rows(self, table: str, df: pd.DataFrame, where: dict[str, Any] | None = None) -> None:
-        """Delete rows matching `where` (all rows if None) then insert `df` — idempotent per key."""
+        """Delete rows matching `where` then insert `df` — idempotent per key.
+
+        `where=None` is an explicit, supported contract: it replaces the *whole
+        table* (deletes every row regardless of source/period, then inserts
+        `df`). An empty `df` with a `where` is a pure delete for that partition
+        (nothing is (re-)inserted).
+
+        The delete and insert run in a single transaction: if the insert fails
+        (e.g. `df`'s columns don't match the table), the delete is rolled back
+        and the previously stored rows for that partition are left intact —
+        callers never observe a partially-replaced partition.
+        """
         if table not in TABLE_NAMES:
             raise ValueError(f"unknown table: {table}")
-        if where:
-            clause = " AND ".join(f"{col} = ?" for col in where)
-            self.con.execute(f"DELETE FROM {table} WHERE {clause}", list(where.values()))
+        self.con.begin()
+        try:
+            if where:
+                clause = " AND ".join(f"{col} = ?" for col in where)
+                self.con.execute(f"DELETE FROM {table} WHERE {clause}", list(where.values()))
+            else:
+                self.con.execute(f"DELETE FROM {table}")
+            if len(df) > 0:
+                self.con.register("_replace_rows_df", df)
+                try:
+                    columns = ", ".join(df.columns)
+                    self.con.execute(
+                        f"INSERT INTO {table} ({columns}) SELECT {columns} FROM _replace_rows_df"
+                    )
+                finally:
+                    self.con.unregister("_replace_rows_df")
+        except Exception:
+            self.con.rollback()
+            raise
         else:
-            self.con.execute(f"DELETE FROM {table}")
-        if len(df) == 0:
-            return
-        self.con.register("_replace_rows_df", df)
-        columns = ", ".join(df.columns)
-        self.con.execute(f"INSERT INTO {table} ({columns}) SELECT {columns} FROM _replace_rows_df")
-        self.con.unregister("_replace_rows_df")
+            self.con.commit()
 
     def upsert_vintage(self, v: SourceVintage) -> None:
         self.con.execute(

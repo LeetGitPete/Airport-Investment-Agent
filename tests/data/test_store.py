@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import duckdb
 import pandas as pd
 import pytest
 
@@ -62,6 +63,73 @@ def test_table_names_matches_schema() -> None:
     }
 
 
+EXPECTED_COLUMNS: dict[str, set[str]] = {
+    "airports": {
+        "iata", "icao", "faa_locid", "name", "city", "state", "faa_region", "hub_size",
+        "lat", "lon", "cbsa_code", "cbsa_name", "commercial", "source_id", "vintage",
+    },
+    "runways": {
+        "faa_locid", "runway_id", "length_ft", "width_ft", "surface", "closed",
+        "source_id", "vintage",
+    },
+    "airport_month": {"iata", "period", "measure", "value", "source_id", "vintage"},
+    "airport_year": {"iata", "year", "measure", "value", "source_id", "vintage"},
+    "routes_month": {
+        "iata", "dest", "dest_name", "period", "carrier", "distance_mi", "departures",
+        "seats", "passengers", "freight_lb", "mail_lb", "is_international", "aircraft_config",
+        "source_id", "vintage",
+    },
+    "otp_taxi_hist": {"iata", "period", "minute_bucket", "n", "source_id", "vintage"},
+    "otp_peak": {"iata", "period", "p95_hourly_ops", "max_hourly_ops", "source_id", "vintage"},
+    "taf_history": {"faa_locid", "year", "enplanements", "ops_total", "source_id", "vintage"},
+    "taf_forecast": {"faa_locid", "year", "enplanements", "ops_total", "source_id", "vintage"},
+    "npias": {
+        "faa_locid", "hub", "enplanements", "dev_estimate_usd", "capacity_label",
+        "capacity_label_text", "source_id", "vintage",
+    },
+    "aip_grants": {"faa_locid", "fy", "amount_usd", "source_id", "vintage"},
+    "catchment": {
+        "iata", "cbsa_code", "cbsa_name", "year", "population", "gdp_real_usd",
+        "source_id", "vintage",
+    },
+    "financials": {
+        "faa_locid", "fy", "hub_size", "cpe_usd", "nonaero_revenue_usd", "enplanements",
+        "source_id", "vintage",
+    },
+    "od_share": {"iata", "year", "od_pax", "total_pax", "source_id", "vintage"},
+    "curated_facts": {
+        "iata", "category", "text", "value", "source_url", "as_of", "expires",
+        "source_id", "vintage",
+    },
+    "curated_inputs": {"iata", "key", "value", "source_url", "as_of", "source_id", "vintage"},
+    "source_vintage": {"source_id", "description", "period_start", "period_end", "fetched_at", "url"},
+    "airport_metrics": {
+        "iata", "metric_id", "horizon", "ref_year", "value", "period_start", "period_end",
+        "quality_json", "source_id", "vintage",
+    },
+}
+
+
+def test_schema_columns_match_plan_exactly(tmp_store: Store) -> None:
+    assert set(EXPECTED_COLUMNS.keys()) == set(TABLE_NAMES)
+    for table, expected_cols in EXPECTED_COLUMNS.items():
+        rows = tmp_store.con.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = 'main' AND table_name = ?",
+            [table],
+        ).fetchall()
+        actual_cols = {r[0] for r in rows}
+        assert actual_cols == expected_cols, f"{table}: got {actual_cols}, expected {expected_cols}"
+
+
+def test_source_id_and_vintage_present_on_every_table_except_source_vintage() -> None:
+    for table, cols in EXPECTED_COLUMNS.items():
+        if table == "source_vintage":
+            assert "vintage" not in cols
+            continue
+        assert {"source_id", "vintage"} <= cols, f"{table} missing source_id/vintage"
+
+
 def test_replace_rows_is_idempotent_for_same_where(tmp_store: Store) -> None:
     df1 = pd.DataFrame(
         {
@@ -114,6 +182,83 @@ def test_replace_rows_only_touches_matching_where(tmp_store: Store) -> None:
     tmp_store.replace_rows("airport_month", df_may, where={"source_id": "bts_otp", "period": "2026-05"})
     count = tmp_store.con.execute("SELECT count(*) FROM airport_month").fetchone()[0]
     assert count == 2
+
+
+def test_replace_rows_failed_insert_leaves_previous_rows_intact(tmp_store: Store) -> None:
+    good = pd.DataFrame(
+        {
+            "iata": ["BOS"],
+            "period": ["2026-05"],
+            "measure": ["total_passengers"],
+            "value": [1.0],
+            "source_id": ["bts_otp"],
+            "vintage": ["2026-05"],
+        }
+    )
+    where = {"source_id": "bts_otp", "period": "2026-05"}
+    tmp_store.replace_rows("airport_month", good, where=where)
+
+    bad = pd.DataFrame({"iata": ["BOS"], "not_a_real_column": ["x"]})
+    with pytest.raises(duckdb.Error):
+        tmp_store.replace_rows("airport_month", bad, where=where)
+
+    rows = tmp_store.con.execute(
+        "SELECT iata, value FROM airport_month WHERE source_id = 'bts_otp' AND period = '2026-05'"
+    ).fetchall()
+    assert rows == [("BOS", 1.0)]
+
+
+def test_replace_rows_where_none_replaces_whole_table(tmp_store: Store) -> None:
+    df_otp = pd.DataFrame(
+        {
+            "iata": ["BOS"],
+            "period": ["2026-05"],
+            "measure": ["m"],
+            "value": [1.0],
+            "source_id": ["bts_otp"],
+            "vintage": ["2026-05"],
+        }
+    )
+    df_socrata = pd.DataFrame(
+        {
+            "iata": ["JFK"],
+            "period": ["2026-06"],
+            "measure": ["m"],
+            "value": [2.0],
+            "source_id": ["bts_socrata"],
+            "vintage": ["2026-06"],
+        }
+    )
+    tmp_store.replace_rows("airport_month", df_otp, where={"source_id": "bts_otp", "period": "2026-05"})
+    tmp_store.replace_rows(
+        "airport_month", df_socrata, where={"source_id": "bts_socrata", "period": "2026-06"}
+    )
+    assert tmp_store.con.execute("SELECT count(*) FROM airport_month").fetchone()[0] == 2
+
+    # where=None is an explicit contract: it wipes the whole table (both sources'
+    # rows), then inserts only df_otp.
+    tmp_store.replace_rows("airport_month", df_otp, where=None)
+    rows = tmp_store.con.execute("SELECT iata FROM airport_month").fetchall()
+    assert rows == [("BOS",)]
+
+
+def test_replace_rows_empty_df_is_pure_delete_for_partition(tmp_store: Store) -> None:
+    df = pd.DataFrame(
+        {
+            "iata": ["BOS"],
+            "period": ["2026-05"],
+            "measure": ["m"],
+            "value": [1.0],
+            "source_id": ["bts_otp"],
+            "vintage": ["2026-05"],
+        }
+    )
+    where = {"source_id": "bts_otp", "period": "2026-05"}
+    tmp_store.replace_rows("airport_month", df, where=where)
+    assert tmp_store.con.execute("SELECT count(*) FROM airport_month").fetchone()[0] == 1
+
+    tmp_store.replace_rows("airport_month", pd.DataFrame(columns=df.columns), where=where)
+    assert tmp_store.con.execute("SELECT count(*) FROM airport_month").fetchone()[0] == 0
 
 
 def test_replace_rows_unknown_table_raises(tmp_store: Store) -> None:
@@ -190,6 +335,11 @@ def test_load_sources_has_expected_ids_and_cadences() -> None:
 def test_load_sources_faa_nasstatus_is_live() -> None:
     sources = load_sources()
     assert sources["faa_nasstatus"].kind == "live"
+
+
+def test_load_sources_bts_otp_has_otp_months() -> None:
+    sources = load_sources()
+    assert sources["bts_otp"].otp_months == 36
 
 
 def test_load_sources_from_explicit_path(tmp_path) -> None:
