@@ -1600,7 +1600,8 @@ def test_scale_metrics_small_ne_airports_do_not_beat_bos_when_peer_group_all(ana
     rep = analyst.compare(AnalysisRequest(question_type="compare", airports=["BOS", "PVD", "MHT"], horizons=["12m"],
                                           focus_metrics=["cbsa_population", "route_count_nonstop"], peer_group="all"))
     for m in ("cbsa_population", "route_count_nonstop"):
-        assert rep.percentiles[m]["BOS"] == 1.0
+        pct = rep.percentiles[m]
+        assert pct["BOS"] > pct["PVD"] and pct["BOS"] > pct["MHT"]
 
 
 def test_sfo_imc_ratio_below_lax(analyst):

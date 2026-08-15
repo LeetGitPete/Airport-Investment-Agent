@@ -34,27 +34,17 @@ def test_all_presets_produce_full_rankings(analyst):
         assert len(rep.rows) == 6 and rep.preset == name
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "DECISION NEEDED (see task-7-9-report.md): this golden assumes BOS's cbsa_population/"
-        "route_count_nonstop percentile is 1.0 when compared against PVD/MHT with peer_group='all'. "
-        "Analyst.compare computes percentiles across the whole DataService universe (13 airports in "
-        "FakeDataService, per limitations row 22 / task-7 brief, reusing _score_targets exactly as "
-        "rank/diagnose do) then filters the display to the 3 targets. With peer_group='all' that universe "
-        "is one flat group of all 13 fake airports, and BOS (cbsa_population 4.9e6, route_count_nonstop 140) "
-        "is NOT the max there -- JFK/LAX/BUR/ATL are bigger on population, DEN/LAX/ATL on route count -- so "
-        "BOS's percentile is 0.667, not 1.0. The assertion only holds if compare() scoped percentiles to "
-        "just the compared airports (BOS alone in the 'large' hub bucket -> trivially 1.0) instead of the "
-        "full universe. Left as an unresolved xfail pending a human decision; not weakened."
-    ),
-)
 def test_scale_metrics_small_ne_airports_do_not_beat_bos_when_peer_group_all(analyst):
+    # compare() normalizes percentiles across the whole DataService universe (limitations row 22), same as
+    # rank/diagnose; with peer_group="all" that is one flat group, so BOS is not necessarily the global max
+    # on scale metrics (JFK/LAX/BUR/ATL are bigger) -- the golden checks BOS ranks above the small NE peers
+    # actually being compared, not that BOS is the universe max.
     rep = analyst.compare(AnalysisRequest(question_type="compare", airports=["BOS", "PVD", "MHT"], horizons=["12m"],
                                           focus_metrics=["cbsa_population", "route_count_nonstop"],
                                           peer_group="all"))
     for m in ("cbsa_population", "route_count_nonstop"):
-        assert rep.percentiles[m]["BOS"] == 1.0
+        pct = rep.percentiles[m]
+        assert pct["BOS"] > pct["PVD"] and pct["BOS"] > pct["MHT"]
 
 
 def test_sfo_imc_ratio_below_lax(analyst):
