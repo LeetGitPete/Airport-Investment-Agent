@@ -11,6 +11,7 @@ Tier = Literal["A", "B", "C"]
 Direction = Literal["up", "down"]  # "up": higher value ⇒ more expansion-attractive
 Pillar = Literal["P1", "P2", "P3", "P4", "P5"]
 PeerGroup = Literal["hub_class", "region", "all"]
+MetricHorizon = Literal["12m", "3y", "5y", "10y", "static", "forecast"]
 
 HORIZONS: tuple[Horizon, ...] = ("12m", "3y", "5y", "10y")
 
@@ -34,12 +35,12 @@ class AirportRef(_Frozen):
     @field_validator("iata", "faa_locid", "state", mode="before")
     @classmethod
     def _upper(cls, v: str) -> str:
-        return v.strip().upper()
+        return v.strip().upper() if isinstance(v, str) else v
 
     @field_validator("icao", mode="before")
     @classmethod
     def _upper_opt(cls, v: str | None) -> str | None:
-        return v.strip().upper() if v else None
+        return v.strip().upper() if isinstance(v, str) else v
 
 
 class SourceVintage(_Frozen):
@@ -60,7 +61,7 @@ class Metric(_Frozen):
     id: str
     value: float | None
     unit: str
-    horizon: Horizon | Literal["static", "forecast"]
+    horizon: MetricHorizon
     period_start: str | None
     period_end: str | None
     source_id: str
@@ -78,7 +79,7 @@ class MetricSpec(_Frozen):
     pillar: Pillar
     tier: Tier
     sources: list[str]
-    horizons: list[str]
+    horizons: list[MetricHorizon]
     caveats: list[str] = Field(default_factory=list)
 
 
@@ -95,7 +96,9 @@ class AirportFilter(BaseModel):
     @field_validator("states", "iatas", mode="before")
     @classmethod
     def _upper_list(cls, v: list[str]) -> list[str]:
-        return [s.strip().upper() for s in v]
+        if not isinstance(v, list):
+            return v
+        return [s.strip().upper() if isinstance(s, str) else s for s in v]
 
 
 class FeatureMatrix(BaseModel):

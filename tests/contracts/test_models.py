@@ -58,6 +58,28 @@ def test_airport_filter_defaults_and_limit():
         AirportFilter(limit=0)
 
 
+def test_airport_ref_rejects_none_and_wrong_types():
+    with pytest.raises(ValidationError):
+        AirportRef(iata=None, icao=None, faa_locid="BOS", name="Logan", city="Boston", state="MA",
+                   faa_region="ANE", hub_size="large", lat=42.36, lon=-71.01)
+
+
+def test_airport_filter_rejects_none_in_list():
+    with pytest.raises(ValidationError):
+        AirportFilter(states=[None])
+
+
+def test_airport_filter_rejects_non_list():
+    with pytest.raises(ValidationError):
+        AirportFilter(states=123)
+
+
+def test_metric_spec_rejects_invalid_horizon():
+    with pytest.raises(ValidationError):
+        MetricSpec(id="x", name="x", definition="d", formula="f", unit="u", direction="down", pillar="P1",
+                   tier="A", sources=["s"], horizons=["not-a-horizon"])
+
+
 def test_route_table_and_profile_construct():
     rt = RouteTable(iata="ANC", period_start="2025-05", period_end="2026-04", source_id="bts_t100", vintage="2026-04",
                     rows=[RouteRow(dest="SEA", dest_name="Seattle", distance_mi=1449, departures=3000, seats=450000,
