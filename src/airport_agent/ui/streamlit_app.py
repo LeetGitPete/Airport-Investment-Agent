@@ -60,25 +60,17 @@ if prompt:
     with st.chat_message("assistant"):
         placeholder = st.empty()
         try:
-            answer = app.answer(prompt, state, defaults=ss.get("defaults"), on_plan=lambda p: placeholder.caption(_plan_caption(p)))
+            app.answer(prompt, state, defaults=ss.get("defaults"), on_plan=lambda p: placeholder.caption(_plan_caption(p)))
         except LLMError as e:
             render_error(e)
         except Exception as e:  # noqa: BLE001 - deliberate catch-all per failure policy (design 03)
             render_error(e)
         else:
             # `placeholder` keeps showing the transient "How I'm approaching this" plan preview set by
-            # `on_plan` while the call was in flight — a faithful trace of what the Concierge told us it
-            # was doing, left in place rather than erased (design 04 transparency). `render_answer`
-            # renders the final `Answer.plan_line` (and the rest of the fixed structure) below it.
-            #
-            # Note (deviation, see task-3 report): the spec also asks for a one-shot `st.rerun()` here so
-            # the sidebar's conversation title refreshes immediately from "New chat" to the question text.
-            # That is deliberately NOT done: `st.rerun()` called mid-script, right after this branch has
-            # already emitted the live answer, causes `streamlit.testing.v1.AppTest`'s bare-mode script
-            # runner to merge the interrupted run's delta tree with the rerun's — it does not prune
-            # elements left over from a run that a `RerunException` cut short — which both erases this
-            # plan-preview caption and leaves duplicate widgets behind (verified experimentally; not a
-            # theory). The sidebar title still refreshes on the next natural rerun (any further widget
-            # interaction), so history is never lost — only the very first title update is deferred by one
-            # interaction.
-            render_answer(answer, specs_by_id, key=f"m{len(state.messages) - 1}", on_followup=_set_pending)
+            # `on_plan` while the call was in flight (design 04 transparency). We deliberately do NOT
+            # `render_answer` here too: `app.answer` already appended + saved the messages, so an
+            # immediate `st.rerun()` makes the history loop above render the just-answered turn (with the
+            # final `Answer.plan_line` replacing this transient caption) on the next pass — a single
+            # rendering path for every turn, first or not, and the sidebar's conversation title (set from
+            # "New chat" to the question text by `app.answer`) refreshes immediately as a side effect.
+            st.rerun()
