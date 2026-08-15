@@ -88,7 +88,7 @@ class Scorer:
                 psub.setdefault(p, 0.0)
             score = sum(metric_contrib.values())
             coverage = len(avail) / len(ids) if ids else 0.0
-            if not ids or not pillar_w:
+            if not ids or not pillar_w or tot_pw <= 0:
                 low = True
             pillar_scores[ref.iata] = psub
             rows.append(ScoreRow(ref=ref, score=score, rank=0, pillar_contrib=pillar_contrib,

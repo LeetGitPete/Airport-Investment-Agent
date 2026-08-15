@@ -165,3 +165,39 @@ def test_absent_pillars_empty_when_full_matrix(scorer, balanced):
     fm = _fm(["BOS", "LAX"], ids, [[0.80, 10.0, 1000.0, 1e6, 10.0], [0.90, 20.0, 2000.0, 2e6, 20.0]])
     res = scorer.score(fm, balanced)
     assert res.absent_pillars == []
+
+
+def test_zero_relative_weight_multi_pillar_redistributes_to_remaining_pillar():
+    from airport_agent.contracts import load_registry
+    from airport_agent.scoring.presets import Preset
+
+    preset = Preset(
+        name="zero_p1_multi",
+        description="test",
+        pillars={"P1": 0.30, "P2": 0.25, "P3": 0.15, "P4": 0.15, "P5": 0.15},
+        metric_weights={"load_factor": 0.0},
+    )
+    scorer = Scorer(load_registry())
+    fm = _fm(["BOS", "LAX"], ["load_factor", "avg_dep_delay_min"], [[0.80, 10.0], [0.90, 20.0]])
+    res = scorer.score(fm, preset)
+    lax = next(r for r in res.rows if r.ref.iata == "LAX")
+    assert "load_factor" not in lax.metric_contrib  # P1 dropped: its only metric has zero relative weight
+    assert lax.metric_contrib["avg_dep_delay_min"] == pytest.approx(100.0)  # P2 absorbs full effective weight
+    assert lax.score == pytest.approx(100.0)
+
+
+def test_preset_pillar_weight_zero_with_only_that_pillar_present_sets_low_confidence():
+    from airport_agent.contracts import load_registry
+    from airport_agent.scoring.presets import Preset
+
+    preset = Preset(
+        name="p1_zero_weight",
+        description="test",
+        pillars={"P1": 0.0, "P2": 1.0, "P3": 0.0, "P4": 0.0, "P5": 0.0},
+    )
+    scorer = Scorer(load_registry())
+    fm = _fm(["BOS", "LAX"], ["load_factor"], [[0.80], [0.90]])
+    res = scorer.score(fm, preset)
+    for r in res.rows:
+        assert r.score == 0.0
+        assert r.low_confidence is True
