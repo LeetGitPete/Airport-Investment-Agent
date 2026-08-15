@@ -102,3 +102,66 @@ def test_all_none_row_scores_zero_with_zero_coverage(scorer, balanced):
     res = scorer.score(fm, balanced)
     bos = next(r for r in res.rows if r.ref.iata == "BOS")
     assert bos.score == 0.0 and bos.coverage == 0.0 and bos.low_confidence is True
+
+
+def test_pillar_scores_include_all_pillars_even_when_metric_missing(scorer, balanced):
+    # BOS's only P2 metric (load_factor's pillar is P1; use avg_dep_delay_min for P2) is None -> P2 still keyed, 0.0
+    fm = _fm(["BOS", "LAX"], ["avg_dep_delay_min"], [[None], [20.0]])
+    res = scorer.score(fm, balanced)
+    assert res.pillar_scores["BOS"]["P2"] == pytest.approx(0.0)
+    assert set(res.pillar_scores["BOS"]) == {"P1", "P2", "P3", "P4", "P5"}
+    assert set(res.pillar_scores["LAX"]) == {"P1", "P2", "P3", "P4", "P5"}
+
+
+def test_duplicate_metric_ids_dedupe_to_one_metric(scorer, balanced):
+    fm = _fm(["BOS", "LAX"], ["load_factor", "load_factor"], [[0.80, 0.80], [0.90, 0.90]])
+    res = scorer.score(fm, balanced)
+    assert res.scored_metric_ids == ["load_factor"]
+    for r in res.rows:
+        assert r.score == pytest.approx(sum(r.metric_contrib.values()))
+        assert list(r.metric_contrib) == ["load_factor"]
+
+
+def test_zero_relative_weight_metrics_drop_pillar_entirely():
+    from airport_agent.scoring.presets import Preset
+    preset = Preset(
+        name="zero_p1",
+        description="test",
+        pillars={"P1": 0.30, "P2": 0.25, "P3": 0.15, "P4": 0.15, "P5": 0.15},
+        metric_weights={"load_factor": 0.0},
+        excluded_metrics=["aip_per_enpl_10y"],
+    )
+    from airport_agent.contracts import load_registry
+    scorer = Scorer(load_registry())
+    fm = _fm(["BOS", "LAX"], ["load_factor"], [[0.80], [0.90]])
+    res = scorer.score(fm, preset)
+    bos = next(r for r in res.rows if r.ref.iata == "BOS")
+    assert bos.score == 0.0
+    assert bos.low_confidence is True
+    assert bos.pillar_contrib["P1"] == pytest.approx(0.0)
+    assert res.pillar_scores["BOS"]["P1"] == pytest.approx(0.0)
+
+
+def test_tier_c_and_excluded_ids_absent_from_result_and_dont_dilute_coverage(scorer, balanced):
+    ids = ["load_factor", "dscr", "aip_per_enpl_10y"]
+    fm = _fm(["BOS", "LAX"], ids, [[0.80, 1.5, 5.0], [0.90, 2.0, 6.0]])
+    res = scorer.score(fm, balanced)
+    assert "dscr" not in res.percentiles and "aip_per_enpl_10y" not in res.percentiles
+    assert res.scored_metric_ids == ["load_factor"]
+    for r in res.rows:
+        assert "dscr" not in r.metric_contrib and "aip_per_enpl_10y" not in r.metric_contrib
+        assert r.coverage == pytest.approx(1.0)
+
+
+def test_absent_pillars_reports_structurally_missing_weighted_pillars(scorer):
+    te = load_presets()["terminal_expansion"]
+    fm = _fm(["BOS", "LAX"], ["pax_per_gate", "imc_capacity_ratio"], [[400000.0, 0.7], [500000.0, 0.8]])
+    res = scorer.score(fm, te)
+    assert res.absent_pillars == ["P1", "P3", "P4", "P5"]
+
+
+def test_absent_pillars_empty_when_full_matrix(scorer, balanced):
+    ids = ["load_factor", "avg_dep_delay_min", "carrier_hhi", "cbsa_population", "cpe_usd"]
+    fm = _fm(["BOS", "LAX"], ids, [[0.80, 10.0, 1000.0, 1e6, 10.0], [0.90, 20.0, 2000.0, 2e6, 20.0]])
+    res = scorer.score(fm, balanced)
+    assert res.absent_pillars == []

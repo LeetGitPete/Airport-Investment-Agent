@@ -19,6 +19,7 @@ class ScoringResult(BaseModel):
     percentiles: dict[str, dict[str, float | None]]
     pillar_scores: dict[str, dict[str, float]] = Field(default_factory=dict)
     scored_metric_ids: list[str] = Field(default_factory=list)
+    absent_pillars: list[str] = Field(default_factory=list)
 
 
 class Scorer:
@@ -29,6 +30,7 @@ class Scorer:
 
     def scoreable_ids(self, preset: Preset, candidate_ids: list[str] | None = None) -> list[str]:
         ids = candidate_ids if candidate_ids is not None else list(self._by_id)
+        ids = list(dict.fromkeys(ids))  # dedupe, preserve order
         return [i for i in ids if i in self._by_id and self._by_id[i].tier != "C"
                 and i not in preset.excluded_metrics]
 
@@ -48,6 +50,9 @@ class Scorer:
             tot = sum(preset.metric_weight(m) for m in members)
             for m in members:
                 weights[m] = preset.metric_weight(m) / tot if tot > 0 else 0.0
+        # pillars with preset weight > 0 that have no scoreable metric in this matrix at all (structural, not
+        # per-airport availability) -- surfaced so callers can caveat "forgone preset weight" (human decision).
+        absent_pillars = [p for p in PILLAR_IDS if preset.pillars[p] > 0 and not by_pillar[p]]
         # 3) per-airport effective weights and contributions
         rows: list[ScoreRow] = []
         pillar_scores: dict[str, dict[str, float]] = {}
@@ -62,7 +67,8 @@ class Scorer:
                 have = [m for m in members if m in avail]
                 if members and preset.pillars[p] > 0 and len(have) / len(members) < 0.5:
                     low = True
-                if have:
+                tot_m = sum(preset.metric_weight(m) for m in have)
+                if have and tot_m > 0:
                     pillar_w[p] = preset.pillars[p]
             tot_pw = sum(pillar_w.values())
             for p, wp in pillar_w.items():
@@ -79,9 +85,10 @@ class Scorer:
                 psub[p] = sub
             for p in PILLAR_IDS:
                 pillar_contrib.setdefault(p, 0.0)
+                psub.setdefault(p, 0.0)
             score = sum(metric_contrib.values())
             coverage = len(avail) / len(ids) if ids else 0.0
-            if not ids or not avail:
+            if not ids or not pillar_w:
                 low = True
             pillar_scores[ref.iata] = psub
             rows.append(ScoreRow(ref=ref, score=score, rank=0, pillar_contrib=pillar_contrib,
@@ -90,4 +97,4 @@ class Scorer:
         rows = [r.model_copy(update={"rank": k + 1}) for k, r in enumerate(rows)]
         percentiles = {m: dict(zip(iatas, pct[m], strict=True)) for m in ids}
         return ScoringResult(rows=rows, weights=weights, percentiles=percentiles, pillar_scores=pillar_scores,
-                             scored_metric_ids=ids)
+                             scored_metric_ids=ids, absent_pillars=absent_pillars)
