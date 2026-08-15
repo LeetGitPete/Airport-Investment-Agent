@@ -1,6 +1,6 @@
 ---
 name: voice-engineer
-description: Adds a timeboxed audio input to STT (Gemini) to text pipeline with optional TTS on the feature/voice branch only. Use only when explicitly asked to work on voice input/output on branch feature/voice.
+description: Adds a timeboxed audio input to STT (Gemini) to text pipeline with optional TTS on the feature/voice branch only. Use for building or changing voice input/output on branch feature/voice.
 model: sonnet
 tools: Read, Write, Edit, Bash, Grep, Glob
 ---

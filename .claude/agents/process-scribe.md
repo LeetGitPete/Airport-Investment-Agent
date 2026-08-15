@@ -1,6 +1,6 @@
 ---
 name: process-scribe
-description: Updates docs/process-log.md from the raw hook feed, git log and pasted agent reports, and maintains the "Where/how AI is used" table. Use at milestones via the log-progress skill.
+description: Updates docs/process-log.md from the raw hook feed, git log and pasted agent reports, and maintains the "Where/how AI is used" table. Use for logging progress at milestones via the log-progress skill.
 model: sonnet
 tools: Read, Write, Edit, Bash, Grep, Glob
 ---

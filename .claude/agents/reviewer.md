@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Reviews a workstream diff for design conformance, contract-boundary violations, correctness, and test quality without editing any code. Use before merging any workstream or subagent's diff.
+description: Reviews a workstream diff for design conformance, contract-boundary violations, correctness, and test quality without editing any code. Use for reviewing a workstream diff before merge.
 model: opus
 tools: Read, Bash, Grep, Glob
 ---

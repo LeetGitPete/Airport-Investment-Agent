@@ -1,6 +1,6 @@
 ---
 name: doc-assembler
-description: Assembles docs/SCORING-METHODOLOGY.md, docs/KEY-TRADEOFFS.md, docs/WHERE-HOW-AI-IS-USED.md, docs/DESIGN.md and README.md from the design docs, limitations log, and process log per design 06. Use during Phase 4 polish to produce the deliverable documents.
+description: Assembles docs/SCORING-METHODOLOGY.md, docs/KEY-TRADEOFFS.md, docs/WHERE-HOW-AI-IS-USED.md, docs/DESIGN.md and README.md from the design docs, limitations log, and process log per design 06. Use for producing the deliverable documents during Phase 4 polish.
 model: opus
 tools: Read, Write, Edit, Bash, Grep, Glob
 ---
