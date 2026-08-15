@@ -12,8 +12,10 @@ def test_text_has_sections_in_fixed_order_and_numbers_verbatim():
     t = answer_to_text(a)
     order = [t.index(h) for h in ("PLAN:", "HEADLINE:", "ASSUMPTIONS:", "UNCERTAINTY:", "SOURCES:", "FOLLOW-UPS:", "TOOL TRACE:")]
     assert order == sorted(order)
-    assert "12.9" in t and "13.9" in t and "bts_otp (2026-04)" in t
+    assert "12.9" in t and "13.9" in t
+    assert "BTS On-Time Performance (2026-04)" in t  # user-facing source names in SOURCES
     assert t.index(a.evidence_tables[0].title) < t.index("ANALYST VIEW:") < t.index("AGREEMENT:") < t.index("ASSUMPTIONS:")
+    assert t.index("== COMPUTED ANALYSIS") < t.index("== ANALYST VIEW")  # engine sections are labeled
 
 
 def test_informational_omits_analyst_sections_but_keeps_assumptions():

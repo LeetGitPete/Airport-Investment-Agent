@@ -9,7 +9,10 @@ Never re-interprets, recomputes or reformats numbers beyond display: table cells
 """
 from __future__ import annotations
 
+from airport_agent.agent.tables import source_name
 from airport_agent.contracts import Answer, Table
+
+_ANALYST_TABLE_PREFIX = "Analyst ranking"
 
 
 def _cell(v: object) -> str:
@@ -41,7 +44,18 @@ def answer_to_text(a: Answer) -> str:
     lines.append("")
     lines.append(f"HEADLINE: {a.headline}")
     lines.append("")
-    for table in a.evidence_tables:
+    computed = [t for t in a.evidence_tables if not t.title.startswith(_ANALYST_TABLE_PREFIX)]
+    analyst_tables = [t for t in a.evidence_tables if t.title.startswith(_ANALYST_TABLE_PREFIX)]
+    if computed:
+        lines.append("== COMPUTED ANALYSIS (every number computed from the cited data) ==")
+        lines.append("")
+    for table in computed:
+        lines.append(table_to_text(table))
+        lines.append("")
+    if analyst_tables or a.analyst_view:
+        lines.append("== ANALYST VIEW (AI specialist interpretation) ==")
+        lines.append("")
+    for table in analyst_tables:
         lines.append(table_to_text(table))
         lines.append("")
     if a.analyst_view:
@@ -57,7 +71,7 @@ def answer_to_text(a: Answer) -> str:
     lines.extend(f"- {s}" for s in a.uncertainty_notes)
     lines.append("")
     lines.append("SOURCES:")
-    lines.extend(f"- {c.source_id} ({c.vintage})" for c in a.citations)
+    lines.extend(f"- {source_name(c.source_id)} ({c.vintage})" for c in a.citations)
     lines.append("")
     lines.append("FOLLOW-UPS:")
     lines.extend(f"- {s}" for s in a.follow_ups)

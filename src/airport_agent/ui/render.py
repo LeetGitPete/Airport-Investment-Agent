@@ -15,7 +15,11 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+from airport_agent.agent.tables import source_name
 from airport_agent.contracts import Answer, LLMError, MetricSpec, Table
+
+#: Analyst-produced tables are titled by `specialist_ranking_table`; everything else is computed.
+_ANALYST_TABLE_PREFIX = "Analyst ranking"
 
 
 def table_df(table: Table) -> pd.DataFrame:
@@ -65,11 +69,8 @@ def _render_table(table: Table, specs_by_id: dict[str, MetricSpec]) -> None:
     st.dataframe(df, column_config=column_help(table.columns, specs_by_id), hide_index=True)
     for note in table.footnotes:
         st.caption(note)
-    ids = metric_ids_in_table(table, specs_by_id)
-    for metric_id in ids[:_MAX_METRIC_DEFINITION_LINES]:
-        st.caption(f"{metric_id} — {specs_by_id[metric_id].definition}")
-    if len(ids) > _MAX_METRIC_DEFINITION_LINES:
-        st.caption("…")
+    # QA 2026-08-16: per-metric definition captions removed (metric definitions are available via
+    # column tooltips and the explain_metric tool; the caption block was noisy and used internal ids).
 
 
 def render_answer(
@@ -82,8 +83,14 @@ def render_answer(
     render_plan_line(answer.plan_line)
     st.markdown(f"**{answer.headline}**")
 
+    computed = [t for t in answer.evidence_tables if not t.title.startswith(_ANALYST_TABLE_PREFIX)]
+    analyst_tables = [t for t in answer.evidence_tables if t.title.startswith(_ANALYST_TABLE_PREFIX)]
+
+    if computed:
+        st.subheader("📊 Computed analysis")
+        st.caption("Every number below is computed from the cited data; the AI cannot alter it.")
     hidden_tables: list[Table] = []
-    for i, table in enumerate(answer.evidence_tables):
+    for i, table in enumerate(computed):
         if i >= 2 and (table.title.startswith("Evidence") or table.title.startswith("More")):
             hidden_tables.append(table)
         else:
@@ -93,8 +100,13 @@ def render_answer(
             for table in hidden_tables:
                 _render_table(table, specs_by_id)
 
+    if analyst_tables or answer.analyst_view:
+        st.subheader("🧠 Analyst view (AI specialist)")
+        st.caption("The specialist's interpretation — it cites the computed evidence, "
+                   "but the ordering and judgement are the model's.")
+    for table in analyst_tables:
+        _render_table(table, specs_by_id)
     if answer.analyst_view:
-        st.subheader("Analyst view")
         st.markdown(answer.analyst_view)
 
     if answer.agreement_line:
@@ -109,7 +121,7 @@ def render_answer(
             st.markdown(f"- {line}")
 
     if answer.citations:
-        sources = ", ".join(f"{c.source_id} ({c.vintage})" for c in answer.citations)
+        sources = ", ".join(f"{source_name(c.source_id)} ({c.vintage})" for c in answer.citations)
         st.caption(f"Sources: {sources}")
     else:
         st.caption("Sources: none stated")
