@@ -29,6 +29,8 @@ from airport_agent.contracts import (
 
 MISSING_LAYER = ("data/scoring packages not available in this checkout — pass data_service/analyst "
                  "explicitly (Phase 3 wires the defaults)")
+MISSING_SNAPSHOT = ("data snapshot not found at {path} — run `uv run python -m airport_agent.data refresh` "
+                    "to build it, or pass data_service explicitly")
 
 
 def repo_root() -> Path:
@@ -42,8 +44,12 @@ def default_sessions_dir() -> Path:
 def _default_data() -> DataService:
     try:
         from airport_agent.data import DuckDBDataService
+        from airport_agent.data.paths import default_snapshot_path
     except ImportError as exc:
         raise RuntimeError(MISSING_LAYER) from exc
+    snapshot = default_snapshot_path()
+    if not snapshot.exists():
+        raise RuntimeError(MISSING_SNAPSHOT.format(path=snapshot))
     return DuckDBDataService()
 
 
