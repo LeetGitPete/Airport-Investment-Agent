@@ -121,9 +121,26 @@ def _cache_key(period: Period) -> str:
 
 
 def _extract_data_csv(zip_path: Path, dest: Path) -> Path:
-    """Extract the one data CSV from the zip (`Documentation.csv` is a field glossary, skipped)."""
+    """Extract the one data CSV from the zip (`Documentation.csv` is a field glossary, skipped).
+
+    A not-yet-published month (per the module docstring: `cboPeriod` for a future month
+    "still returns the form page, not a zip") is an HTTP 200 whose body is the HTML form
+    page, not a zip — `download()` has no way to know that and caches it as if it were a
+    real response. Detected here (`zipfile.BadZipFile`) and turned into a `ValueError` any
+    caller can catch generically as "period not available"; the bad cached file is deleted
+    so a later refresh re-fetches instead of replaying the same stale non-zip forever.
+    """
     if dest.exists() and dest.stat().st_size > 0:
         return dest
+    try:
+        _extract_from_zip(zip_path, dest)
+    except zipfile.BadZipFile as exc:
+        zip_path.unlink(missing_ok=True)
+        raise ValueError(f"{zip_path.name} is not a zip (likely an unpublished period's form re-render)") from exc
+    return dest
+
+
+def _extract_from_zip(zip_path: Path, dest: Path) -> None:
     with zipfile.ZipFile(zip_path) as zf:
         names = [n for n in zf.namelist() if n.lower() != "documentation.csv" and n.lower().endswith(".csv")]
         if len(names) != 1:
@@ -145,7 +162,6 @@ def _extract_data_csv(zip_path: Path, dest: Path) -> Path:
 
     stamp = calendar.timegm((*info.date_time, 0, 0, -1))
     os.utime(dest, (stamp, stamp))
-    return dest
 
 
 @register

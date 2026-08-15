@@ -101,10 +101,13 @@ def _month_before(year: int, month: int) -> tuple[int, int]:
 
 def _probe_trailing_periods(adapter, cache_dir: Path, n_months: int, start: tuple[int, int]) -> list[Period]:
     """Fetch (and cache) up to `n_months` periods ending at the latest month that
-    successfully downloads, probing backward from `start` for publication lag. A
-    non-2xx response (`httpx.HTTPStatusError`) is treated as "not yet published" and
-    skipped, not a hard failure — the caller's per-source try/except still catches any
-    other error."""
+    successfully downloads, probing backward from `start` for publication lag. Any failure
+    to fetch/land a given period — a non-2xx response (`httpx.HTTPStatusError`), or (T-100
+    specifically) an HTTP 200 whose body is an HTML form re-render rather than a real zip,
+    which `adapters/bts_t100.py::_extract_data_csv` turns into a `ValueError` — is treated
+    as "not yet published" and skipped, not a hard failure. If NO period in the whole probe
+    budget succeeds, the caller raises (a real outage looks the same as exhausted publication
+    lag from here, but genuinely nothing to ingest either way)."""
     y, m = start
     found: list[Period] = []
     max_attempts = n_months + _PROBE_SLACK_MONTHS
@@ -114,7 +117,7 @@ def _probe_trailing_periods(adapter, cache_dir: Path, n_months: int, start: tupl
         p = Period(year=y, month=m)
         try:
             adapter.fetch(p, cache_dir)
-        except httpx.HTTPStatusError:
+        except (httpx.HTTPStatusError, ValueError):
             pass
         else:
             found.append(p)

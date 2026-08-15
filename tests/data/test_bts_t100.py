@@ -13,6 +13,7 @@ from airport_agent.data.adapters.bts_t100 import (
     FORM_URL,
     ROUTES_MONTH_COLUMNS,
     BtsT100SegmentAdapter,
+    _extract_data_csv,
     _scrape_hidden_fields,
 )
 from airport_agent.data.paths import raw_cache_dir
@@ -64,6 +65,24 @@ class TestScrapeHiddenFields:
     def test_missing_field_raises(self) -> None:
         with pytest.raises(ValueError, match="missing expected hidden field"):
             _scrape_hidden_fields("<html>no hidden fields here</html>")
+
+
+class TestExtractDataCsvRejectsAFormRerender:
+    """Verified 2026-08-16 in production: an unpublished month's POST returns HTTP 200 with
+    the form page's HTML body, not a zip — `download()` (which only checks the HTTP status)
+    caches it as if it were real data, and refresh.py's trailing-months probe needs a clean
+    signal to skip the period rather than crash the whole source."""
+
+    def test_html_body_raises_and_deletes_the_bad_cache(self, tmp_path: Path) -> None:
+        fake_zip = tmp_path / "not_really_a_zip.zip"
+        fake_zip.write_text("<!DOCTYPE html>\n<html><body>Download page</body></html>", encoding="utf-8")
+        dest = tmp_path / "out.csv"
+
+        with pytest.raises(ValueError, match="not a zip"):
+            _extract_data_csv(fake_zip, dest)
+
+        assert not fake_zip.exists()  # bad cache cleaned up so a later refresh re-fetches
+        assert not dest.exists()
 
 
 class TestNormalizeShape:
