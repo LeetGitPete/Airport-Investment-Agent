@@ -17,6 +17,8 @@ def test_guard_secrets_blocks_env_in_commit():
     assert g.blocked_files(["src/a.py", ".env"]) == [".env"]
     assert g.blocked_files(["config/keys.yaml", "notes/secret_stuff.md"]) == ["config/keys.yaml", "notes/secret_stuff.md"]
     assert g.blocked_files([".env.example", "src/ok.py"]) == []
+    assert g.blocked_files(["api_secret_monkey.txt"]) == ["api_secret_monkey.txt"]
+    assert g.blocked_files([".claude/keybindings.json"]) == []
     assert g.is_git_write("git commit -m x") and g.is_git_write("git push origin main")
     assert not g.is_git_write("git status")
 
@@ -55,4 +57,5 @@ def test_log_agent_stop_appends_jsonl(tmp_path):
     lines = [json.loads(line) for line in out.read_text().splitlines()]
     assert lines[0]["agent"] == "data-engineer" and lines[0]["ts"] == "2026-08-15T10:00:00"
     assert lines[0]["summary"].startswith("changed: x")
+    assert lines[0]["event"] == "SubagentStop"
     assert lines[1]["agent"] == "main"

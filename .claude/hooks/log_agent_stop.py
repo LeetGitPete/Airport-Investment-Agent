@@ -7,7 +7,7 @@ from pathlib import Path
 
 def append_event(path: Path, data: dict, now: str | None = None) -> None:
     ts = now or dt.datetime.now().isoformat(timespec="seconds")
-    agent = data.get("agent_type") or data.get("agent_name") or ("main" if data.get("hook_event_name") == "Stop" else "subagent")
+    agent = data.get("agent_type") or ("main" if data.get("hook_event_name") == "Stop" else "subagent")
     msg = (data.get("last_assistant_message") or "").strip().replace("\r", "")
     summary = msg[:400]
     path.parent.mkdir(parents=True, exist_ok=True)

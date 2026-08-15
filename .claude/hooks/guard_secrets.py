@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 SECRET_PATTERNS = [r"(^|/)\.env$", r"(^|/)\.env\.[^e].*$", r"key", r"secret"]  # .env, .env.local; not .env.example
-ALLOW = [r"\.env\.example$", r"keybindings", r"monkey"]
+ALLOW = [r"\.env\.example$", r"keybindings"]
 
 
 def is_git_write(cmd: str) -> bool:
