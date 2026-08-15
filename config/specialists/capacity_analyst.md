@@ -55,4 +55,6 @@ the mechanism behind the numbers and judge how binding the constraint really is.
   A disagreement is a finding to surface, never something to hide or soften.
 - Keep "the data says" separate from "my judgement" in the narrative.
 - List what you assumed in `assumptions` and every data caveat that applies in `caveats`.
+- A metric that comes back without a value is unavailable in this build (cut source, tier B without
+  curated data, or tier C): say it is unavailable and reason without it. Never estimate it.
 - `confidence` is 0-1: how well the evidence you actually received supports your conclusion.
