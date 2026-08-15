@@ -62,8 +62,15 @@ bts_otp:
   url: https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_{YYYY}_{M}.zip
   cadence_days: 60
   description: BTS On-Time Performance monthly zip — delay, taxi, cancellation, and delay-cause minutes
-  notes: "otp_months: 36. Publication lag ~2 months; covers passenger carriers >=0.5% of domestic revenue, contiguous-48 only (undercounts ANC and cargo)."
-  otp_months: 36
+  notes: "RESCOPE 2026-08-16: otp_months=12 (trailing 12 months only, not 36) so the 3y/5y delay
+    horizons (pct_arr_delay_gt15, avg_dep_delay_min) are None rather than dishonestly labelled.
+    Verified 2026-08-16: every column name matches the research note exactly; Cancelled/Diverted/
+    ArrDel15 are 0.0/1.0 floats; CRSDepTime/CRSArrTime are HHMM ints (range 1-2359, no 2400 seen);
+    TaxiOut and the delay-cause columns are NaN for cancelled flights. Publication lag ~2 months
+    (2026-06 latest as of 2026-08-16); covers passenger carriers >=0.5% of domestic revenue,
+    contiguous-48 only (undercounts ANC and cargo). Aggregated to airport-month at ingest; no
+    row-level data is stored."
+  otp_months: 12
 
 bts_delay_cause:
   kind: bulk

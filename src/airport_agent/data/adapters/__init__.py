@@ -17,6 +17,7 @@ def register(cls: type) -> type:
 
 # --- adapter modules (import for registration side effect) -----------------
 # Later tasks append one import per adapter here.
+from airport_agent.data.adapters import bts_otp as _bts_otp  # noqa: E402, F401
 from airport_agent.data.adapters import bts_socrata as _bts_socrata  # noqa: E402, F401
 from airport_agent.data.adapters import bts_t100 as _bts_t100  # noqa: E402, F401
 from airport_agent.data.adapters import curated as _curated  # noqa: E402, F401
