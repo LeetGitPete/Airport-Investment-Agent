@@ -19,8 +19,7 @@ from pydantic import BaseModel, Field
 from airport_agent.agent.specialists.runner import compact_deterministic, fit_tool_result
 from airport_agent.agent.tables import (
     citations_from,
-    comparison_table,
-    evidence_table,
+    data_matrix,
     ranking_table,
     specialist_ranking_table,
     tool_result_tables,
@@ -43,7 +42,7 @@ from airport_agent.llm import parse_json_text
 MAX_SYNTHESIS_TOOL_CHARS = 2000
 FALLBACK_NOTE = "synthesis text unavailable — showing raw report"
 FALLBACK_HEADLINE = "Results below."
-FALLBACK_FOLLOW_UPS = ["Show the metrics that were hidden?", "Try another horizon?", "Try another preset?"]
+FALLBACK_FOLLOW_UPS = ["Compare with peer airports?", "Try another horizon?", "Try another preset?"]
 BASELINE_ASSUMPTION = ("Every number shown comes from a cited source at the vintage listed; nothing "
                        "is estimated or adjusted by the model")
 TIER_ASSUMPTION = "Tier B metrics only where curated data exists; tier C never scored"
@@ -167,7 +166,6 @@ class Synthesizer:
             tool_results=tool_results, defaults=defaults))
 
         tables: list[Table] = []
-        hidden: list[str] = []
         assumptions: list[str] = []
         notes: list[str] = []
         metrics: list[Metric] = []
@@ -178,11 +176,12 @@ class Synthesizer:
             question_type = deterministic.question_type
             if deterministic.rows and question_type in ("rank", "custom"):
                 tables.append(ranking_table(deterministic))
-            if deterministic.comparison:
-                tables.append(comparison_table(deterministic, self.by_id))
-            evidence, hidden = evidence_table(deterministic, synthesis.show_metrics, self.by_id)
-            if evidence.rows:
-                tables.append(evidence)
+            # QA task 5: ONE canonical data matrix, always shown — metric rows, a value column per
+            # airport, percentiles and provenance together. No separate evidence table, nothing
+            # collapsed behind an expander, and the LLM cannot choose to hide rows.
+            matrix = data_matrix(deterministic, self.by_id)
+            if matrix.rows:
+                tables.append(matrix)
             # QA 2026-08-16: the templated explanation is no longer appended below the first table
             # (poor placement); it still backs the fallback headline and the LLM synthesis input.
             assumptions.extend(self._report_assumptions(req, deterministic))
@@ -207,10 +206,6 @@ class Synthesizer:
             assumptions.extend(self._tool_assumptions(out))
             notes.extend(self._tool_notes(tool, out))
 
-        if hidden:
-            reason = synthesis.hidden_reason or "not central to the question"
-            names = ", ".join(self.by_id[m].name if m in self.by_id else m for m in hidden)
-            notes.append(f"{len(hidden)} metrics not shown ({names}): {reason}")
         if defaults:
             assumptions.append("UI defaults applied: "
                                + ", ".join(f"{k}={v}" for k, v in defaults.items() if v))

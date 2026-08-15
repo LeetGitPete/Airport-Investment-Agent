@@ -129,47 +129,31 @@ def _provenance_by_id(rep: DeterministicReport) -> dict[str, list[str]]:
     return {mid: [" / ".join(slot) for slot in slots] for mid, slots in fields.items()}
 
 
-def evidence_table(rep: DeterministicReport, show: list[str],
-                   specs_by_id: dict[str, MetricSpec]) -> tuple[Table, list[str]]:
-    """Provenance for the metrics behind a SINGLE-airport report. Returns (table, hidden metric ids).
-
-    A `Metric` carries no airport, so per-metric value rows are only honest when the report covers
-    exactly one airport. Multi-airport reports get their values AND provenance from
-    `comparison_table` (one row per metric, one column per airport) — this returns an empty table
-    for them so nothing ambiguous is ever rendered.
-    """
-    order: list[str] = []
+def _matrix_values(rep: DeterministicReport, iatas: list[str]) -> dict[str, dict[str, Any]]:
+    """Per metric id: {iata: value}. `rep.comparison` when present; a single-airport report
+    falls back to its evidence (a `Metric` carries no airport, so this is only honest for one)."""
+    if rep.comparison:
+        return dict(rep.comparison)
+    if len(iatas) != 1:
+        return {}
+    single = iatas[0]
+    values: dict[str, dict[str, Any]] = {}
     for metric in rep.evidence:
-        if metric.id not in order:
-            order.append(metric.id)
-    matched = [m for m in show if m in order]
-    shown = matched or list(order)  # ids we do not have must never collapse the evidence to nothing
-    hidden = [m for m in order if m not in shown]
-    if len(rep.rows) != 1:
-        return Table(title="Evidence", columns=[], rows=[], footnotes=[]), hidden
-    single = rep.rows[0].ref.iata
-    rows = [[_metric_name(metric.id, specs_by_id), *_metric_row(metric)]
-            for metric_id in shown for metric in rep.evidence
-            if metric.id == metric_id and metric.value is not None]
-    skipped = sum(1 for metric_id in shown for m in rep.evidence
-                  if m.id == metric_id and m.value is None)
-    footnotes = []
-    if hidden:
-        footnotes.append(f"{len(hidden)} further metrics were collected but are not shown.")
-    if skipped:
-        footnotes.append(f"{skipped} metrics have no value for this airport and are not shown.")
-    return Table(title=f"Evidence — {single}", columns=["metric", *METRIC_PROVENANCE_COLUMNS],
-                 rows=rows, footnotes=footnotes), hidden
+        values.setdefault(metric.id, {})
+        if metric.value is not None and single not in values[metric.id]:
+            values[metric.id][single] = metric.value
+    return values
 
 
-def comparison_table(rep: DeterministicReport, specs_by_id: dict[str, MetricSpec]) -> Table:
-    """One row per metric, one value column per airport, with provenance on every row.
+def data_matrix(rep: DeterministicReport, specs_by_id: dict[str, MetricSpec]) -> Table:
+    """THE canonical metrics table for every analytical answer (QA task 5) — always shown.
 
-    Rows where no airport has a value are hidden (counted in a footnote). Percentile columns appear
-    when the report carries them.
+    One row per metric (user-facing name), one value column per airport (one airport = one
+    column), percentile columns when the report carries them, and provenance (source, data as
+    of) on every row. Rows where no airport has a value are hidden and counted in a footnote.
     """
-    comparison = rep.comparison or {}
     iatas = [row.ref.iata for row in sorted(rep.rows, key=lambda r: r.rank)]
+    comparison = _matrix_values(rep, iatas)
     if not iatas:
         iatas = sorted({iata for values in comparison.values() for iata in values})
     percentiles = rep.percentiles or {}
@@ -197,8 +181,13 @@ def comparison_table(rep: DeterministicReport, specs_by_id: dict[str, MetricSpec
         if percentiles else []
     if hidden_empty:
         footnotes.append(f"{hidden_empty} metrics have no value for these airports and are not shown.")
-    return Table(title=f"Comparison — time period {rep.horizon}",
-                 columns=columns, rows=rows, footnotes=footnotes)
+    title = (f"Comparison — time period {rep.horizon}" if len(iatas) > 1
+             else f"Data — {iatas[0] if iatas else '?'}, time period {rep.horizon}")
+    return Table(title=title, columns=columns, rows=rows, footnotes=footnotes)
+
+
+#: Back-compat alias: the comparison table IS the data matrix.
+comparison_table = data_matrix
 
 
 def specialist_ranking_table(rep: SpecialistReport) -> Table | None:
@@ -317,11 +306,9 @@ def tool_result_tables(tool: str, result: dict[str, Any],
     if tool in REPORT_TOOLS:
         report = _report_from_dict(result)
         tables = [ranking_table(report)] if report.rows else []
-        if report.comparison:
-            tables.append(comparison_table(report, specs_by_id))
-        evidence, _ = evidence_table(report, [], specs_by_id)
-        if evidence.rows:
-            tables.append(evidence)
+        matrix = data_matrix(report, specs_by_id)
+        if matrix.rows:
+            tables.append(matrix)
         return tables
     if tool == "get_route_stats":
         return _route_tables(result)

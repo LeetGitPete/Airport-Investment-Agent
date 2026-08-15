@@ -154,6 +154,9 @@ class Analyst:
         res, n_uni = self._score_targets(targets, metric_ids, horizon, peer_group, preset)
         evidence, ev, facts = self._evidence(targets, metric_ids, horizon)
         rows: list[ScoreRow] = res.rows
+        # Per-airport raw values for the answer's data matrix (QA task 5) — same shape compare uses.
+        comparison = {m: {i: (ev[(i, m)].value if (i, m) in ev else None) for i in targets}
+                      for m in metric_ids}
 
         absent_weight: float | None = None
         caveats = self._caveats(metric_ids, peer_group, n_uni)
@@ -165,7 +168,7 @@ class Analyst:
 
         return DeterministicReport(
             question_type=req.question_type, preset=preset.name, weights=res.weights, horizon=horizon,
-            peer_group=peer_group, rows=rows, comparison=None, evidence=evidence,
+            peer_group=peer_group, rows=rows, comparison=comparison, evidence=evidence,
             explanation=explain_rank(res, self.by_id, ev, preset.name, horizon, peer_group,
                                      absent_weight=absent_weight),
             caveats=caveats, curated_facts=facts, percentiles=res.percentiles)

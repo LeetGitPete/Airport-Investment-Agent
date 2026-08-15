@@ -38,7 +38,8 @@ def test_synthesize_analytical_structure_and_no_altered_numbers(fake_analyst, sp
     assert "a1" in ans.assumptions and any("confidence 0.60" in u for u in ans.uncertainty_notes)
     assert ans.citations and all(c.source_id and c.vintage for c in ans.citations)
     assert ans.follow_ups == SYN["follow_ups"]
-    assert any("delay metrics collapsed" in u for u in ans.uncertainty_notes)
+    # QA task 5: nothing is hidden any more, so no hidden-metrics disclosure is emitted
+    assert not any("not shown" in u for u in ans.uncertainty_notes)
     assert llm.calls[0]["response_schema"] == SYNTHESIS_SCHEMA
 
 
@@ -86,15 +87,14 @@ def test_llm_error_propagates_from_synthesis(fake_analyst, specs):
             specialist=None, tool_results=[], trace=[], defaults=None)
 
 
-def test_defaults_and_hidden_metrics_are_disclosed(fake_analyst, specs):
+def test_defaults_are_disclosed_and_nothing_is_hidden(fake_analyst, specs):
     req = AnalysisRequest(question_type="rank", airports=["SFO", "JFK"], horizons=["12m"])
     det = fake_analyst.rank(req)
     ans = Synthesizer(ScriptedLLM([SYN]), specs).synthesize(
         message="q", plan=_plan(), plan_line="pl", req=req, deterministic=det, specialist=None,
         tool_results=[], trace=[], defaults={"horizon": "12m", "peer_group": "all"})
     assert any(a.startswith("UI defaults applied") for a in ans.assumptions)
-    hidden_note = next(u for u in ans.uncertainty_notes if "not shown" in u)
-    # the disclosure uses user-facing metric names, never internal ids
-    assert "Mean departure delay" in hidden_note and "avg_dep_delay_min" not in hidden_note
-    assert "delay metrics collapsed" in hidden_note  # the LLM's stated reason is kept verbatim
+    # QA task 5: the data matrix always shows every metric with a value — the LLM cannot hide
+    # rows, so there is no hidden-metrics disclosure to make.
+    assert not any("not shown" in u for u in ans.uncertainty_notes)
     assert ans.analyst_view is None and ans.agreement_line is None

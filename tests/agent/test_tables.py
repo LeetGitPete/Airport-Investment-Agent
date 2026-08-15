@@ -6,8 +6,7 @@ import pytest
 
 from airport_agent.agent.tables import (
     citations_from,
-    comparison_table,
-    evidence_table,
+    data_matrix,
     ranking_table,
     specialist_ranking_table,
     tool_result_tables,
@@ -66,30 +65,31 @@ def test_every_preset_has_a_rank_legend():
     assert rank_legend("unknown_preset").startswith("Rank 1 =")
 
 
-def test_evidence_table_is_empty_for_multi_airport_reports_but_still_reports_hidden(fake_analyst, by_id):
-    # A multi-airport evidence Metric carries no airport: values+provenance render via the
-    # comparison table instead, so nothing ambiguous is ever shown (QA standard 2026-08-16).
+def test_data_matrix_covers_rank_reports_with_airport_columns(fake_analyst, by_id):
+    # Rank reports carry per-airport raw values too (QA task 5): one row per metric,
+    # one value column per airport — never unlabeled per-airport rows.
     rep = _rank_report(fake_analyst)
-    table, hidden = evidence_table(rep, ["taxi_out_p80_min", "load_factor"], by_id)
-    assert table.rows == []
-    assert "avg_dep_delay_min" in hidden and "load_factor" not in hidden
+    table = data_matrix(rep, by_id)
+    assert table.rows
+    for iata in ("BOS", "BDL", "PVD"):
+        assert iata in table.columns
 
 
-def test_evidence_table_single_airport_uses_user_names_and_labels(fake_analyst, by_id):
+def test_data_matrix_single_airport_uses_one_value_column(fake_analyst, by_id):
     req = AnalysisRequest(question_type="diagnose", airports=["SFO"], horizons=["12m"])
     rep = fake_analyst.diagnose(req)
-    table, _ = evidence_table(rep, [], by_id)
-    assert table.title == "Evidence — SFO"
-    for column in ("value", "unit", "time period", "period end", "source", "data as of"):
+    table = data_matrix(rep, by_id)
+    assert table.title.startswith("Data — SFO")
+    assert "SFO" in table.columns
+    for column in ("unit", "time period", "period end", "source", "data as of"):
         assert column in table.columns
     names = [row[table.columns.index("metric")] for row in table.rows]
     assert names and all("_" not in n for n in names)  # user-facing names, never internal ids
-    assert all(row[table.columns.index("value")] is not None for row in table.rows)
 
 
 def test_comparison_table_row_per_metric_with_airport_columns_and_provenance(fake_analyst, by_id):
     rep = _compare_report(fake_analyst)
-    table = comparison_table(rep, by_id)
+    table = data_matrix(rep, by_id)
     for iata in ("SFO", "LAX"):
         assert iata in table.columns and f"percentile {iata}" in table.columns
     for column in ("time period", "source", "data as of"):

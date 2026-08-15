@@ -89,16 +89,9 @@ def render_answer(
     if computed:
         st.subheader("📊 Computed analysis")
         st.caption("Every number below is computed from the cited data; the AI cannot alter it.")
-    hidden_tables: list[Table] = []
-    for i, table in enumerate(computed):
-        if i >= 2 and (table.title.startswith("Evidence") or table.title.startswith("More")):
-            hidden_tables.append(table)
-        else:
-            _render_table(table, specs_by_id)
-    if hidden_tables:
-        with st.expander("More metrics"):
-            for table in hidden_tables:
-                _render_table(table, specs_by_id)
+    # QA task 5: every computed table renders in place — data is never tucked behind an expander.
+    for table in computed:
+        _render_table(table, specs_by_id)
 
     if analyst_tables or answer.analyst_view:
         st.subheader("🧠 Analyst view (AI specialist)")
