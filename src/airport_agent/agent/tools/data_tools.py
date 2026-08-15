@@ -50,6 +50,8 @@ class FindAirportsArgs(_Args):
     iatas: list[str] = Field(default_factory=list, description="Explicit IATA codes to restrict to.")
     hub_sizes: list[HubSize] = Field(default_factory=list,
                                      description="Hub classes: large, medium, small, nonhub.")
+    cbsa_codes: list[str] = Field(default_factory=list,
+                                  description="Census CBSA codes; used with `AirportFilter.cbsa_codes`.")
     name_contains: str | None = Field(default=None, description="Case-insensitive substring of the airport name.")
     limit: int = Field(default=50, ge=1, le=600,
                        description="Maximum airports returned (1-600, default 50); truncated is true when the "
@@ -100,7 +102,8 @@ def build_data_tools(data: DataService, analyst: DeterministicAnalyst) -> list[T
 
     def find_airports(p: FindAirportsArgs) -> dict[str, Any]:
         refs = data.list_airports(AirportFilter(states=p.states, faa_regions=p.faa_regions, iatas=p.iatas,
-                                                hub_sizes=p.hub_sizes, name_contains=p.name_contains, limit=p.limit))
+                                                hub_sizes=p.hub_sizes, cbsa_codes=p.cbsa_codes,
+                                                name_contains=p.name_contains, limit=p.limit))
         return {"airports": [r.model_dump(mode="json") for r in refs], "count": len(refs),
                 "truncated": len(refs) == p.limit}
 
@@ -150,8 +153,8 @@ def build_data_tools(data: DataService, analyst: DeterministicAnalyst) -> list[T
     return [
         ToolSpec(name="find_airports", params_model=FindAirportsArgs, fn=find_airports,
                  engines=[CONCIERGE, EXPANSION, MARKET, GENERAL],
-                 description="List airports matching a filter (states, FAA regions, IATA codes, hub sizes, name "
-                             "substring). Returns at most `limit` airports (1-600, default 50); the truncated "
+                 description="List airports matching a filter (states, FAA regions, CBSA codes, IATA codes, hub "
+                             "sizes, name substring). Returns at most `limit` airports (1-600, default 50); the truncated "
                              "flag is set when the limit was hit. No scoring - use score_airports to rank."),
         ToolSpec(name="get_profile", params_model=GetProfileArgs, fn=get_profile, engines=list(ALL_ENGINES),
                  description="Structured profile of one airport: metrics per requested horizon, forecast, routes "

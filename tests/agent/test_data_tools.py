@@ -24,6 +24,16 @@ def test_find_airports_new_england(fake_data, fake_analyst):
     assert {a["iata"] for a in out["airports"]} == {"BOS", "BDL", "PVD", "MHT", "PWM"} and out["truncated"] is False
 
 
+def test_find_airports_passes_cbsa_codes_to_the_filter(fake_data, fake_analyst):
+    seen = []
+    real = fake_data.list_airports
+    fake_data.list_airports = lambda f: (seen.append(f), real(f))[1]
+    out = build_registry(fake_data, fake_analyst).call(
+        "find_airports", {"cbsa_codes": ["14460"], "limit": 10}, engine="concierge")
+    assert "error" not in out
+    assert seen and seen[0].cbsa_codes == ["14460"] and seen[0].limit == 10
+
+
 def test_get_route_stats_anchorage(fake_data, fake_analyst):
     out = build_registry(fake_data, fake_analyst).call("get_route_stats", {"iata": "anc", "top_n": 3}, engine="concierge")
     assert out["long_haul_share"]["freight"]["value"] > out["long_haul_share"]["passenger"]["value"]

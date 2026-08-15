@@ -54,6 +54,8 @@ class ScoreAirportsArgs(_Args):
     faa_regions: list[str] = Field(default_factory=list, description="FAA region codes, e.g. ANE, AWP.")
     hub_sizes: list[HubSize] = Field(default_factory=list,
                                      description="Hub classes: large, medium, small, nonhub.")
+    cbsa_codes: list[str] = Field(default_factory=list,
+                                  description="Census CBSA codes; used with `AirportFilter.cbsa_codes`.")
     limit: int = Field(default=50, ge=1, le=600,
                        description="Maximum airports pulled in by the filter (1-600, default 50); ignored when "
                                    "airports are given explicitly.")
@@ -80,6 +82,8 @@ class DiagnoseArgs(_Args):
 def _report_dict(report: DeterministicReport) -> dict[str, Any]:
     out = report.model_dump(mode="json")
     out["provenance"] = prov(report.evidence)
+    # design 03: every tool result carries coverage. For a report it is the mean metric coverage of its rows.
+    out["coverage"] = (sum(r.coverage for r in report.rows) / len(report.rows)) if report.rows else None
     return out
 
 
@@ -87,8 +91,9 @@ def build_analysis_tools(analyst: DeterministicAnalyst) -> list[ToolSpec]:
     """Build the rank / compare / diagnose tools bound to a Deterministic Analyst."""
 
     def score_airports(p: ScoreAirportsArgs) -> dict[str, Any]:
-        has_filter = bool(p.states or p.faa_regions or p.hub_sizes)
+        has_filter = bool(p.states or p.faa_regions or p.hub_sizes or p.cbsa_codes)
         filter_ = AirportFilter(states=p.states, faa_regions=p.faa_regions, hub_sizes=p.hub_sizes,
+                                cbsa_codes=p.cbsa_codes,
                                 limit=p.limit) if not p.airports and has_filter else None
         req = AnalysisRequest(question_type="rank", airports=p.airports, filter=filter_, horizons=[p.horizon],
                               peer_group=p.peer_group, scoring_preset=p.scoring_preset,
@@ -110,8 +115,8 @@ def build_analysis_tools(analyst: DeterministicAnalyst) -> list[ToolSpec]:
         ToolSpec(name="score_airports", params_model=ScoreAirportsArgs, fn=score_airports,
                  engines=[CONCIERGE, EXPANSION, GENERAL],
                  description="Rank airports with the deterministic scoring engine. Give either explicit airports "
-                             "or a filter (states / faa_regions / hub_sizes, at most `limit` airports, default "
-                             "50) - a call with neither is rejected. Returns scores, ranks, pillar and metric "
+                             "or a filter (states / faa_regions / hub_sizes / cbsa_codes, at most `limit` "
+                             "airports, default 50) - a call with neither is rejected. Returns scores, ranks, pillar and metric "
                              "contributions, coverage, percentiles, evidence and caveats. The numbers are the "
                              "formula's: report them as returned, never recompute or reweight them."),
         ToolSpec(name="compare_airports", params_model=CompareAirportsArgs, fn=compare_airports,
