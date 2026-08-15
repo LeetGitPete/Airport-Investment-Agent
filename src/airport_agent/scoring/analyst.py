@@ -63,6 +63,23 @@ class Analyst:
     def _universe(self) -> list[AirportRef]:
         return self.data.list_airports(AirportFilter(limit=UNIVERSE_LIMIT))
 
+    #: Peer expansion cap: enough context to rank in, small enough to read (QA task 8).
+    PEER_EXPANSION_LIMIT = 30
+
+    def _expand_to_peers(self, iata: str) -> tuple[list[str], str]:
+        """Expand a lone rank target to its hub-size class (largest first, capped, target kept)."""
+        ref = self.data.get_airport(iata)
+        if ref is None:
+            raise KeyError(iata)  # matches get_feature_matrix's unknown-iata semantics
+        peers = [a.iata for a in self.data.list_airports(
+            AirportFilter(hub_sizes=[ref.hub_size] if ref.hub_size else None,
+                          limit=self.PEER_EXPANSION_LIMIT))]
+        targets = list(dict.fromkeys([iata, *peers]))[: self.PEER_EXPANSION_LIMIT]
+        hub = ref.hub_size or "unknown"
+        return targets, (f"A single airport cannot be ranked: expanded to {len(targets)} "
+                         f"{hub}-hub peers so {iata} has context (largest by enplanements, "
+                         f"capped at {self.PEER_EXPANSION_LIMIT}).")
+
     def _resolve_metric_ids(self, preset: Preset, focus_metrics: list[str] | None) -> tuple[list[str], list[str]]:
         """Return (scoreable metric ids, caveats about any focus_metrics dropped).
 
@@ -150,6 +167,11 @@ class Analyst:
         preset = self._preset(req.scoring_preset)
         peer_group: PeerGroup = req.peer_group or "hub_class"
         targets = self._resolve_airports(req)
+        expansion_caveat: str | None = None
+        if len(targets) == 1:
+            # QA task 8 (human decision 2026-08-16): a single airport cannot be ranked, so expand
+            # to its hub-size peers and rank it in that context ("SNA ranks 4th of 12...").
+            targets, expansion_caveat = self._expand_to_peers(targets[0])
         metric_ids, dropped_caveats = self._resolve_metric_ids(preset, req.focus_metrics)
         res, n_uni = self._score_targets(targets, metric_ids, horizon, peer_group, preset)
         evidence, ev, facts = self._evidence(targets, metric_ids, horizon)
@@ -161,6 +183,8 @@ class Analyst:
         absent_weight: float | None = None
         caveats = self._caveats(metric_ids, peer_group, n_uni)
         caveats.extend(dropped_caveats)
+        if expansion_caveat:
+            caveats.append(expansion_caveat)
         if res.absent_pillars:
             absent_weight = sum(preset.pillars[p] for p in res.absent_pillars)
             caveats.append(f"Pillars {', '.join(res.absent_pillars)} not scored (no metric in the scored set; "

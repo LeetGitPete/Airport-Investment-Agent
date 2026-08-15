@@ -318,7 +318,13 @@ class Planner:
             self._tools_block(),
 
             "SCORING PRESETS (fixed in config; pick one or 'none' — never invent weights): "
-            + ", ".join(self.presets),
+            + ", ".join(self.presets) + "\n"
+            "- A generic investment question with no stated focus ('should I invest in X', 'how much "
+            "to invest') takes 'balanced'; pick a focused preset only when the question names that "
+            "focus (terminal/gates, congestion/runways, market entry).\n"
+            "- A rank over a single named airport is automatically expanded to its hub-size peers by "
+            "the deterministic engine, so ranking one airport IS a valid plan for 'should I invest "
+            "in X' questions.",
 
             self._specialists_block(),
             self._metrics_block(),

@@ -26,6 +26,19 @@ def test_rank_new_england_terminal_expansion(analyst):
     assert any("Percentiles computed within hub_class" in c for c in rep.caveats)
 
 
+def test_rank_single_airport_expands_to_hub_size_peers(analyst, fake):
+    # QA task 8 (human decision 2026-08-16): one airport cannot be ranked — it is ranked
+    # within its hub-size class instead, with the expansion disclosed as a caveat.
+    rep = analyst.rank(AnalysisRequest(question_type="rank", airports=["SFO"], horizons=["12m"]))
+    iatas = [r.ref.iata for r in rep.rows]
+    assert "SFO" in iatas and len(iatas) > 1
+    sfo_hub = fake.get_airport("SFO").hub_size
+    assert all(r.ref.hub_size == sfo_hub for r in rep.rows)
+    assert len(iatas) <= Analyst.PEER_EXPANSION_LIMIT
+    assert any("cannot be ranked" in c and "expanded" in c for c in rep.caveats)
+    assert rep.comparison and "SFO" in next(iter(rep.comparison.values()))
+
+
 def test_rank_evidence_carries_source_and_vintage(analyst):
     rep = analyst.rank(AnalysisRequest(question_type="rank", airports=["BOS", "LAX", "SFO"], horizons=["12m"]))
     assert rep.evidence and all(m.source_id and m.vintage for m in rep.evidence)
