@@ -17,7 +17,7 @@ faa_taf:
   url: https://taf.faa.gov/Downloads/APO100_TAF_Final_2025.zip
   cadence_days: 365
   description: FAA Terminal Area Forecast — Enplanements.xlsx, AirportsOperations.xlsx, Airports.xlsx (1976-2055)
-  notes: ""
+  notes: "Verified 2026-08-15: `scenario` 0 = actual (<= 2024), 1 = forecast (>= 2025, the TAF 2025 base year). Enplanements.xlsx has no total column — total = aac+aat+commuter+us_flag+frgn_flag. ops_total = itn_Ac+itn_at+itn_ga+itn_mil+loc_ga+loc_mil (tot_overs = overflights, excluded). HUB_SIZE is numeric 3/2/1/0 = large/medium/small/nonhub; `locid` is space-padded to 4 chars. Operations start in 1990, enplanements in 1976."
 
 faa_npias:
   kind: bulk
