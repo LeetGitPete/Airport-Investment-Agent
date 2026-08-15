@@ -105,10 +105,18 @@ def partial_window_flag(coverage: dict[str, int], iata: str, nominal_months: int
 def annual_enplanements(con, year: int, latest_period: str) -> pd.DataFrame:
     """Annual enplanements for `year`: columns `iata, value, source_id, quality_code`.
 
-    `quality_code` is `None` (a complete Socrata year), `"partial_year"` (current year,
-    trailing-12m fallback) or `"taf_actual"` (TAF actual used because Socrata has no
-    complete year, e.g. before 2014 or a gap). See plan "Derived metric definitions",
-    `annual_enplanements`.
+    Priority (plan "Derived metric definitions", `annual_enplanements`): a complete Socrata
+    year first; for an incomplete year, TAF actual if present, else trailing-12m. In
+    practice a genuine TAF *actual* (`taf_history`, `scenario=0`) essentially never exists
+    for the current year under a live TAF edition (its base year is `>=` the current year,
+    so the current year falls in `taf_forecast`, not `taf_history`) — the trailing-12m
+    fallback is what actually fires for "the current year is incomplete" in this snapshot.
+    The TAF-actual branch matters for a genuinely gapped *historical* year (e.g. a year
+    Socrata never fully reported), which is the case it is spec'd for.
+
+    `quality_code` is `None` (a complete Socrata year), `"taf_actual"` (TAF actual used
+    because Socrata has no complete year for `year`) or `"partial_year"` (current year,
+    neither of the above — trailing-12m fallback).
     """
     latest_year = int(latest_period.split("-")[0])
     socrata = con.execute(
@@ -118,15 +126,6 @@ def annual_enplanements(con, year: int, latest_period: str) -> pd.DataFrame:
     socrata["quality_code"] = None
     frames = [socrata]
     have = set(socrata["iata"])
-
-    if year == latest_year:
-        start, end = window_months("12m", latest_period)
-        trailing = sum_airport_month(con, "total_passengers", start, end)
-        trailing = trailing[~trailing["iata"].isin(have)][["iata", "value"]].copy()
-        trailing["source_id"] = "bts_socrata"
-        trailing["quality_code"] = "partial_year"
-        frames.append(trailing)
-        have = have | set(trailing["iata"])
 
     taf = con.execute(
         """
@@ -140,6 +139,15 @@ def annual_enplanements(con, year: int, latest_period: str) -> pd.DataFrame:
     taf["source_id"] = "faa_taf"
     taf["quality_code"] = "taf_actual"
     frames.append(taf)
+    have = have | set(taf["iata"])
+
+    if year == latest_year:
+        start, end = window_months("12m", latest_period)
+        trailing = sum_airport_month(con, "total_passengers", start, end)
+        trailing = trailing[~trailing["iata"].isin(have)][["iata", "value"]].copy()
+        trailing["source_id"] = "bts_socrata"
+        trailing["quality_code"] = "partial_year"
+        frames.append(trailing)
 
     out = pd.concat(frames, ignore_index=True)
     return out[out["value"].notna() & (out["value"] > 0)].reset_index(drop=True)

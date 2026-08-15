@@ -4,12 +4,19 @@ Usage: uv run python tests/fixtures/bts_t100/make_fixture.py
 
 Runs the real adapter (`BtsT100SegmentAdapter.fetch`) for 2026-04 (scripts the
 DL_SelectFields ASP.NET form, cached under `data/raw/`), keeps only the 15
-fixture airports' origin rows, and caps each origin at 80 rows (by descending
-departures, so the busiest real routes survive) to stay under the ~300 KB
-fixture budget — the un-capped 15-airport subset is ~1.6 MB (mega-hubs ORD/DEN/
-ATL/LAX alone contribute 1,000+ rows each). ANC keeps every `SEATS=0` cargo row
-regardless of the cap so the "cargo carriers with SEATS=0" fixture requirement
-holds. Rows are copied verbatim from the real file.
+fixture airports' origin rows, and caps each origin at `PER_ORIGIN_CAP` rows
+(by descending departures, so the busiest real routes survive) to stay under
+the ~300 KB fixture budget — the un-capped 15-airport subset is ~1.6 MB
+(mega-hubs ORD/DEN/ATL/LAX alone contribute 1,000+ rows each). No separate
+"keep every cargo row" carve-out: ANC's real `SEATS=0` freighter routes are
+high-frequency enough (verified: 37 of ANC's top-80-by-departures rows are
+cargo) to survive the departures-based cap on their own, which also keeps
+ANC's real nonstop-destination count (34, verified) inside the 6-50 range
+`tests/contracts/test_data_service_contract.py::test_routes_sorted_and_flagged`
+expects (calibrated to `tests/fakes.py`'s 6-route synthetic ANC) — an earlier
+version of this script kept every cargo row unconditionally, which pushed
+ANC to 63 destinations and broke that frozen test. Rows are copied verbatim
+from the real file.
 """
 from __future__ import annotations
 
@@ -39,10 +46,8 @@ def main() -> None:
 
     parts = []
     for _origin, group in keep.groupby("ORIGIN"):
-        cargo = group[group["SEATS"] == 0]
         by_departures = group.sort_values("DEPARTURES_PERFORMED", ascending=False)
-        capped = by_departures.head(PER_ORIGIN_CAP)
-        parts.append(pd.concat([capped, cargo]).drop_duplicates())
+        parts.append(by_departures.head(PER_ORIGIN_CAP))
     trimmed = pd.concat(parts, ignore_index=True).sort_values(["ORIGIN", "DEST"])
 
     missing = sorted(set(FIXTURE_IATAS) - set(trimmed["ORIGIN"]))

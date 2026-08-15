@@ -259,13 +259,15 @@ def pax_per_capita(con, horizon: str, ref_year: int, latest_period: str) -> pd.D
         flags = [{"code": "cbsa_proxy", "message": "CBSA population is a proxy for true catchment"}]
         if r.quality_code == "partial_year":
             flags.append({"code": "partial_year", "message": "current year incomplete; trailing 12m used"})
+        elif r.quality_code == "taf_actual":
+            flags.append({"code": "taf_actual", "message": "enplanements from FAA TAF actuals, not Socrata"})
         rows.append(
             dict(
                 iata=r.iata,
                 value=v,
                 period_start=period,
                 period_end=period,
-                source_id="bts_socrata",
+                source_id=r.source_id,
                 vintage=period,
                 quality_json=common.quality_json(flags),
             )
