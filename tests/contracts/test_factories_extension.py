@@ -26,9 +26,12 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
 
 
 def test_every_registered_factory_is_parametrized_and_conforms(factory, request):
-    assert request.node.callspec.id in {"fake", "fake2"}
+    # Real registrations (e.g. "duckdb" from tests/data/conftest_plugin.py) join the base "fake"
+    # and this module's appended "fake2" — the mechanism under test is the append, not the exact set.
+    assert request.node.callspec.id in {n for n, _ in EXTENDED}
     assert isinstance(factory(), DataService)
 
 
 def test_registered_ids_include_the_appended_one():
-    assert [n for n, _ in EXTENDED] == ["fake", "fake2"]
+    ids = [n for n, _ in EXTENDED]
+    assert ids[0] == "fake" and ids[-1] == "fake2" and len(ids) == len(set(ids))
