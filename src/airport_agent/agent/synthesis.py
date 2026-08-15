@@ -173,8 +173,9 @@ class Synthesizer:
 
         if deterministic is not None:
             metrics.extend(deterministic.evidence)
-            question_type = deterministic.question_type
-            if deterministic.rows and question_type in ("rank", "custom"):
+            # QA task 6: every analytical answer opens its computed section with the score view
+            # (pillar-level contributions); a single airport gets "Scores" without a rank column.
+            if deterministic.rows:
                 tables.append(ranking_table(deterministic))
             # QA task 5: ONE canonical data matrix, always shown — metric rows, a value column per
             # airport, percentiles and provenance together. No separate evidence table, nothing

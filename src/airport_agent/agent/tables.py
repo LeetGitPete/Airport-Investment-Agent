@@ -99,17 +99,26 @@ def _metric_row(metric: Metric) -> list[Any]:
 
 
 def ranking_table(rep: DeterministicReport) -> Table:
-    """The deterministic ranking, verbatim: score, coverage and the pillar contributions behind it."""
-    columns = ["rank", "airport", "name", "hub", "score", "coverage", "low_confidence", *PILLARS]
-    rows = [[row.rank, row.ref.iata, row.ref.name, row.ref.hub_size, row.score, row.coverage,
-             row.low_confidence, *[row.pillar_contrib.get(p) for p in PILLARS]]
+    """The deterministic scores, verbatim: score, coverage and the pillar contributions behind them.
+
+    A single-airport report has no meaningful rank (QA task 6): the rank column is dropped and the
+    table is titled "Scores". Pillar columns are limited to pillars the preset actually weights.
+    """
+    single = len(rep.rows) == 1
+    pillars = [p for p in PILLARS if rep.weights.get(p)] or PILLARS
+    columns = [*([] if single else ["rank"]), "airport", "name", "hub", "score", "coverage",
+               "low_confidence", *pillars]
+    rows = [[*([] if single else [row.rank]), row.ref.iata, row.ref.name, row.ref.hub_size, row.score,
+             row.coverage, row.low_confidence, *[row.pillar_contrib.get(p) for p in pillars]]
             for row in sorted(rep.rows, key=lambda r: r.rank)]
     preset = rep.preset or "engine default"
-    return Table(title=f"Ranking — preset {preset}, time period {rep.horizon} "
+    kind = "Scores" if single else "Ranking"
+    footnotes = ["Score = how strong the case is under this preset (0-100 within the peer group); "
+                 "it is a relative standing, not a dollar figure."] if single else [rank_legend(rep.preset)]
+    footnotes.append("Pillar columns are contributions to the score (weight x percentile x 100).")
+    return Table(title=f"{kind} — preset {preset}, time period {rep.horizon} "
                        f"(percentiles among {peer_label(rep.peer_group)})",
-                 columns=columns, rows=rows,
-                 footnotes=[rank_legend(rep.preset),
-                            "Pillar columns are contributions to the score (weight x percentile x 100)."])
+                 columns=columns, rows=rows, footnotes=footnotes)
 
 
 def _provenance_by_id(rep: DeterministicReport) -> dict[str, list[str]]:

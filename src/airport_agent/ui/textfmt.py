@@ -46,12 +46,7 @@ def answer_to_text(a: Answer) -> str:
     lines.append("")
     computed = [t for t in a.evidence_tables if not t.title.startswith(_ANALYST_TABLE_PREFIX)]
     analyst_tables = [t for t in a.evidence_tables if t.title.startswith(_ANALYST_TABLE_PREFIX)]
-    if computed:
-        lines.append("== COMPUTED ANALYSIS (every number computed from the cited data) ==")
-        lines.append("")
-    for table in computed:
-        lines.append(table_to_text(table))
-        lines.append("")
+    # QA task 6 layout: headline -> analyst view -> computed scores & data.
     if analyst_tables or a.analyst_view:
         lines.append("== ANALYST VIEW (AI specialist interpretation) ==")
         lines.append("")
@@ -63,6 +58,12 @@ def answer_to_text(a: Answer) -> str:
         lines.append("")
     if a.agreement_line:
         lines.append(f"AGREEMENT: {a.agreement_line}")
+        lines.append("")
+    if computed:
+        lines.append("== COMPUTED ANALYSIS (every number computed from the cited data) ==")
+        lines.append("")
+    for table in computed:
+        lines.append(table_to_text(table))
         lines.append("")
     lines.append("ASSUMPTIONS:")
     lines.extend(f"- {s}" for s in a.assumptions)

@@ -86,13 +86,7 @@ def render_answer(
     computed = [t for t in answer.evidence_tables if not t.title.startswith(_ANALYST_TABLE_PREFIX)]
     analyst_tables = [t for t in answer.evidence_tables if t.title.startswith(_ANALYST_TABLE_PREFIX)]
 
-    if computed:
-        st.subheader("📊 Computed analysis")
-        st.caption("Every number below is computed from the cited data; the AI cannot alter it.")
-    # QA task 5: every computed table renders in place — data is never tucked behind an expander.
-    for table in computed:
-        _render_table(table, specs_by_id)
-
+    # QA task 6 layout: headline -> analyst view (+ its ranking) -> computed scores & data.
     if analyst_tables or answer.analyst_view:
         st.subheader("🧠 Analyst view (AI specialist)")
         st.caption("The specialist's interpretation — it cites the computed evidence, "
@@ -101,9 +95,15 @@ def render_answer(
         _render_table(table, specs_by_id)
     if answer.analyst_view:
         st.markdown(answer.analyst_view)
-
     if answer.agreement_line:
         st.info(answer.agreement_line)
+
+    if computed:
+        st.subheader("📊 Computed analysis")
+        st.caption("Every number below is computed from the cited data; the AI cannot alter it.")
+    # QA task 5: every computed table renders in place — data is never tucked behind an expander.
+    for table in computed:
+        _render_table(table, specs_by_id)
 
     with st.expander("Assumptions & uncertainty", expanded=assumptions_expanded(answer)):
         st.markdown("**Assumptions**")

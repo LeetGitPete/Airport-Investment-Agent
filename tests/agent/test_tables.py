@@ -40,12 +40,23 @@ def test_ranking_table_row_per_report_row_with_pillar_columns(fake_analyst):
     rep = _rank_report(fake_analyst)
     table = ranking_table(rep)
     assert table.title.startswith("Ranking") and "balanced" in table.title and "12m" in table.title
-    assert [c for c in table.columns if c.startswith("P")] == ["P1", "P2", "P3", "P4", "P5"]
+    # only pillars the preset actually weights appear (QA task 6)
+    expected = [p for p in ("P1", "P2", "P3", "P4", "P5") if rep.weights.get(p)]
+    assert [c for c in table.columns if c.startswith("P")] == expected
     assert len(table.rows) == len(rep.rows)
     scores = {row[table.columns.index("airport")]: row[table.columns.index("score")] for row in table.rows}
     assert scores == {r.ref.iata: r.score for r in rep.rows}  # verbatim, not reformatted
     ranks = [row[table.columns.index("rank")] for row in table.rows]
     assert ranks == sorted(ranks)
+
+
+def test_single_airport_report_gets_scores_without_a_rank_column(fake_analyst, by_id):
+    req = AnalysisRequest(question_type="diagnose", airports=["SFO"], horizons=["12m"])
+    rep = fake_analyst.diagnose(req)
+    table = ranking_table(rep)
+    assert table.title.startswith("Scores")
+    assert "rank" not in table.columns and "score" in table.columns
+    assert any("relative standing" in note for note in table.footnotes)
 
 
 def test_ranking_table_states_what_rank_1_means(fake_analyst):
