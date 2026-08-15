@@ -7,4 +7,4 @@ which runs the whole DataService contract suite against the real implementation 
 """
 from __future__ import annotations
 
-pytest_plugins: list[str] = []
+pytest_plugins: list[str] = ["tests.data.conftest_plugin"]

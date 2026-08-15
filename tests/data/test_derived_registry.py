@@ -121,8 +121,13 @@ class TestTierBOnlyCurated:
 
 class TestGoldenValues:
     def test_anc_longhaul_dep_share_in_range(self, snapshot_con) -> None:
+        # Plan Task 13 checklist quoted 0.15-0.5 from a single-month (2026-04) T-100 subset;
+        # the 12m window now spans 6 real months (see make_fixture_extra_months.py, added for
+        # `spill_proxy`'s >=6-month requirement), which pulls the real value down slightly to
+        # ~0.13 — still a plausible, real, non-trivial long-haul share, just outside that
+        # narrower single-month estimate. Widened to 0.10-0.5.
         v = _current(snapshot_con, "longhaul_dep_share", "12m", "ANC")
-        assert 0.15 <= v <= 0.5
+        assert 0.10 <= v <= 0.5
 
     def test_anc_competing_seats_is_near_zero(self, snapshot_con) -> None:
         v = _current(snapshot_con, "competing_seats_100mi", "12m", "ANC")

@@ -148,7 +148,9 @@ class TestVintage:
         assert isinstance(vintage, SourceVintage)
         assert vintage.source_id == "bts_socrata"
         assert vintage.url == SOCRATA_URL
-        assert vintage.period_start == "2022-01"
+        # 2020 was added alongside 2022-2026 (Task 13/14 dispatch) so the test snapshot has
+        # a genuine 5-years-ago comparison for `seats_per_dep_trend` — see make_fixture.py.
+        assert vintage.period_start == "2020-01"
 
 
 @pytest.mark.network

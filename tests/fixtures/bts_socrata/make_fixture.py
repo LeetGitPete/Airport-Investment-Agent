@@ -3,12 +3,18 @@
 Usage: uv run python tests/fixtures/bts_socrata/make_fixture.py
 
 Queries the real Socrata endpoint (same `$select`/casts the adapter uses) filtered
-to the 15 fixture airports and `year >= 2022`, and writes the single-page JSON
-response next to this file. Full history (2014+) for all 15 airports is ~522 KB —
-over the fixture budget — so this subset trims to the last ~4.3 years (2022-2026),
-which still gives BOS a full 12 months in 2025 and several complete years per
-airport for adapter-level tests (multi-year *derived* metric tests are out of
-scope for this adapter's own test suite). Rows are copied verbatim from the API.
+to the 15 fixture airports and `year >= 2022 OR year = 2020`, and writes the
+single-page JSON response next to this file. Full history (2014+) for all 15
+airports is ~522 KB — over the fixture budget — so this subset trims to the last
+~4.3 years (2022-2026) plus one extra complete year (2020).
+
+The 2020 year was added by the Task 13/14 dispatch (2026-08-16): the frozen
+`tests/contracts/test_data_service_contract.py::test_feature_matrix_conforms_to_registry`
+requires `seats_per_dep_trend` (a genuine 5-years-ago comparison, tier A, not in
+`ATTEMPT_IDS`) to be non-None at the 5y horizon for BOS/SFO/ANC — the original
+2022-2026-only subset has no year 5 years before the fixture's latest complete
+year (2025), so `seats_per_dep_trend` was always empty in the test snapshot.
+2020 is real, unedited API data, not invented. Rows are copied verbatim from the API.
 """
 from __future__ import annotations
 
@@ -28,7 +34,7 @@ FIXTURE_IATAS = [
 
 def main() -> None:
     codes = ",".join(f"'{code}'" for code in FIXTURE_IATAS)
-    where = f"origin_airport_code in({codes}) AND year >= '2022'"
+    where = f"origin_airport_code in({codes}) AND (year >= '2022' OR year = '2020')"
     params = {
         "$select": _select_clause(),
         "$where": where,
