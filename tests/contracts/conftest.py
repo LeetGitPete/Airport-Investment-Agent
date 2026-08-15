@@ -12,6 +12,11 @@ implementation is then exercised by the whole suite. Phase 2's data-engineer reg
 
 A `@pytest.fixture(params=DATA_SERVICE_FACTORIES)` would NOT work: params are snapshotted when the
 decorator runs, i.e. when this conftest is imported, which is before any plugin can append.
+
+The list is shared by import path, so the plugin and this module must resolve to the same module object:
+keep `tests/__init__.py` and `tests/contracts/__init__.py` (and the repo root on sys.path, added by
+`tests/conftest.py`), so everything imports it as `tests.contracts.conftest` — a rootdir-relative
+re-import under a different name would append to a second, unused copy of the list.
 """
 from __future__ import annotations
 

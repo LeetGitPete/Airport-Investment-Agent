@@ -34,10 +34,10 @@ class DataService(Protocol):
                             peer_group: PeerGroup = "hub_class") -> FeatureMatrix:
         """Return a dense numeric matrix of metric_ids x airports for the Deterministic Analyst.
 
-        Horizon semantics. Horizon-invariant metrics (MetricSpec.horizons containing only "static" and/or
-        "forecast", or level metrics declaring the requested horizon) are returned at their own declared
-        horizon. Trend/level metrics whose MetricSpec.horizons does NOT include the requested horizon MUST
-        return None — implementations never relabel a 12m number as a 5y number.
+        Horizon semantics. Horizon-invariant metrics = MetricSpec.horizons is a subset of
+        {"static", "forecast"}; they are returned at their own declared horizon regardless of the requested
+        one. Non-invariant metrics: returned only if MetricSpec.horizons includes the requested horizon,
+        else None. Never relabel across horizons — no implementation may pass a 12m number off as a 5y one.
 
         Unknown iata -> raise KeyError; unknown metric id -> raise KeyError.
         """
@@ -54,15 +54,27 @@ class DataService(Protocol):
 
     def get_routes(self, iata: str, horizon: Horizon = "12m", top_n: int = 25,
                     international: bool | None = None) -> RouteTable:
-        """Return the top routes served by an airport for a horizon, optionally filtered by international status."""
+        """Return the top routes served by an airport for a horizon, optionally filtered by international status.
+
+        Unknown iata -> raise KeyError (never an empty/fabricated result).
+        """
         ...
 
     def get_metric_series(self, iata: str, metric_id: str) -> list[Metric]:
-        """Return the annual time series for a metric_id at an airport (used for trends)."""
+        """Return the annual series for a metric_id at an airport, at the metric's own declared horizon.
+
+        Metrics declaring "12m" -> one Metric per calendar year with horizon "12m"; trend metrics
+        (3y/5y/10y) -> one per year at that horizon; horizon-invariant metrics (static/forecast) -> []
+        (a static value has no time series).
+        Unknown iata -> KeyError; unknown metric id -> KeyError; metric unavailable for this airport -> [].
+        """
         ...
 
     def get_live_status(self, iata: str) -> LiveStatus:
-        """Return current operational status (delay programs, ground stops, closures)."""
+        """Return current operational status (delay programs, ground stops, closures).
+
+        Unknown iata -> raise KeyError (never an empty/fabricated result).
+        """
         ...
 
     def describe_metrics(self) -> list[MetricSpec]:

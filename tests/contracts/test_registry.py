@@ -38,8 +38,6 @@ def test_pillars_match_names_and_weights_sum_to_one():
     assert abs(sum(v["default_weight"] for v in pillars.values()) - 1.0) < 1e-9
 
 
-
-
 DUP_YAML = """
 pillars:
   P1: {name: Demand Pressure, default_weight: 1.0}

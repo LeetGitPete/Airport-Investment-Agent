@@ -18,7 +18,7 @@ class ExtendedOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
     requested_sections: list[str] = Field(default_factory=list)
     metrics: list[str] = Field(default_factory=list)
-    peer_group: PeerGroup | None = None
+    peer_group: PeerGroup | None = None  # overrides AnalysisRequest.peer_group when set (general_analyst only)
 
 
 class AnalysisRequest(BaseModel):

@@ -102,7 +102,11 @@ class AirportFilter(BaseModel):
 
 
 class FeatureMatrix(BaseModel):
-    """Dense numeric matrix for the Deterministic Analyst. values[i][j] = airport i, metric j (None = missing)."""
+    """Dense numeric matrix for the Deterministic Analyst. values[i][j] = airport i, metric j (None = missing).
+
+    A column's true horizon is its MetricSpec's declared horizon (see DataService.get_feature_matrix);
+    horizon-invariant columns may appear in any requested horizon — cite them at their own horizon.
+    """
     model_config = ConfigDict(extra="forbid")
     airports: list[AirportRef]
     metric_ids: list[str]

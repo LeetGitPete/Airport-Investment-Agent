@@ -43,6 +43,7 @@ def test_feature_matrix_conforms_to_registry(data_service):
                 assert all(v is not None for v in column), f"{spec.id}: tier-A gap at 5y"
         else:
             assert all(v is None for v in column), f"{spec.id}: value invented for an undeclared horizon"
+    assert 0.0 < fm.coverage() < 0.5  # most metrics do not declare 5y: the matrix is legitimately sparse
 
 
 def test_feature_matrix_12m_covers_tier_a(data_service):
@@ -63,6 +64,10 @@ def test_unknown_airport_raises(data_service):
         data_service.get_feature_matrix(["ZZZ"], ["load_factor"], "12m")
     with pytest.raises(KeyError):
         data_service.get_profile("ZZZ")
+    with pytest.raises(KeyError):
+        data_service.get_routes("ZZZ")
+    with pytest.raises(KeyError):
+        data_service.get_live_status("ZZZ")
 
 
 def test_profile_has_all_sections_and_provenance(data_service):
@@ -91,6 +96,7 @@ def test_metric_series_is_chronological(data_service):
 def test_metric_series_empty_when_metric_missing(data_service):
     assert data_service.get_metric_series("ANC", "pax_per_gate") == []  # tier B, not curated for ANC
     assert data_service.get_metric_series("BOS", "asv_utilization") == []  # tier C, never available
+    assert data_service.get_metric_series("BOS", "imc_capacity_ratio") == []  # static: no time series
 
 
 def test_live_status_and_vintages(data_service):

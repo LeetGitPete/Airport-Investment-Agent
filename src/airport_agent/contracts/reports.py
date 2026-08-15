@@ -25,8 +25,8 @@ class DeterministicReport(BaseModel):
     report_type: Literal["deterministic"] = "deterministic"
     question_type: QuestionType
     preset: str | None
-    # pillar and metric weights, keyed by pillar id (P1..P5) and metric id;
-    # ScoreRow.metric_contrib = w_m x percentile x 100
+    # pillar and metric weights keyed by pillar id (P1..P5) and metric id; metric entries are within-pillar
+    # weights; ScoreRow.metric_contrib = w_p x w_m x percentile x 100, so metric contributions sum to the score
     weights: dict[str, float]
     horizon: Horizon
     peer_group: PeerGroup

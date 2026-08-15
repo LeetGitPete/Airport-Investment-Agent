@@ -76,13 +76,18 @@ class FakeDataService:
         """The horizon a value is reported AT: the requested one only if the spec declares it."""
         return horizon if horizon in spec.horizons else spec.horizons[0]
 
+    @staticmethod
+    def _is_invariant(spec: MetricSpec) -> bool:
+        """Horizon-invariant: the metric declares only static and/or forecast horizons."""
+        return set(spec.horizons) <= {"static", "forecast"}
+
     def _value(self, iata: str, metric_id: str, horizon: str) -> float | None:
         spec = self._spec(metric_id)
         if spec.tier == "C":
             return None
         # Contract: never relabel another horizon as the requested one. Horizon-invariant metrics
         # ("static"/"forecast") answer any request; everything else must declare the horizon or be None.
-        if horizon not in spec.horizons and not ({"static", "forecast"} & set(spec.horizons)):
+        if horizon not in spec.horizons and not self._is_invariant(spec):
             return None
         if spec.tier == "B":
             row = TIER_B.get(iata, {})
@@ -152,17 +157,20 @@ class FakeDataService:
 
     def get_routes(self, iata: str, horizon: Horizon = "12m", top_n: int = 25,
                    international: bool | None = None) -> RouteTable:
-        rows = ROUTES.get(iata.upper(), [])
+        rows = ROUTES.get(self._ref(iata).iata, [])
         if international is not None:
             rows = [r for r in rows if r.is_international == international]
         rows = sorted(rows, key=lambda r: r.departures, reverse=True)
-        return RouteTable(iata=iata.upper(), period_start="2025-05", period_end=VINT, source_id="bts_t100",
+        return RouteTable(iata=self._ref(iata).iata, period_start="2025-05", period_end=VINT, source_id="bts_t100",
                           vintage=VINT, rows=rows[:top_n], truncated=len(rows) > top_n)
 
     def get_metric_series(self, iata: str, metric_id: str) -> list[Metric]:
         spec = self._spec(metric_id)
+        ref = self._ref(iata)
+        if self._is_invariant(spec):
+            return []  # a static/forecast value has no time series
         h = self._stamped_horizon(spec, "12m")  # a 5y-only metric has a 5y series, not a 12m one
-        base = self._value(self._ref(iata).iata, metric_id, h)
+        base = self._value(ref.iata, metric_id, h)
         if base is None:  # metric unavailable here (tier C, or tier B outside the curated set) - no invented numbers
             return []
         return [Metric(id=metric_id, value=base * (1 - 0.01 * (2026 - y)), unit=spec.unit, horizon=h,
@@ -170,7 +178,7 @@ class FakeDataService:
                 for y in range(2016, 2027)]
 
     def get_live_status(self, iata: str) -> LiveStatus:
-        i = iata.upper()
+        i = self._ref(iata).iata
         return LiveStatus(iata=i, delay_programs=["Ground Delay Program"] if i == "SFO" else [], ground_stop=False,
                           closure=False, latest_month={"total_passengers": 1e6}, fetched_at=FETCHED,
                           source_ids=["faa_nasstatus", "bts_socrata"])
