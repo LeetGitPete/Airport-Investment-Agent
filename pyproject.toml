@@ -29,7 +29,7 @@ packages = ["src/airport_agent"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-markers = ["network: tests that hit the internet (skipped by default)"]
+markers = ["network: tests that hit the internet (skipped by default)", "llm: tests that call a live LLM provider (need GEMINI_API_KEY)"]
 addopts = "-m 'not network' -q"
 
 [tool.ruff]
