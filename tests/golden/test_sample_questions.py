@@ -81,6 +81,41 @@ def _numeric_cells(answer: Answer) -> list[float]:
     return cells
 
 
+def _numeric_tokens(text: str) -> list[float]:
+    """Standalone numbers written in prose: 15.4, 15.4%, 1,500 - but not the 12 in 12m or the 2 in P2."""
+    tokens: list[float] = []
+    i = 0
+    while i < len(text):
+        if not text[i].isdigit():
+            i += 1
+            continue
+        start = i
+        while i < len(text) and (text[i].isdigit() or text[i] in ",."):
+            i += 1
+        raw = text[start:i].rstrip(".,")
+        end = start + len(raw)
+        before = text[start - 1] if start else " "
+        after = text[end] if end < len(text) else " "
+        standalone = not (before.isalnum() or before == "_") and not (after.isalnum() or after == "_")
+        if standalone:
+            try:
+                tokens.append(float(raw.replace(",", "")))
+            except ValueError:
+                pass
+        while i < len(text) and (text[i].isalnum() or text[i] == "_"):
+            i += 1
+    return tokens
+
+
+def _traceable(number: float, allowed: set[float]) -> bool:
+    """A prose number must be a report number, in either percent or fraction form, allowing for rounding."""
+    for value in allowed:
+        for candidate in (value, value * 100.0, value / 100.0):
+            if abs(number - candidate) <= max(0.05, abs(candidate) * 0.005):
+                return True
+    return False
+
+
 def _check_answer(answer: Answer, state, registry) -> None:
     assert isinstance(answer, Answer)
     assert answer.plan_line.startswith("How I'm approaching this")
@@ -91,6 +126,9 @@ def _check_answer(answer: Answer, state, registry) -> None:
     allowed = _allowed_numbers(state, answer, registry)
     unexplained = [c for c in _numeric_cells(answer) if c not in allowed]
     assert unexplained == [], f"table cells not traceable to a report or tool result: {unexplained}"
+    prose = " ".join(t for t in (answer.headline, answer.analyst_view) if t)
+    invented = [n for n in _numeric_tokens(prose) if not _traceable(n, allowed)]
+    assert invented == [], f"numbers in the prose that no report or tool result supports: {invented}"
 
 
 @pytest.mark.parametrize("index", range(4))
@@ -137,6 +175,10 @@ def test_q3_is_informational_with_no_analyst_view(session):
     assert any(t.title.startswith("Long-haul share") for t in answer.evidence_tables)
     assert any("1500" in a or "1,500" in a for a in answer.assumptions)
     assert len(llm.calls) == 2
+    # the quoted share is the value the engine computed, not a number the model chose
+    routes = registry.call("get_route_stats", {"iata": "ANC"}, engine="concierge")
+    computed_pct = routes["long_haul_share"]["passenger"]["value"] * 100.0
+    assert _numeric_tokens(answer.headline)[0] == pytest.approx(computed_pct, abs=0.05)
     _check_answer(answer, state, registry)
 
 

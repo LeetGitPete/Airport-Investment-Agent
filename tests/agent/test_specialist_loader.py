@@ -99,3 +99,24 @@ def test_slice_selects_pillars_and_named_ids(specs):
                            metric_ids=["load_factor"], body="{METRIC_SLICE}")
     ids = [s.id for s in cfg.slice_specs(specs)]
     assert "load_factor" in ids and "cbsa_population" in ids and "carrier_hhi" not in ids
+
+
+MAX_CALLS_PER_QUESTION = 6  # design 03 call budget: ~10 RPM free tier means ~2 analytical questions a minute
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_specialist_loop_fits_the_call_budget(name, specs):
+    cfg = load_specialist(name, specs)
+    # plan (1) + specialist loop turns + specialist final (1) + synthesis (1)
+    total = 1 + cfg.max_turns + 1 + 1
+    assert total <= MAX_CALLS_PER_QUESTION, f"{name} can cost {total} LLM calls for one question"
+
+
+def test_max_turns_above_the_budget_is_rejected(tmp_path, specs):
+    config = BROKEN_CONFIG.replace("name: broken", "name: greedy").replace(
+        "metric_ids: [not_a_metric]", "metric_ids: [load_factor]") + "max_turns: 4"
+    body = config.split("---")
+    text = "---" + body[1] + "max_turns: 4\n---" + body[2]
+    (tmp_path / "greedy.md").write_text(text, encoding="utf-8")
+    with pytest.raises(ValueError, match="less than or equal to 3"):
+        load_specialist("greedy", specs, config_dir=tmp_path)

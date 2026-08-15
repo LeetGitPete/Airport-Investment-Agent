@@ -105,7 +105,7 @@ Q2_SYNTHESIS = synthesis(headline="LAX is the more congested field; SNA is const
 Q3_PLAN = plan(intent="informational", engines=["tools"],
                tool_calls=[{"tool": "get_route_stats", "args_json": ANC_ROUTES}],
                presentation_notes="State the long-haul convention and separate passenger from freight.")
-Q3_SYNTHESIS = synthesis(headline="About 15% of ANC passenger departures are long haul; freight is far higher.",
+Q3_SYNTHESIS = synthesis(headline="15.4% of ANC passenger departures are long haul; freight is far higher.",
                          show_metrics=[], hidden_reason="",
                          follow_ups=["And for freight only?", "Which sources did you use?", "Compare to SEA?"])
 
