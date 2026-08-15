@@ -218,7 +218,8 @@ class Planner:
 
     def _tools_block(self) -> str:
         lines = [f"- {s.name} — {s.description}" for s in self.registry.for_engine(CONCIERGE)]
-        return ("TOOLS you may plan (informational intent only; one tool_calls entry per call):\n"
+        return ("TOOLS you may plan (informational intent only; at most ONE tool_calls entry per tool "
+                "name — call a tool once with all its args; the Concierge executes each entry):\n"
                 + "\n".join(lines))
 
     def _metrics_block(self) -> str:
@@ -230,8 +231,8 @@ class Planner:
                 lines.append(f"- {pillar} {pillar_name}: " + "; ".join(ids))
         gaps = [s.id for s in self.specs if s.tier == "C"]
         if gaps:
-            lines.append("- documented gaps (tier C — no public source, never scored; name them only as a "
-                         "limitation): " + ", ".join(gaps))
+            lines.append("- tier C — documented gaps, not computable from our data; never scored "
+                         "(name them only as a limitation): " + ", ".join(gaps))
         return ("METRIC IDS (registry — focus_metrics must come from this list; never invent an id; "
                 "* = tier B, curated data for major airports only):\n" + "\n".join(lines))
 
@@ -335,6 +336,7 @@ class Planner:
         return self._parse(parse_json_text(result.text))
 
     def _parse(self, raw: dict[str, Any]) -> tuple[Plan, PlanFilters]:
+        clarify = raw.get("intent") == "clarify"  # a clarify turn executes nothing: no engines, no tools
         filters = PlanFilters(
             question_type=_unset(raw.get("question_type")),
             airports=raw.get("airports") or [],
@@ -346,9 +348,9 @@ class Planner:
             focus_metrics=raw.get("focus_metrics") or [],
             hint=raw.get("hint") or "",
             peer_group=_unset(raw.get("peer_group")),
-            tool_calls=raw.get("tool_calls") or [],
+            tool_calls=[] if clarify else (raw.get("tool_calls") or []),
         )
-        engines = [] if raw.get("intent") == "clarify" else list(raw.get("engines") or [])
+        engines = [] if clarify else list(raw.get("engines") or [])
         allowed = {"tools", "deterministic", *[f"specialist:{s}" for s in self.specialists]}
         unknown = [e for e in engines if e not in allowed]
         if unknown:

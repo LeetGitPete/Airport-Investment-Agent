@@ -6,7 +6,7 @@ import pytest
 
 from airport_agent.agent.planner import PLAN_SCHEMA, SAMPLE_QUESTIONS, PlanFilters, Planner
 from airport_agent.agent.tools.data_tools import build_registry
-from airport_agent.contracts import Plan, SessionState
+from airport_agent.contracts import LLMError, Plan, SessionState
 from tests.agent.fake_llm import ScriptedLLM
 
 PRESETS = ["balanced", "terminal_expansion", "congestion_relief", "market_entry"]
@@ -114,6 +114,16 @@ def test_clarify_intent_drops_engines(fake_data, fake_analyst, specs):
     assert Planner.plan_line(plan, f).endswith("engines: none")
 
 
+def test_clarify_intent_drops_tool_calls_too(fake_data, fake_analyst, specs):
+    js = _plan_json(intent="clarify", engines=["tools"], question_type="none", faa_regions=[], horizons=[],
+                    scoring_preset="none",
+                    tool_calls=[{"tool": "get_route_stats", "args_json": '{"iata": "ANC"}'}])
+    p = _planner([js], fake_data, fake_analyst, specs)
+    plan, f = p.plan("which airport did you mean?", SessionState(session_id="s", title="t"))
+    assert plan.engines == [] and plan.tools_to_call == [] and f.tool_calls == []
+    assert plan.filters["tool_calls"] == []
+
+
 def test_unknown_engine_is_loud(fake_data, fake_analyst, specs):
     p = _planner([_plan_json(engines=["deterministic", "specialist:price_analyst"])], fake_data, fake_analyst, specs)
     with pytest.raises(ValueError, match="unknown engines"):
@@ -175,4 +185,26 @@ def test_metric_block_marks_tiers(fake_data, fake_analyst, specs):
     sysmsg = p.system_prompt(None)
     assert "load_factor (Load factor)" in sysmsg  # tier A, unmarked
     assert "peak_hour_ops_ratio (Peak demand/capacity)*" in sysmsg  # tier B, marked
-    assert "documented gaps (tier C" in sysmsg and "dscr" in sysmsg
+    assert "tier C — documented gaps, not computable from our data" in sysmsg and "dscr" in sysmsg
+
+
+def test_plan_call_is_low_temperature_and_two_messages(fake_data, fake_analyst, specs):
+    p = _planner([_plan_json()], fake_data, fake_analyst, specs)
+    p.plan(SAMPLE_QUESTIONS[0], SessionState(session_id="s", title="t"))
+    call = p.llm.calls[0]
+    assert call["temperature"] == 0.1 and call["tools"] is None
+    assert [m["role"] for m in call["messages"]] == ["system", "user"]
+    assert call["messages"][1]["content"] == SAMPLE_QUESTIONS[0]
+
+
+def test_llm_error_propagates_from_plan(fake_data, fake_analyst, specs):
+    p = _planner([LLMError("gemini", 429, "quota exceeded")], fake_data, fake_analyst, specs)
+    with pytest.raises(LLMError, match="quota exceeded"):
+        p.plan("x", SessionState(session_id="s", title="t"))
+
+
+def test_presentation_notes_pass_through(fake_data, fake_analyst, specs):
+    p = _planner([_plan_json(presentation_notes="lead with the top 5 rows, collapse the rest")],
+                 fake_data, fake_analyst, specs)
+    plan, _ = p.plan(SAMPLE_QUESTIONS[0], SessionState(session_id="s", title="t"))
+    assert plan.presentation_notes == "lead with the top 5 rows, collapse the rest"
