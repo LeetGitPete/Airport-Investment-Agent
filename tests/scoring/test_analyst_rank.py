@@ -88,3 +88,42 @@ def test_rank_absent_pillar_caveat_mentions_pillar_and_forgone_weight(analyst):
                                        scoring_preset="balanced", focus_metrics=["load_factor"]))
     caveat = next(c for c in rep.caveats if c.startswith("Pillars "))
     assert "P2" in caveat and "0.70" in caveat
+
+
+def test_rank_absent_weight_reaches_the_explanation_too(analyst):
+    rep = analyst.rank(AnalysisRequest(question_type="rank", airports=["BOS", "LAX", "SFO"], horizons=["12m"],
+                                       scoring_preset="balanced", focus_metrics=["load_factor"]))
+    assert "forgone preset weight 0.70" in rep.explanation
+
+
+def test_rank_all_focus_metrics_unscoreable_raises_never_ranks_on_nothing(analyst):
+    # asv_utilization is tier C -> never scoreable under any preset; ranking must fail loudly, not
+    # silently emit an alphabetical (score=0 for everyone) ranking.
+    with pytest.raises(ValueError, match="no scoreable metrics"):
+        analyst.rank(AnalysisRequest(question_type="rank", airports=["BOS", "LAX"], horizons=["12m"],
+                                     focus_metrics=["asv_utilization"]))
+
+
+def test_rank_focus_metrics_partial_drop_is_disclosed_in_a_caveat(analyst):
+    rep = analyst.rank(AnalysisRequest(question_type="rank", airports=["BOS", "LAX"], horizons=["12m"],
+                                       focus_metrics=["not_a_metric", "load_factor", "asv_utilization"]))
+    dropped = next(c for c in rep.caveats if c.startswith("focus_metrics dropped:"))
+    assert "not_a_metric" in dropped and "asv_utilization" in dropped
+    # the surviving metric still scores normally
+    assert set(rep.percentiles) == {"load_factor"}
+
+
+def test_rank_unknown_target_airport_raises_key_error(analyst):
+    with pytest.raises(KeyError):
+        analyst.rank(AnalysisRequest(question_type="rank", airports=["ZZZ"], horizons=["12m"]))
+
+
+def test_rank_duplicate_targets_are_deduped(analyst):
+    rep = analyst.rank(AnalysisRequest(question_type="rank", airports=["BOS", "LAX", "BOS"], horizons=["12m"]))
+    assert [r.ref.iata for r in rep.rows].count("BOS") == 1
+    assert len(rep.rows) == 2
+
+
+def test_rank_empty_horizons_raises_value_error_not_index_error(analyst):
+    with pytest.raises(ValueError, match="horizons must not be empty"):
+        analyst.rank(AnalysisRequest(question_type="rank", airports=["BOS"], horizons=[]))

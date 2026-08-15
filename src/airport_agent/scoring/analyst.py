@@ -43,7 +43,11 @@ class Analyst:
     def _resolve_airports(self, req: AnalysisRequest) -> list[str]:
         if req.airports:
             return list(dict.fromkeys(req.airports))
-        assert req.filter is not None  # guaranteed by AnalysisRequest validator
+        if req.filter is None:
+            # AnalysisRequest's own validator already guarantees airports or filter is set; this is
+            # belt-and-braces so a future relaxation of that validator fails loudly here too, not with
+            # an AttributeError deep in list_airports.
+            raise ValueError("AnalysisRequest needs airports or a filter")
         iatas = [a.iata for a in self.data.list_airports(req.filter)]
         if not iatas:
             raise ValueError("no airports match the filter")
@@ -51,6 +55,28 @@ class Analyst:
 
     def _universe(self) -> list[AirportRef]:
         return self.data.list_airports(AirportFilter(limit=UNIVERSE_LIMIT))
+
+    def _resolve_metric_ids(self, preset: Preset, focus_metrics: list[str] | None) -> tuple[list[str], list[str]]:
+        """Return (scoreable metric ids, caveats about any focus_metrics dropped).
+
+        Never silently fall back to ranking on an empty metric set: if focus_metrics is given but
+        nothing in it is scoreable (all unknown / tier C / excluded by the preset), fail loudly.
+        """
+        if not focus_metrics:
+            return self.scorer.scoreable_ids(preset), []
+        candidates = list(dict.fromkeys(focus_metrics))
+        ids = self.scorer.scoreable_ids(preset, candidates)
+        unknown = [m for m in candidates if m not in self.by_id]
+        dropped_tier_or_excluded = [m for m in candidates if m not in unknown and m not in ids]
+        if not ids:
+            raise ValueError(f"no scoreable metrics for this request: focus_metrics={candidates!r} "
+                             "(tier C / excluded / unknown ids)")
+        caveats: list[str] = []
+        if unknown or dropped_tier_or_excluded:
+            dropped = unknown + dropped_tier_or_excluded
+            caveats.append(f"focus_metrics dropped: {dropped!r} (unknown: {unknown!r}; "
+                           f"tier C/excluded: {dropped_tier_or_excluded!r})")
+        return ids, caveats
 
     def _evidence(self, iatas: list[str], metric_ids: list[str], horizon: Horizon
                   ) -> tuple[list[Metric], Evidence, list[CuratedFact]]:
@@ -100,26 +126,31 @@ class Analyst:
             out.append(LONGHAUL_CONVENTION)
         if "load_factor" in metric_ids:
             out.append(SPILL_CONVENTION)
-        for m in metric_ids:
-            for c in self.by_id[m].caveats:
+        scored = set(metric_ids)
+        for spec in self.specs:  # registry order, not the (possibly focus_metrics-supplied) metric_ids order
+            if spec.id not in scored:
+                continue
+            for c in spec.caveats:
                 if c not in out:
                     out.append(c)
         return out
 
     # ---- DeterministicAnalyst -------------------------------------------------------------------
     def rank(self, req: AnalysisRequest) -> DeterministicReport:
+        if not req.horizons:
+            raise ValueError("horizons must not be empty")
         horizon: Horizon = req.horizons[0]
         preset = self._preset(req.scoring_preset)
         peer_group: PeerGroup = req.peer_group or "hub_class"
         targets = self._resolve_airports(req)
-        metric_ids = self.scorer.scoreable_ids(preset, req.focus_metrics) if req.focus_metrics \
-            else self.scorer.scoreable_ids(preset)
+        metric_ids, dropped_caveats = self._resolve_metric_ids(preset, req.focus_metrics)
         res, n_uni = self._score_targets(targets, metric_ids, horizon, peer_group, preset)
         evidence, ev, facts = self._evidence(targets, metric_ids, horizon)
         rows: list[ScoreRow] = res.rows
 
         absent_weight: float | None = None
         caveats = self._caveats(metric_ids, peer_group, n_uni)
+        caveats.extend(dropped_caveats)
         if res.absent_pillars:
             absent_weight = sum(preset.pillars[p] for p in res.absent_pillars)
             caveats.append(f"Pillars {', '.join(res.absent_pillars)} not scored (no metric in the scored set; "
