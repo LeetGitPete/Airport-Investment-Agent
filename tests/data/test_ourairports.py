@@ -79,6 +79,63 @@ class TestNormalizeAirports:
         assert airports["vintage"].str.fullmatch(r"\d{4}-\d{2}-\d{2}").all()
 
 
+def _raw_airport_row(**overrides: str) -> dict[str, str]:
+    """One raw OurAirports row (shape of the real CSV), overridable per test."""
+    row = {
+        "ident": "KBOS",
+        "type": "large_airport",
+        "name": "Boston Logan International Airport",
+        "latitude_deg": "42.36197",
+        "longitude_deg": "-71.0079",
+        "iso_country": "US",
+        "iso_region": "US-MA",
+        "municipality": "Boston",
+        "icao_code": "KBOS",
+        "iata_code": "BOS",
+        "gps_code": "KBOS",
+        "local_code": "BOS",
+    }
+    row.update(overrides)
+    return row
+
+
+class TestIcaoResolution:
+    """`icao` prefers the authoritative `icao_code` column, then `ident`, then `gps_code`."""
+
+    def test_fixture_rows_use_icao_code(self, normalized: dict[str, pd.DataFrame], fixtures_dir: Path) -> None:
+        raw = pd.read_csv(
+            fixtures_dir / "ourairports" / "airports.csv", dtype=str, keep_default_na=False
+        )
+        expected = dict(zip(raw["iata_code"], raw["icao_code"], strict=True))
+        got = dict(zip(normalized["airports"]["iata"], normalized["airports"]["icao"], strict=True))
+        assert got == expected
+
+    def test_prefers_icao_code_over_a_local_ident(self) -> None:
+        # Real upstream shape: Nunapitchuk (NUP) has ident "16A" but icao_code "PPIT".
+        raw = pd.DataFrame(
+            [
+                _raw_airport_row(
+                    ident="16A", icao_code="PPIT", gps_code="PPIT", local_code="16A",
+                    iata_code="NUP", type="small_airport", iso_region="US-AK",
+                )
+            ]
+        )
+        out = OurAirportsAdapter()._airports_frame(raw)
+        assert out.loc[0, "icao"] == "PPIT"
+        assert out.loc[0, "faa_locid"] == "16A"
+
+    def test_falls_back_to_ident_when_icao_code_blank(self) -> None:
+        # Real upstream shape: many small US fields have no ICAO code at all.
+        raw = pd.DataFrame(
+            [_raw_airport_row(ident="07FA", icao_code="", gps_code="07FA", local_code="07FA", iata_code="OCA")]
+        )
+        assert OurAirportsAdapter()._airports_frame(raw).loc[0, "icao"] == "07FA"
+
+    def test_falls_back_to_gps_code_when_icao_code_and_ident_blank(self) -> None:
+        raw = pd.DataFrame([_raw_airport_row(ident="", icao_code="", gps_code="KBOS")])
+        assert OurAirportsAdapter()._airports_frame(raw).loc[0, "icao"] == "KBOS"
+
+
 class TestNormalizeRunways:
     def test_columns_match_store_schema(self, normalized: dict[str, pd.DataFrame]) -> None:
         assert list(normalized["runways"].columns) == list(RUNWAY_COLUMNS)

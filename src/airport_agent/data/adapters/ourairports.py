@@ -105,16 +105,27 @@ class OurAirportsAdapter:
         runways = self._runways_frame(_read_csv(runways_path), keep)
         return {"airports": airports, "runways": runways}
 
+    @staticmethod
+    def _icao(keep: pd.DataFrame) -> pd.Series:
+        """ICAO code: the dedicated `icao_code` column, else `ident`, else `gps_code`.
+
+        `icao_code` is the authoritative field (added upstream after the research note was
+        written); `ident` equals it for every airport that has a real ICAO code, but is a
+        local designator (e.g. "16A" where `icao_code` is "PPIT") for ~12% of the kept US
+        rows. `gps_code` is the last resort when both are blank.
+        """
+        icao = keep["icao_code"].str.strip()
+        ident = keep["ident"].str.strip()
+        gps = keep["gps_code"].str.strip()
+        return icao.where(icao != "", ident.where(ident != "", gps))
+
     def _airports_frame(self, keep: pd.DataFrame) -> pd.DataFrame:
         iata = keep["iata_code"].str.strip()
         local = keep["local_code"].str.strip()
-        ident = keep["ident"].str.strip()
         out = pd.DataFrame(
             {
                 "iata": iata,
-                # OurAirports' `ident` is the ICAO code where one exists; `gps_code` is the
-                # documented fallback for airports whose ident is a local designator.
-                "icao": ident.where(ident != "", keep["gps_code"].str.strip()),
+                "icao": self._icao(keep),
                 "faa_locid": local.where(local != "", iata),
                 "name": keep["name"].str.strip(),
                 "city": keep["municipality"].str.strip(),
