@@ -1,0 +1,2 @@
+# DuckDB snapshots are binary: never apply CRLF/text conversion
+*.duckdb binary
