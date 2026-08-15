@@ -50,3 +50,6 @@ Assignment-first; Python 3.12 + pydantic v2 + DuckDB + LiteLLM (**Gemini free ti
 
 ## Memory
 `C:\Users\palis\.claude\projects\C--Users-palis-Desktop-soft-projects-airport-agent\memory\` has `working-style-escalate-dont-improvise.md` and `airport-agent-methodology.md`; keep them current.
+
+## Controller docs follow-ups to apply on main at Phase 3 merge (from task reviews)
+- limitations rows: OurAirports `icao_code→ident→gps_code`; identity placeholders (hub_size/faa_region/commercial) until TAF/Socrata overwrite; vintage = newest raw-file mtime (mtime-as-vintage proxy); analysis-tool results carry `coverage` (data tools do not) — amend design 03:30; roster allowed_tools now include explain_metric (capacity/market) + get_metric_series (market) — amend design 03 roster; low_confidence rule (absent-by-design pillars ⇒ no flag + caveat with forgone weight).
