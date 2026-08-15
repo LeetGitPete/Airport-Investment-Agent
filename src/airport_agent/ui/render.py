@@ -40,8 +40,23 @@ def assumptions_expanded(answer: Answer) -> bool:
     return answer.plan.intent == "analytical"
 
 
+def metric_ids_in_table(table: Table, specs_by_id: dict[str, MetricSpec]) -> list[str]:
+    """Registered metric ids that appear as *cell values* anywhere in the table (e.g. a long-format table
+    with a metric-id column) — complements `column_help`'s column-name tooltips, in first-appearance
+    order, deduplicated."""
+    seen: list[str] = []
+    for row in table.rows:
+        for cell in row:
+            if isinstance(cell, str) and cell in specs_by_id and cell not in seen:
+                seen.append(cell)
+    return seen
+
+
 def render_plan_line(plan_line: str) -> None:
     st.caption(plan_line)
+
+
+_MAX_METRIC_DEFINITION_LINES = 12
 
 
 def _render_table(table: Table, specs_by_id: dict[str, MetricSpec]) -> None:
@@ -50,6 +65,11 @@ def _render_table(table: Table, specs_by_id: dict[str, MetricSpec]) -> None:
     st.dataframe(df, column_config=column_help(table.columns, specs_by_id), hide_index=True)
     for note in table.footnotes:
         st.caption(note)
+    ids = metric_ids_in_table(table, specs_by_id)
+    for metric_id in ids[:_MAX_METRIC_DEFINITION_LINES]:
+        st.caption(f"{metric_id} — {specs_by_id[metric_id].definition}")
+    if len(ids) > _MAX_METRIC_DEFINITION_LINES:
+        st.caption("…")
 
 
 def render_answer(
@@ -91,6 +111,8 @@ def render_answer(
     if answer.citations:
         sources = ", ".join(f"{c.source_id} ({c.vintage})" for c in answer.citations)
         st.caption(f"Sources: {sources}")
+    else:
+        st.caption("Sources: none stated")
 
     for i, text in enumerate(answer.follow_ups):
         if st.button(text, key=f"{key}-fu-{i}"):
@@ -102,7 +124,7 @@ def render_answer(
             [
                 {
                     "tool": t.tool,
-                    "args": json.dumps(t.args),
+                    "args": json.dumps(t.args, default=str),
                     "rows": t.rows,
                     "provider": t.provider,
                     "latency_ms": t.latency_ms,

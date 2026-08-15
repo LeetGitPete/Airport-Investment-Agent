@@ -18,47 +18,84 @@ DEFAULT_PRESET = "balanced"
 DEFAULT_PEER_GROUP = "hub_class"
 
 
+_RADIO_KEY = "sidebar_conversations_radio"
+_RENAME_KEY = "sidebar_rename_input"
+_NEW_CHAT_KEY = "sidebar_new_chat"
+_RENAME_BUTTON_KEY = "sidebar_rename_button"
+_DELETE_KEY = "sidebar_delete"
+_PENDING_DELETE_KEY = "_sidebar_pending_delete"
+
+
+def _select(ss: dict, session_id: str) -> None:
+    """Point both the logical selection and the radio widget's own stored value at `session_id`. Must
+    happen *before* the radio widget is instantiated in the current run — Streamlit raises if a widget's
+    session_state key is written to after that widget has already been instantiated this run."""
+    ss["session_id"] = session_id
+    ss[_RADIO_KEY] = session_id
+
+
 def _render_conversations(app: Any, ss: dict) -> None:
     st.subheader("Conversations")
 
-    if st.button("New chat"):
+    # Deletion is deferred one run: the "Delete" button is rendered *after* the radio widget below, so
+    # acting on it immediately would mutate the radio's session_state key after that widget has already
+    # been instantiated this run (Streamlit forbids this). Instead we stash the id and act on it here, at
+    # the top of the *next* run, before any widget in this function has been instantiated.
+    pending_delete = ss.pop(_PENDING_DELETE_KEY, None)
+    if pending_delete is not None:
+        app.sessions.delete(pending_delete)
+        remaining = app.sessions.list()
+        new_id = remaining[0].session_id if remaining else app.sessions.new().session_id
+        _select(ss, new_id)
+        ss.pop("_rename_for", None)
+
+    if st.button("New chat", key=_NEW_CHAT_KEY):
         state = app.sessions.new()
-        ss["session_id"] = state.session_id
+        _select(ss, state.session_id)
+        st.rerun()
 
     sessions = app.sessions.list()
     if not sessions:
         state = app.sessions.new()
         sessions = [state]
-        ss["session_id"] = state.session_id
+        _select(ss, state.session_id)
 
     ids = [s.session_id for s in sessions]
+    titles_by_id = {s.session_id: s.title for s in sessions}
+
     if ss.get("session_id") not in ids:
         ss["session_id"] = ids[0]
+    if ss.get(_RADIO_KEY) not in ids:
+        ss[_RADIO_KEY] = ss["session_id"]
 
-    titles = [s.title for s in sessions]
-    current_index = ids.index(ss["session_id"])
-    selected_title = st.radio("Chats", titles, index=current_index, key="sidebar_conversations_radio")
-    selected_index = titles.index(selected_title)
-    ss["session_id"] = ids[selected_index]
+    # Radio options are session IDs (stable, unique) — titles may repeat (e.g. two "New chat" chats)
+    # and must never be used to identify which conversation is selected.
+    selected_id = st.radio("Chats", ids, format_func=lambda sid: titles_by_id[sid], key=_RADIO_KEY)
+    ss["session_id"] = selected_id
 
-    new_title = st.text_input("Rename", value=titles[selected_index], key="sidebar_rename_input")
-    if st.button("Rename"):
-        app.sessions.rename(ss["session_id"], new_title)
+    # The rename box must reset to the *current* chat's title whenever the selection changes — otherwise
+    # a value typed while chat A was selected gets applied to chat B after switching.
+    if ss.get("_rename_for") != selected_id:
+        ss[_RENAME_KEY] = titles_by_id[selected_id]
+        ss["_rename_for"] = selected_id
 
-    if st.button("Delete"):
-        app.sessions.delete(ss["session_id"])
-        remaining = app.sessions.list()
-        if remaining:
-            ss["session_id"] = remaining[0].session_id
-        else:
-            state = app.sessions.new()
-            ss["session_id"] = state.session_id
+    new_title = st.text_input("Rename", key=_RENAME_KEY)
+    if st.button("Rename", key=_RENAME_BUTTON_KEY):
+        app.sessions.rename(selected_id, new_title)
+        st.rerun()
+
+    if st.button("Delete", key=_DELETE_KEY):
+        ss[_PENDING_DELETE_KEY] = selected_id
+        st.rerun()
 
 
 def _render_provider(app: Any) -> None:
     st.subheader("Provider")
     for row in app.provider_status():
-        st.markdown(f"{row['name']} · {row['model']} · **{row['status']}**")
+        name = row.get("name", "?")
+        model = row.get("model", "?")
+        status = row.get("status", "?")
+        st.markdown(f"{name} · {model} · **{status}**")
         st.caption(row.get("detail", ""))
 
 

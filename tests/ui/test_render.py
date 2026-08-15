@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from airport_agent.contracts import Table, load_registry, registry_by_id
-from airport_agent.ui.render import assumptions_expanded, column_help, table_df
+from airport_agent.ui.render import assumptions_expanded, column_help, metric_ids_in_table, table_df
 from tests.ui.fake_app import make_answer
 
 
@@ -22,3 +22,13 @@ def test_column_help_uses_metric_definitions():
 def test_assumptions_expanded_only_for_analytical():
     assert assumptions_expanded(make_answer("rank")) is True
     assert assumptions_expanded(make_answer("informational")) is False
+
+
+def test_metric_ids_in_table_dedupes_cell_matches_only():
+    by_id = registry_by_id(load_registry())
+    table = Table(
+        title="t",
+        columns=["metric", "value"],
+        rows=[["load_factor", 0.8], ["load_factor", 0.9], ["spill_proxy", 0.1], ["not_a_metric_id", 1]],
+    )
+    assert metric_ids_in_table(table, by_id) == ["load_factor", "spill_proxy"]
