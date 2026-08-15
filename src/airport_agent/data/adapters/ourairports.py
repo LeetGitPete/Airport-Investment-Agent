@@ -17,7 +17,7 @@ import pandas as pd
 
 from airport_agent.contracts.models import SourceVintage
 from airport_agent.data.adapters import register
-from airport_agent.data.adapters.base import Period, download
+from airport_agent.data.adapters.base import Period, download, file_vintage
 
 BASE_URL = "https://davidmegginson.github.io/ourairports-data"
 AIRPORTS_URL = f"{BASE_URL}/airports.csv"
@@ -80,21 +80,27 @@ class OurAirportsAdapter:
     kind: Literal["bulk", "live"] = "bulk"
 
     def __init__(self) -> None:
-        self._fetched_at: datetime = datetime.now(UTC)
+        # Provisional only: `fetch`/`normalize` replace these with the raw files' own dates
+        # (see `file_vintage`), so provenance describes the data, not this process.
+        now = datetime.now(UTC)
+        self._vintage: str = now.date().isoformat()
+        self._fetched_at: str = now.isoformat()
 
     # -- fetch ---------------------------------------------------------------
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
-        """Download both CSVs (cached on disk). `period` is ignored: the files are a snapshot of today."""
-        self._fetched_at = datetime.now(UTC)
-        return [
+        """Download both CSVs (cached on disk). `period` is ignored: the files are a full nightly snapshot."""
+        paths = [
             download(AIRPORTS_URL, cache_dir, filename="ourairports_airports.csv"),
             download(RUNWAYS_URL, cache_dir, filename="ourairports_runways.csv"),
         ]
+        self._set_vintage(paths)
+        return paths
 
     # -- normalize -----------------------------------------------------------
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"airports": df, "runways": df}` matching the store schema."""
         airports_path, runways_path = _split(paths)
+        self._set_vintage(paths)
         raw_airports = _read_csv(airports_path)
         keep = raw_airports[
             raw_airports["type"].isin(KEPT_TYPES)
@@ -167,9 +173,13 @@ class OurAirportsAdapter:
         return out[list(RUNWAY_COLUMNS)].sort_values(["faa_locid", "runway_id"]).reset_index(drop=True)
 
     # -- provenance ----------------------------------------------------------
+    def _set_vintage(self, paths: list[Path]) -> None:
+        """Derive vintage/fetched_at from the raw files' mtimes (cached download => file's date)."""
+        self._vintage, self._fetched_at = file_vintage(paths)
+
     def row_vintage(self) -> str:
-        """Per-row vintage: the fetch date ("YYYY-MM-DD"). The files carry no period of their own."""
-        return self._fetched_at.date().isoformat()
+        """Per-row vintage: the raw files' date ("YYYY-MM-DD"). The files carry no period of their own."""
+        return self._vintage
 
     def vintage(self) -> SourceVintage:
         return SourceVintage(
@@ -177,6 +187,6 @@ class OurAirportsAdapter:
             description="OurAirports airports + runways (public domain, rebuilt nightly)",
             period_start=None,
             period_end=None,
-            fetched_at=self._fetched_at.isoformat(),
+            fetched_at=self._fetched_at,
             url=AIRPORTS_URL,
         )

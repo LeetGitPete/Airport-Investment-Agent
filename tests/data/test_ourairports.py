@@ -1,6 +1,9 @@
 """Tests for `airport_agent.data.adapters.ourairports` — normalize on real fixture rows."""
 from __future__ import annotations
 
+import os
+import shutil
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -155,6 +158,11 @@ class TestNormalizeRunways:
     def test_closed_is_boolean(self, normalized: dict[str, pd.DataFrame]) -> None:
         assert normalized["runways"]["closed"].dtype == bool
 
+    def test_closed_matches_real_rows(self, normalized: dict[str, pd.DataFrame]) -> None:
+        closed = normalized["runways"].set_index(["faa_locid", "runway_id"])["closed"]
+        assert bool(closed[("ORD", "14L")]) is True  # decommissioned ORD runway
+        assert bool(closed[("BOS", "04L")]) is False  # active BOS runway
+
 
 class TestVintage:
     def test_vintage_shape(self) -> None:
@@ -184,6 +192,90 @@ class TestStoreRoundTrip:
         tmp_store.replace_rows("airports", normalized["airports"], None)
         tmp_store.replace_rows("airports", normalized["airports"], None)
         assert tmp_store.con.execute("SELECT count(*) FROM airports").fetchone()[0] == 15
+
+
+def _write_raw_csvs(tmp_path: Path, rows: list[dict[str, str]]) -> list[Path]:
+    """Write a raw-shaped airports.csv (+ empty runways.csv) that `normalize` can read."""
+    airports = tmp_path / "ourairports_airports.csv"
+    runways = tmp_path / "ourairports_runways.csv"
+    pd.DataFrame(rows).to_csv(airports, index=False, encoding="utf-8")
+    pd.DataFrame(
+        columns=["airport_ident", "length_ft", "width_ft", "surface", "closed", "le_ident"]
+    ).to_csv(runways, index=False, encoding="utf-8")
+    return [airports, runways]
+
+
+class TestRowFilter:
+    """Only US large/medium/small airports that have an IATA code reach the store."""
+
+    def test_keeps_valid_row_drops_heliport_foreign_and_blank_iata(self, tmp_path: Path) -> None:
+        paths = _write_raw_csvs(
+            tmp_path,
+            [
+                _raw_airport_row(),  # US large_airport with IATA -> kept
+                _raw_airport_row(  # heliport (wrong type) -> dropped
+                    ident="KJRB", type="heliport", name="Downtown Manhattan Heliport",
+                    iata_code="JRB", local_code="JRB", icao_code="KJRB", gps_code="KJRB",
+                    iso_region="US-NY", municipality="New York",
+                ),
+                _raw_airport_row(  # Canadian airport -> dropped
+                    ident="CYYZ", icao_code="CYYZ", gps_code="CYYZ", local_code="",
+                    iata_code="YYZ", iso_country="CA", iso_region="CA-ON", municipality="Toronto",
+                    name="Toronto Pearson International Airport",
+                ),
+                _raw_airport_row(  # US airport without an IATA code -> dropped
+                    ident="KBED", icao_code="KBED", gps_code="KBED", local_code="BED",
+                    iata_code="", name="Laurence G Hanscom Field", municipality="Bedford",
+                ),
+            ],
+        )
+
+        airports = OurAirportsAdapter().normalize(paths)["airports"]
+
+        assert list(airports["iata"]) == ["BOS"]
+
+    @pytest.mark.parametrize("kept_type", ["large_airport", "medium_airport", "small_airport"])
+    def test_all_three_airport_types_are_kept(self, tmp_path: Path, kept_type: str) -> None:
+        paths = _write_raw_csvs(tmp_path, [_raw_airport_row(type=kept_type)])
+        assert list(OurAirportsAdapter().normalize(paths)["airports"]["iata"]) == ["BOS"]
+
+    @pytest.mark.parametrize("dropped_type", ["heliport", "seaplane_base", "closed", "balloonport"])
+    def test_non_airport_types_are_dropped(self, tmp_path: Path, dropped_type: str) -> None:
+        paths = _write_raw_csvs(tmp_path, [_raw_airport_row(type=dropped_type)])
+        assert len(OurAirportsAdapter().normalize(paths)["airports"]) == 0
+
+
+class TestVintageIsDataDerived:
+    """Vintage describes the raw files (mtime), never the wall clock — cached files stay old."""
+
+    def _aged_copy(self, tmp_path: Path, fixture_paths: list[Path], when: datetime) -> list[Path]:
+        copies = []
+        for src in fixture_paths:
+            dest = tmp_path / f"ourairports_{src.name}"
+            shutil.copyfile(src, dest)
+            os.utime(dest, (when.timestamp(), when.timestamp()))
+            copies.append(dest)
+        return copies
+
+    def test_normalize_uses_file_mtime_not_now(self, tmp_path: Path, fixture_paths: list[Path]) -> None:
+        aged = self._aged_copy(tmp_path, fixture_paths, datetime(2021, 3, 4, 12, 0, tzinfo=UTC))
+        adapter = OurAirportsAdapter()
+
+        tables = adapter.normalize(aged)
+
+        assert (tables["airports"]["vintage"] == "2021-03-04").all()
+        assert (tables["runways"]["vintage"] == "2021-03-04").all()
+        assert adapter.vintage().fetched_at.startswith("2021-03-04T12:00")
+
+    def test_newest_file_wins(self, tmp_path: Path, fixture_paths: list[Path]) -> None:
+        aged = self._aged_copy(tmp_path, fixture_paths, datetime(2021, 3, 4, 12, 0, tzinfo=UTC))
+        newer = datetime(2022, 6, 7, 8, 0, tzinfo=UTC).timestamp()
+        os.utime(aged[1], (newer, newer))
+
+        adapter = OurAirportsAdapter()
+        tables = adapter.normalize(aged)
+
+        assert (tables["airports"]["vintage"] == "2022-06-07").all()
 
 
 @pytest.mark.network

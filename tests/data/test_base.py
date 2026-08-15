@@ -1,6 +1,8 @@
 """Tests for `airport_agent.data.adapters.base`: Period, SourceAdapter, download."""
 from __future__ import annotations
 
+import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -9,7 +11,7 @@ import pydantic
 import pytest
 
 from airport_agent.contracts.models import SourceVintage
-from airport_agent.data.adapters.base import Period, SourceAdapter, download
+from airport_agent.data.adapters.base import Period, SourceAdapter, download, file_vintage
 
 
 class _CountingHandler:
@@ -141,3 +143,41 @@ class TestSourceAdapterProtocol:
             id = "nope"
 
         assert not isinstance(NotAnAdapter(), SourceAdapter)
+
+
+class TestFileVintage:
+    """`file_vintage` derives provenance from the files themselves, never the wall clock."""
+
+    def _touch(self, path: Path, when: datetime) -> Path:
+        path.write_text("x", encoding="utf-8")
+        os.utime(path, (when.timestamp(), when.timestamp()))
+        return path
+
+    def test_single_file_mtime(self, tmp_path: Path) -> None:
+        path = self._touch(tmp_path / "a.csv", datetime(2021, 3, 4, 12, 30, tzinfo=UTC))
+
+        vintage, fetched_at = file_vintage([path])
+
+        assert vintage == "2021-03-04"
+        assert fetched_at.startswith("2021-03-04T12:30")
+
+    def test_newest_of_several_wins(self, tmp_path: Path) -> None:
+        old = self._touch(tmp_path / "a.csv", datetime(2021, 3, 4, tzinfo=UTC))
+        new = self._touch(tmp_path / "b.csv", datetime(2023, 9, 1, tzinfo=UTC))
+
+        assert file_vintage([old, new])[0] == "2023-09-01"
+
+    def test_empty_paths_raise(self) -> None:
+        with pytest.raises(ValueError, match="at least one path"):
+            file_vintage([])
+
+    def test_cached_download_keeps_the_files_date(self, tmp_path: Path) -> None:
+        handler = _CountingHandler()
+        url = "https://example.com/data/report.csv"
+        path = download(url, tmp_path, client=_client(handler))
+        when = datetime(2020, 1, 2, tzinfo=UTC)
+        os.utime(path, (when.timestamp(), when.timestamp()))
+
+        again = download(url, tmp_path, client=_client(handler))
+
+        assert file_vintage([again])[0] == "2020-01-02"

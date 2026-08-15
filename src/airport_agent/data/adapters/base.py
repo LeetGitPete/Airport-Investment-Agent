@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, Protocol, runtime_checkable
 
@@ -52,6 +53,21 @@ class SourceAdapter(Protocol):
     def vintage(self) -> SourceVintage:
         """Describe the vintage of the most recently fetched/normalized data."""
         ...
+
+
+def file_vintage(paths: list[Path] | tuple[Path, ...]) -> tuple[str, str]:
+    """Return `(vintage "YYYY-MM-DD", fetched_at ISO)` derived from the raw files themselves.
+
+    Provenance must describe the *data*, not the moment the process happened to start: a
+    cached download that `download` reused is as old as its file, and `normalize` called on
+    committed fixtures must report those files' dates. Both values come from the newest
+    mtime among `paths` (UTC). Every adapter uses this instead of `datetime.now()`.
+    """
+    if not paths:
+        raise ValueError("file_vintage() needs at least one path")
+    newest = max(p.stat().st_mtime for p in paths)
+    stamp = datetime.fromtimestamp(newest, tz=UTC)
+    return stamp.date().isoformat(), stamp.isoformat()
 
 
 def _suffix_from_url(url: str) -> str:
