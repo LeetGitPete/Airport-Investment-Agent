@@ -17,7 +17,9 @@ ENV_VAR = "AIRPORT_AGENT_APP_FACTORY"
 def get_app() -> Any:
     spec = os.environ.get(ENV_VAR)
     if spec:
-        module_name, _, attr = spec.partition(":")
+        module_name, sep, attr = spec.partition(":")
+        if not sep:
+            raise ValueError(f"AIRPORT_AGENT_APP_FACTORY must be 'module:callable', got {spec!r}")
         module = importlib.import_module(module_name)
         factory = getattr(module, attr)
         return factory()

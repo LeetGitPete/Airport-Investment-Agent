@@ -1,7 +1,10 @@
 """Non-interactive CLI harness: `python -m airport_agent.ui.cli "question" [--session id] [--json] ...`.
 
 Loud failures (design 03 §Failure policy): `LLMError` prints its (already actionable) message verbatim to
-stderr and exits 1; any other exception prints `f"{type(e).__name__}: {e}"` to stderr and exits 2.
+stderr and exits 1; any other exception — including a failure to obtain the `App` itself (e.g.
+`build_app()`/the configured factory raising) or to resolve the session — prints
+`f"{type(e).__name__}: {e}"` to stderr and exits 2. Every failure route below returns 1 or 2; nothing
+escapes as a bare traceback.
 """
 from __future__ import annotations
 
@@ -38,18 +41,19 @@ def _defaults_from(args: argparse.Namespace) -> dict[str, str] | None:
 
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
-    app = get_app()
-
-    if args.session:
-        try:
-            state = app.sessions.load(args.session)
-        except KeyError:
-            state = app.sessions.new()
-            print(state.session_id, file=sys.stderr)
-    else:
-        state = app.sessions.new()
 
     try:
+        app = get_app()
+
+        if args.session:
+            try:
+                state = app.sessions.load(args.session)
+            except KeyError:
+                state = app.sessions.new()
+                print(state.session_id, file=sys.stderr)
+        else:
+            state = app.sessions.new()
+
         answer = app.answer(args.question, state, defaults=_defaults_from(args))
     except LLMError as e:
         print(str(e), file=sys.stderr)

@@ -17,9 +17,21 @@ def _cell(v: object) -> str:
 
 
 def table_to_text(table: Table) -> str:
-    lines = [table.title, "  ".join(table.columns)]
-    lines.extend("  ".join(_cell(v) for v in row) for row in table.rows)
-    lines.extend(table.footnotes)
+    """Title, then a monospace grid: header row + rows, columns padded to their max width
+    (except the last column, which is left ragged to avoid trailing whitespace)."""
+    header = [str(c) for c in table.columns]
+    rows = [[_cell(v) for v in row] for row in table.rows]
+    grid = [header, *rows]
+    ncols = len(header)
+    widths = [max((len(r[i]) for r in grid if i < len(r)), default=0) for i in range(ncols)]
+
+    def _row(cells: list[str]) -> str:
+        parts = []
+        for i, cell in enumerate(cells):
+            parts.append(cell.ljust(widths[i]) if i < ncols - 1 and i < len(widths) else cell)
+        return "  ".join(parts)
+
+    lines = [table.title, *(_row(r) for r in grid), *table.footnotes]
     return "\n".join(lines)
 
 

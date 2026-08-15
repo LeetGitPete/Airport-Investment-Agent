@@ -24,10 +24,10 @@ from airport_agent.contracts import (
 VINT = "2026-04"
 
 SAMPLE_QUESTIONS = [
-    "Rank the top airports in New England for a 5-year capacity expansion.",
+    "Which airports in New England are strong candidates for terminal expansion?",
     "Compare LA and Santa Ana airport congestion levels.",
-    "Which airports have the largest unmet demand relative to capacity?",
-    "What percentage of flights at Logan are long-haul?",
+    "What is the percentage of long haul flights out of Anchorage airport?",
+    "What is the unmet flight demand in SFO airport and why?",
 ]
 
 
@@ -95,16 +95,17 @@ def make_answer(kind: Literal["informational", "rank", "compare", "diagnose"]) -
         )
     if kind == "informational":
         plan = _plan("informational", "Answering a direct factual question via a single tool call.")
-        table = _table("Long-haul departure share (BOS)", ["iata", "longhaul_dep_share"], [["BOS", 0.14]])
+        table = _table("Long-haul departure share (ANC)", ["iata", "longhaul_dep_share"], [["ANC", 0.30]])
         return Answer(
             plan=plan,
-            plan_line="Looking up the long-haul departure share for Logan.",
-            headline="About 14% of departures at Logan (BOS) are long-haul (>=1,500 mi).",
+            plan_line="Looking up the long-haul departure share for Anchorage.",
+            headline="About 30% of departures at Anchorage (ANC) are long-haul (>=1,500 mi).",
             evidence_tables=[table],
             analyst_view=None,
             agreement_line=None,
             assumptions=["Long-haul convention: stage length >= 1,500 miles."],
-            uncertainty_notes=["Based on the most recent 12-month period only."],
+            uncertainty_notes=["Based on the most recent 12-month period only.",
+                                "OTP undercounts ANC (cargo/regional carriers not in OTP)."],
             citations=[Citation(source_id="bts_t100", vintage=VINT, url=None)],
             follow_ups=["Show the trend over the last 5 years?"],
             tool_trace=[_trace("get_metric_series")],
@@ -132,17 +133,25 @@ def make_answer(kind: Literal["informational", "rank", "compare", "diagnose"]) -
 
 
 class FakeSessions:
-    """In-memory stand-in for `SessionStore` — same method names."""
+    """In-memory stand-in for `SessionStore` — same method names. `list()` is newest-first, like the
+    real `SessionStore` (sorted by mtime desc): `new()`/`save()` both "touch" a session's recency."""
 
     def __init__(self) -> None:
         self._store: dict[str, SessionState] = {}
+        self._order: list[str] = []  # most-recently-touched first
+
+    def _touch(self, session_id: str) -> None:
+        if session_id in self._order:
+            self._order.remove(session_id)
+        self._order.insert(0, session_id)
 
     def list(self) -> list[SessionState]:
-        return list(self._store.values())
+        return [self._store[i] for i in self._order]
 
     def new(self, title: str = "New chat") -> SessionState:
         state = SessionState(session_id=uuid.uuid4().hex[:12], title=title)
         self._store[state.session_id] = state
+        self._touch(state.session_id)
         return state
 
     def load(self, session_id: str) -> SessionState:
@@ -150,9 +159,12 @@ class FakeSessions:
 
     def save(self, state: SessionState) -> None:
         self._store[state.session_id] = state
+        self._touch(state.session_id)
 
     def delete(self, session_id: str) -> None:
         del self._store[session_id]
+        if session_id in self._order:
+            self._order.remove(session_id)
 
     def rename(self, session_id: str, title: str) -> SessionState:
         state = self._store[session_id]
@@ -204,6 +216,8 @@ class FakeApp:
         a = make_answer(kind)
         if on_plan is not None:
             on_plan(a.plan)
+        if state.title == "New chat":
+            state.title = message.strip()[:60]
         state.messages.append(ChatMessage(role="user", content=message))
         state.messages.append(ChatMessage(role="assistant", content=a.headline, answer=a))
         self.sessions.save(state)
@@ -223,3 +237,9 @@ def make_app() -> FakeApp:
     global LAST_APP
     LAST_APP = FakeApp()
     return LAST_APP
+
+
+def make_broken_app() -> FakeApp:
+    """Test-only factory that always fails to build — exercises the CLI's exit-2 (unexpected
+    exception) path, mirroring a real `build_app()` failure (e.g. missing config/API key)."""
+    raise RuntimeError("app factory boom")

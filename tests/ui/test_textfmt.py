@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 
-from airport_agent.ui.textfmt import answer_to_json, answer_to_text
+from airport_agent.contracts import Table
+from airport_agent.ui.textfmt import answer_to_json, answer_to_text, table_to_text
 from tests.ui.fake_app import make_answer
 
 
@@ -23,3 +24,16 @@ def test_informational_omits_analyst_sections_but_keeps_assumptions():
 def test_json_roundtrip():
     a = make_answer("rank")
     assert json.loads(answer_to_json(a))["headline"] == a.headline
+
+
+def test_none_cell_rendered_as_dash():
+    table = Table(title="T", columns=["a", "b"], rows=[[1, None]], footnotes=[])
+    lines = table_to_text(table).splitlines()
+    assert lines[-1].split("  ")[-1].strip() == "-"
+
+
+def test_footnotes_rendered():
+    table = Table(title="T", columns=["a"], rows=[[1]], footnotes=["note one", "note two"])
+    t = table_to_text(table)
+    assert "note one" in t and "note two" in t
+    assert t.splitlines()[-2:] == ["note one", "note two"]
