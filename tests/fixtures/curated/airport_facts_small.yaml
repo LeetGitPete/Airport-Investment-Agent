@@ -1,0 +1,16 @@
+# Two-airport fixture for the curated adapter tests (same shape as data/curated/airport_facts.yaml).
+airports:
+  SFO:
+    inputs: {declared_rate_vmc: 105.5, declared_rate_imc: 72.5, slot_or_cap_flag: 1}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://example.test/SFO-profile.pdf", as_of: "2019"}
+      declared_rate_imc: {url: "https://example.test/SFO-profile.pdf", as_of: "2019"}
+      slot_or_cap_flag: {url: "https://example.test/slots", as_of: "2026-08-11"}
+    facts:
+      - {category: slot_level, text: "FAA Level 2 schedule-facilitated.", value: 2, source_url: "https://example.test/slots", as_of: "2026-08-11", expires: null}
+  PDX:
+    inputs: {declared_rate_vmc: 122.5, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://example.test/PDX-profile.pdf", as_of: "2015"}
+      slot_or_cap_flag: {url: "https://example.test/slots", as_of: "2026-08-11"}
+    facts: []

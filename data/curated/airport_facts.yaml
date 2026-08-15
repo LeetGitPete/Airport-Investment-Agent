@@ -1,0 +1,258 @@
+# Hand-curated per-airport tier-B inputs and facts. Every input and fact carries its own
+# source_url + as_of; airports without a verifiable source for a value simply omit it
+# (product rule: no invented numbers).
+#
+# Conventions (human decision 2026-08-15, recorded in known-limitations-and-tradeoffs):
+# * declared_rate_vmc = midpoint of the HIGHEST visual-configuration rate range in the FAA
+#   Airport Capacity Profile (best-case throughput -- the denominator peak_hour_ops_ratio
+#   compares peak demand against).
+# * declared_rate_imc = midpoint of the LOWEST instrument-configuration range, excluding
+#   "Low Instrument" rows (worst normal-IMC flow, so imc_capacity_ratio measures weather
+#   vulnerability). Profiles are 2014-2019 and not since updated by the FAA (stale; as_of
+#   states each profile's year).
+# * gates: no authoritative public source was secured -- omitted for every airport, so
+#   pax_per_gate and deps_per_gate_day are absent (see limitations log).
+# * slot_or_cap_flag: 1 = FAA Level 3 slot-controlled (JFK, LGA, DCA), FAA Level 2
+#   schedule-facilitated (ORD, LAX, EWR, SFO), or capacity capped by legal agreement (SNA
+#   1985 Settlement Agreement). 0 = named by neither list on the FAA slot administration
+#   page (its enumeration is exhaustive).
+
+slot_page: &slot_page
+  url: https://www.faa.gov/about/office_org/headquarters_offices/ato/service_units/systemops/perf_analysis/slot_administration
+  as_of: "2026-08-11"
+
+airports:
+  ATL:
+    inputs: {declared_rate_vmc: 251, declared_rate_imc: 200.5, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/ATL-Airport-Capacity-Profile-2018.pdf", as_of: "2018"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/ATL-Airport-Capacity-Profile-2018.pdf", as_of: "2018"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  BOS:
+    inputs: {declared_rate_vmc: 120.5, declared_rate_imc: 68, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/BOS-Airport-Capacity-Profile-2019.pdf", as_of: "2019"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/BOS-Airport-Capacity-Profile-2019.pdf", as_of: "2019"}
+      slot_or_cap_flag: *slot_page
+    facts:
+      - {category: constraint, text: "Capacity is flow-dependent: 116-125 ops/hr in north-flow visual conditions but 59-77 ops/hr in south-flow instrument conditions (FAA capacity profile 2019).", value: null, source_url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/BOS-Airport-Capacity-Profile-2019.pdf", as_of: "2019", expires: null}
+  BWI:
+    inputs: {declared_rate_vmc: 70, declared_rate_imc: 62, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/BWI-Airport-Capacity-Profile-2018.pdf", as_of: "2018"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/BWI-Airport-Capacity-Profile-2018.pdf", as_of: "2018"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  CLT:
+    inputs: {declared_rate_vmc: 172.5, declared_rate_imc: 137.5, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/CLT-Airport-Capacity-Profile-2015.pdf", as_of: "2015"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/CLT-Airport-Capacity-Profile-2015.pdf", as_of: "2015"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  DCA:
+    inputs: {declared_rate_vmc: 70.5, declared_rate_imc: 59, slot_or_cap_flag: 1}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/DCA-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/DCA-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts:
+      - {category: slot_level, text: "FAA Level 3 slot-controlled: runway slots limit scheduled traffic.", value: 3, source_url: "https://www.faa.gov/about/office_org/headquarters_offices/ato/service_units/systemops/perf_analysis/slot_administration", as_of: "2026-08-11", expires: null}
+  DEN:
+    inputs: {declared_rate_vmc: 264, declared_rate_imc: 233.5, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/DEN-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/DEN-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  DFW:
+    inputs: {declared_rate_vmc: 201.5, declared_rate_imc: 169, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/DFW-Airport-Capacity-Profile-2018.pdf", as_of: "2018"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/DFW-Airport-Capacity-Profile-2018.pdf", as_of: "2018"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  DTW:
+    inputs: {declared_rate_vmc: 181, declared_rate_imc: 136, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/DTW-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/DTW-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  EWR:
+    inputs: {declared_rate_vmc: 96.5, declared_rate_imc: 69, slot_or_cap_flag: 1}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/EWR-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/EWR-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts:
+      - {category: slot_level, text: "FAA Level 2 schedule-facilitated: formal FAA schedule review and approval process.", value: 2, source_url: "https://www.faa.gov/about/office_org/headquarters_offices/ato/service_units/systemops/perf_analysis/slot_administration", as_of: "2026-08-11", expires: null}
+  FLL:
+    inputs: {declared_rate_vmc: 105.5, declared_rate_imc: 90.5, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/FLL-Airport-Capacity-Profile-2015.pdf", as_of: "2015"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/FLL-Airport-Capacity-Profile-2015.pdf", as_of: "2015"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  HNL:
+    inputs: {declared_rate_vmc: 106, declared_rate_imc: 55, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/HNL-Airport-Capacity-Profile-2017.pdf", as_of: "2017"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/HNL-Airport-Capacity-Profile-2017.pdf", as_of: "2017"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  IAD:
+    inputs: {declared_rate_vmc: 159, declared_rate_imc: 104, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/IAD-Airport-Capacity-Profile-2015.pdf", as_of: "2015"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/IAD-Airport-Capacity-Profile-2015.pdf", as_of: "2015"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  IAH:
+    inputs: {declared_rate_vmc: 185.5, declared_rate_imc: 147.5, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/IAH-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/IAH-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  JFK:
+    inputs: {declared_rate_vmc: 85.5, declared_rate_imc: 79, slot_or_cap_flag: 1}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/JFK-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/JFK-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts:
+      - {category: slot_level, text: "FAA Level 3 slot-controlled: runway slots limit scheduled traffic.", value: 3, source_url: "https://www.faa.gov/about/office_org/headquarters_offices/ato/service_units/systemops/perf_analysis/slot_administration", as_of: "2026-08-11", expires: null}
+  LAS:
+    inputs: {declared_rate_vmc: 122.5, declared_rate_imc: 70.5, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/LAS-Airport-Capacity-Profile-2015.pdf", as_of: "2015"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/LAS-Airport-Capacity-Profile-2015.pdf", as_of: "2015"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  LAX:
+    inputs: {declared_rate_vmc: 171.5, declared_rate_imc: 138, slot_or_cap_flag: 1}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/LAX-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/LAX-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts:
+      - {category: slot_level, text: "FAA Level 2 schedule-facilitated: formal FAA schedule review and approval process.", value: 2, source_url: "https://www.faa.gov/about/office_org/headquarters_offices/ato/service_units/systemops/perf_analysis/slot_administration", as_of: "2026-08-11", expires: null}
+  LGA:
+    inputs: {declared_rate_vmc: 83, declared_rate_imc: 75, slot_or_cap_flag: 1}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/LGA-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/LGA-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts:
+      - {category: slot_level, text: "FAA Level 3 slot-controlled: runway slots limit scheduled traffic.", value: 3, source_url: "https://www.faa.gov/about/office_org/headquarters_offices/ato/service_units/systemops/perf_analysis/slot_administration", as_of: "2026-08-11", expires: null}
+  MCO:
+    inputs: {declared_rate_vmc: 165.5, declared_rate_imc: 144, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/MCO-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/MCO-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  MDW:
+    inputs: {declared_rate_vmc: 67, declared_rate_imc: 57, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/MDW-Airport-Capacity-Profile-2018.pdf", as_of: "2018"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/MDW-Airport-Capacity-Profile-2018.pdf", as_of: "2018"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  MEM:
+    inputs: {declared_rate_vmc: 152, declared_rate_imc: 122.5, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/MEM-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/MEM-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  MIA:
+    inputs: {declared_rate_vmc: 141, declared_rate_imc: 102, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/MIA-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/MIA-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  MSP:
+    inputs: {declared_rate_vmc: 161.5, declared_rate_imc: 127.5, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/MSP-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/MSP-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  ORD:
+    inputs: {declared_rate_vmc: 219, declared_rate_imc: 194, slot_or_cap_flag: 1}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/ORD-Airport-Capacity-Profile-2018.pdf", as_of: "2018"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/ORD-Airport-Capacity-Profile-2018.pdf", as_of: "2018"}
+      slot_or_cap_flag: *slot_page
+    facts:
+      - {category: slot_level, text: "FAA Level 2 schedule-facilitated: formal FAA schedule review and approval process.", value: 2, source_url: "https://www.faa.gov/about/office_org/headquarters_offices/ato/service_units/systemops/perf_analysis/slot_administration", as_of: "2026-08-11", expires: null}
+  PDX:
+    inputs: {declared_rate_vmc: 122.5, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/PDX-Airport-Capacity-Profile-2015.pdf", as_of: "2015"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  PHL:
+    inputs: {declared_rate_vmc: 123, declared_rate_imc: 86, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/PHL-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/PHL-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  PHX:
+    inputs: {declared_rate_vmc: 141.5, declared_rate_imc: 98.5, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/PHX-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/PHX-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  SAN:
+    inputs: {declared_rate_vmc: 52.5, declared_rate_imc: 48, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/SAN-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/SAN-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts:
+      - {category: constraint, text: "Single runway (27): capacity 48-57 ops/hr in visual conditions, 48 in instrument conditions; no parallel-runway relief possible on the existing site.", value: null, source_url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/SAN-Airport-Capacity-Profile-2014.pdf", as_of: "2014", expires: null}
+  SEA:
+    inputs: {declared_rate_vmc: 95.5, declared_rate_imc: 57.5, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/SEA-Airport-Capacity-Profile-2018.pdf", as_of: "2018"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/SEA-Airport-Capacity-Profile-2018.pdf", as_of: "2018"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  SFO:
+    inputs: {declared_rate_vmc: 105.5, declared_rate_imc: 72.5, slot_or_cap_flag: 1}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/SFO-Airport-Capacity-Profile-2019.pdf", as_of: "2019"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/SFO-Airport-Capacity-Profile-2019.pdf", as_of: "2019"}
+      slot_or_cap_flag: *slot_page
+    facts:
+      - {category: slot_level, text: "FAA Level 2 schedule-facilitated: formal FAA schedule review and approval process.", value: 2, source_url: "https://www.faa.gov/about/office_org/headquarters_offices/ato/service_units/systemops/perf_analysis/slot_administration", as_of: "2026-08-11", expires: null}
+      - {category: constraint, text: "Instrument conditions force in-trail approaches on the 28s: 71-78 ops/hr versus 104-107 ops/hr for visual side-by approaches (FAA capacity profile 2019).", value: null, source_url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/SFO-Airport-Capacity-Profile-2019.pdf", as_of: "2019", expires: null}
+  SLC:
+    inputs: {declared_rate_vmc: 149, declared_rate_imc: 117, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/SLC-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/SLC-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts: []
+  SNA:
+    inputs: {declared_rate_vmc: 58.5, declared_rate_imc: 43.5, slot_or_cap_flag: 1}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/SNA-Airport-Capacity-Profile-Appendix-A-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/SNA-Airport-Capacity-Profile-Appendix-A-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: {url: "https://www.ocair.com/about/administration/settlement-agreement/", as_of: "2026-08"}
+    facts:
+      - {category: constraint, text: "1985 Settlement Agreement (as amended) restricts capacity by law: night curfew, an annual passenger (MAP) cap, Class A average daily departure limits and a passenger loading bridge limit.", value: null, source_url: "https://www.ocair.com/about/administration/settlement-agreement/", as_of: "2026-08", expires: null}
+  TPA:
+    inputs: {declared_rate_vmc: 114, declared_rate_imc: 92.5, slot_or_cap_flag: 0}
+    inputs_sources:
+      declared_rate_vmc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/TPA-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      declared_rate_imc: {url: "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/profiles/TPA-Airport-Capacity-Profile-2014.pdf", as_of: "2014"}
+      slot_or_cap_flag: *slot_page
+    facts: []
