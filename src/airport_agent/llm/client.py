@@ -61,20 +61,23 @@ class LiteLLMClient:
             resp = self._completion(**kwargs)
         except Exception as e:  # noqa: BLE001 - every provider failure must become a loud LLMError
             raise LLMError(primary.name, getattr(e, "status_code", None), str(e)[:400]) from e
-        choice = resp.choices[0]
-        msg = choice.message
-        calls: list[ToolCall] = []
-        for tc in getattr(msg, "tool_calls", None) or []:
-            raw = tc.function.arguments or "{}"
-            try:
-                args = json.loads(raw)
-                if not isinstance(args, dict):
-                    args = {"_raw": raw}
-            except json.JSONDecodeError:
-                args = {"_raw": raw}
-            calls.append(ToolCall(id=str(tc.id), name=tc.function.name, arguments=args))
-        usage = getattr(resp, "usage", None)
-        return LLMResult(text=msg.content or "", tool_calls=calls, provider=primary.name,
-                         model=getattr(resp, "model", None) or primary.model,
-                         input_tokens=getattr(usage, "prompt_tokens", None) if usage else None,
-                         output_tokens=getattr(usage, "completion_tokens", None) if usage else None)
+        try:
+            choice = resp.choices[0]
+            msg = choice.message
+            calls: list[ToolCall] = []
+            for tc in getattr(msg, "tool_calls", None) or []:
+                raw = tc.function.arguments or "{}"
+                try:
+                    args = raw if isinstance(raw, dict) else json.loads(raw)
+                    if not isinstance(args, dict):
+                        args = {"_raw": raw}
+                except (TypeError, ValueError):
+                    args = {"_raw": str(raw)}
+                calls.append(ToolCall(id=str(tc.id), name=tc.function.name, arguments=args))
+            usage = getattr(resp, "usage", None)
+            return LLMResult(text=msg.content or "", tool_calls=calls, provider=primary.name,
+                             model=getattr(resp, "model", None) or primary.model,
+                             input_tokens=getattr(usage, "prompt_tokens", None) if usage else None,
+                             output_tokens=getattr(usage, "completion_tokens", None) if usage else None)
+        except Exception as e:  # noqa: BLE001 - malformed provider response must become a loud LLMError
+            raise LLMError(primary.name, None, f"malformed provider response: {e}"[:400]) from e

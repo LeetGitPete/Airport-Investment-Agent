@@ -74,3 +74,33 @@ def test_provider_exception_becomes_llm_error_with_status():
         c.chat([{"role": "user", "content": "x"}])
     assert ei.value.provider == "gemini" and ei.value.status == 429 and "quota" in ei.value.detail
     assert "LLM provider error — gemini: 429" in str(ei.value)
+
+
+def test_chat_maps_tool_call_args_already_dict():
+    tc = [NS(id="1", function=NS(name="find_airports", arguments={"states": ["MA"]}))]
+    c = LiteLLMClient(CFG, env={"GEMINI_API_KEY": "k"}, completion_fn=lambda **kw: _resp(None, tc))
+    r = c.chat([{"role": "user", "content": "x"}])
+    assert r.tool_calls[0].arguments == {"states": ["MA"]}
+
+
+def test_malformed_response_becomes_llm_error():
+    bad = NS(choices=[], model="gemini/x", usage=NS(prompt_tokens=1, completion_tokens=1))
+    c = LiteLLMClient(CFG, env={"GEMINI_API_KEY": "k"}, completion_fn=lambda **kw: bad)
+    with pytest.raises(LLMError) as ei:
+        c.chat([{"role": "user", "content": "x"}])
+    assert ei.value.provider == "gemini" and "malformed provider response" in ei.value.detail
+
+
+def test_chat_omits_optional_kwargs():
+    calls = []
+    c = LiteLLMClient(CFG, env={"GEMINI_API_KEY": "k"}, completion_fn=lambda **kw: calls.append(kw) or _resp())
+    c.chat([{"role": "user", "content": "x"}])
+    assert "tools" not in calls[0] and "tool_choice" not in calls[0] and "response_format" not in calls[0]
+
+
+def test_maps_missing_usage_and_model():
+    resp = NS(choices=[NS(message=NS(content="hi", tool_calls=None))], model=None, usage=None)
+    del resp.model
+    c = LiteLLMClient(CFG, env={"GEMINI_API_KEY": "k"}, completion_fn=lambda **kw: resp)
+    r = c.chat([{"role": "user", "content": "x"}])
+    assert r.input_tokens is None and r.output_tokens is None and r.model == "gemini/x"
