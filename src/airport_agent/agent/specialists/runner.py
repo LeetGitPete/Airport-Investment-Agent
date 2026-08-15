@@ -85,15 +85,15 @@ def _cap_lists(node: Any, cap: int, path: tuple[str, ...], trimmed: list[str]) -
     return node
 
 
-def fit_tool_result(out: dict[str, Any]) -> str:
-    """Serialize a tool result into at most MAX_TOOL_RESULT_CHARS of **valid** JSON.
+def fit_tool_result(out: dict[str, Any], limit: int = MAX_TOOL_RESULT_CHARS) -> str:
+    """Serialize a tool result into at most `limit` characters of **valid** JSON.
 
     A raw string slice would hand the model broken JSON, so oversized results are shortened structurally:
     lists are capped (shortest cap that fits) and the message says what was cut, so the model can ask for a
     narrower call instead of assuming it saw everything.
     """
     text = json.dumps(out)
-    if len(text) <= MAX_TOOL_RESULT_CHARS:
+    if len(text) <= limit:
         return text
     for cap in (16, 8, 4, 2, 1):
         trimmed: list[str] = []
@@ -102,7 +102,7 @@ def fit_tool_result(out: dict[str, Any]) -> str:
         compact["truncation_note"] = ("result too large; lists shortened - " + "; ".join(trimmed)
                                       + ". Ask for a narrower call if you need the rest.")
         text = json.dumps(compact)
-        if len(text) <= MAX_TOOL_RESULT_CHARS:
+        if len(text) <= limit:
             return text
     return text
 
