@@ -24,7 +24,11 @@ faa_npias:
   url: https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/npias/current/ARP-NPIAS-2025-2029-AppendixA.xlsx
   cadence_days: 730
   description: FAA NPIAS 2025-2029 Appendix A — hub class, enplanements, 5y development estimate
-  notes: "Page has a malformed href with leading space — strip whitespace if scraping"
+  notes: "Verified 2026-08-15: sheet `All NPIAS Airports` (3,287 x 11); headers contain embedded newlines (`Hub
+(FY25)`, `Enplaned
+(CY23/FY25)`, `Development
+Estimate
+2025-2029`) - collapse whitespace before lookup. `Hub (FY25)` is L/M/S/N for 390 primary airports, empty for the rest. Capacity labels are NOT in Appendix A: they come from data/curated/npias_capacity_lists.yaml (Figure 1 of ARP-NPIAS-2025-2029-Narrative.pdf, p.9). Page has a malformed href with leading space - strip whitespace if scraping."
 
 bts_socrata:
   kind: bulk
