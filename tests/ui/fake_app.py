@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, Literal
 
 from airport_agent.contracts import (
@@ -134,11 +135,33 @@ def make_answer(kind: Literal["informational", "rank", "compare", "diagnose"]) -
 
 class FakeSessions:
     """In-memory stand-in for `SessionStore` — same method names. `list()` is newest-first, like the
-    real `SessionStore` (sorted by mtime desc): `new()`/`save()` both "touch" a session's recency."""
+    real `SessionStore` (sorted by mtime desc): `new()`/`save()` both "touch" a session's recency.
 
-    def __init__(self) -> None:
+    When `sessions_dir` is given, every mutation is also persisted to `<sessions_dir>/<id>.json` (via
+    `SessionState.model_dump_json`), and existing files are loaded back on construction — mirroring the
+    real `SessionStore`'s on-disk semantics closely enough to exercise a genuine JSON round trip of a
+    saved `Answer` (tables, citations, tool trace, etc.) across separate `FakeApp` instances pointed at
+    the same directory."""
+
+    def __init__(self, sessions_dir: str | None = None) -> None:
+        self._dir = Path(sessions_dir) if sessions_dir else None
         self._store: dict[str, SessionState] = {}
         self._order: list[str] = []  # most-recently-touched first
+        if self._dir is not None:
+            self._dir.mkdir(parents=True, exist_ok=True)
+            self._load_from_disk()
+
+    def _load_from_disk(self) -> None:
+        assert self._dir is not None
+        paths = sorted(self._dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for path in paths:
+            state = SessionState.model_validate_json(path.read_text(encoding="utf-8"))
+            self._store[state.session_id] = state
+            self._order.append(state.session_id)  # already newest-first by mtime
+
+    def _persist(self, state: SessionState) -> None:
+        if self._dir is not None:
+            (self._dir / f"{state.session_id}.json").write_text(state.model_dump_json(), encoding="utf-8")
 
     def _touch(self, session_id: str) -> None:
         if session_id in self._order:
@@ -152,6 +175,7 @@ class FakeSessions:
         state = SessionState(session_id=uuid.uuid4().hex[:12], title=title)
         self._store[state.session_id] = state
         self._touch(state.session_id)
+        self._persist(state)
         return state
 
     def load(self, session_id: str) -> SessionState:
@@ -160,16 +184,22 @@ class FakeSessions:
     def save(self, state: SessionState) -> None:
         self._store[state.session_id] = state
         self._touch(state.session_id)
+        self._persist(state)
 
     def delete(self, session_id: str) -> None:
         del self._store[session_id]
         if session_id in self._order:
             self._order.remove(session_id)
+        if self._dir is not None:
+            path = self._dir / f"{session_id}.json"
+            if path.exists():
+                path.unlink()
 
     def rename(self, session_id: str, title: str) -> SessionState:
         state = self._store[session_id]
         state.title = title
         self._store[session_id] = state
+        self._persist(state)
         return state
 
 
@@ -193,7 +223,7 @@ class FakeApp:
 
     def __init__(self, sessions_dir: str | None = None) -> None:
         self.sessions_dir = sessions_dir
-        self.sessions = FakeSessions()
+        self.sessions = FakeSessions(sessions_dir)
         self.data = FakeData()
         self.last_defaults: dict[str, str] | None = None
 
