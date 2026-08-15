@@ -44,7 +44,6 @@ _A = [  # iata, icao, name, city, state, region, hub, lat, lon
 ]
 AIRPORTS = [AirportRef(iata=i, icao=c, faa_locid=i, name=n, city=ci, state=s, faa_region=r, hub_size=h, lat=la, lon=lo)
             for i, c, n, ci, s, r, h, la, lo in _A]
-MAJORS = {"BOS", "LAX", "SFO", "JFK", "SNA"}
 
 CAGR_IDS = {"enpl_cagr_3y": 0.9, "enpl_cagr_5y": 1.0, "enpl_cagr_10y": 0.6}  # multipliers on BASE["enpl_cagr"]
 LABEL_MAP = {0: "none", 1: "congested", 2: "constrained_2033", 3: "constrained_2028", 4: "severe_2033"}
@@ -144,7 +143,9 @@ class FakeDataService:
 
     def get_metric_series(self, iata: str, metric_id: str) -> list[Metric]:
         spec = self._by_id[metric_id]
-        base = self._value(iata.upper(), metric_id, "12m") or 0.0
+        base = self._value(iata.upper(), metric_id, "12m")
+        if base is None:  # metric unavailable here (tier C, or tier B outside the curated set) - no invented numbers
+            return []
         return [Metric(id=metric_id, value=base * (1 - 0.01 * (2026 - y)), unit=spec.unit, horizon="12m",
                        period_start=f"{y}-01", period_end=f"{y}-12", source_id=spec.sources[0], vintage=VINT)
                 for y in range(2016, 2027)]

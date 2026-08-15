@@ -61,6 +61,11 @@ def test_metric_series_is_chronological(data_service):
     assert len(s) >= 3 and [m.period_end for m in s] == sorted(m.period_end for m in s)
 
 
+def test_metric_series_empty_when_metric_missing(data_service):
+    assert data_service.get_metric_series("ANC", "pax_per_gate") == []  # tier B, not curated for ANC
+    assert data_service.get_metric_series("BOS", "asv_utilization") == []  # tier C, never available
+
+
 def test_live_status_and_vintages(data_service):
     ls = data_service.get_live_status("SFO")
     assert ls.iata == "SFO" and ls.fetched_at
