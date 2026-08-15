@@ -48,7 +48,14 @@ bts_t100:
   url: https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FIM&QO_fu146_anzr=Nv4%20Pn44vr45
   cadence_days: 90
   description: BTS T-100 Domestic Segment (form POST; FIM = Domestic Segment) — route-level, all carriers incl. cargo
-  notes: "ASP.NET form: GET page for __VIEWSTATE/__VIEWSTATEGENERATOR/__EVENTVALIDATION then POST. International Segment table code unverified (FIK/FIJ/FII 404)."
+  notes: "Verified 2026-08-16: ASP.NET form works as documented (GET for __VIEWSTATE/__VIEWSTATEGENERATOR/
+    __EVENTVALIDATION, POST back to the same URL with cboGeography=All, cboYear, cboPeriod (month 1-12 or
+    'All'), chkAllVars=on, chkDownloadZip=on, btnDownload=Download) - the ASP.NET session cookie from the
+    GET MUST be replayed on the POST (reuse one httpx.Client) or the POST just re-renders the form page.
+    Publication lag ~3 months (2026-05 latest as of 2026-08-16). Domestic only: International Segment table
+    code not found after a 15-min probe of FIL/FIH/FIS/FIT/FIN/FIQ/FIP/FIO/FIC/FIB/FID/FGH/FGJ-FGQ/FMG (all
+    302 to /Homepage.asp, i.e. invalid gnoyr_VQ); bts_socrata's outbound/inbound international totals are
+    the fallback (no route-level intl detail). See known-limitations row 2."
 
 bts_otp:
   kind: bulk
