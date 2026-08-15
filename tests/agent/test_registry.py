@@ -53,3 +53,17 @@ def test_engine_gate(reg):
 def test_llm_error_propagates(reg):
     with pytest.raises(LLMError):
         reg.call("boom", {"text": "a"}, engine="concierge")
+
+
+def test_non_dict_result_is_error_dict():
+    r = ToolRegistry()
+    r.register(ToolSpec(name="bad", description="Returns a list.", params_model=EchoArgs,
+                        fn=lambda p: ["not", "a", "dict"], engines=["concierge"]))
+    out = r.call("bad", {"text": "a"}, engine="concierge")
+    assert out["error"] == "TypeError: tool 'bad' returned non-dict result"
+    assert out["provenance"] == [] and out["truncated"] is False
+
+
+def test_non_str_arg_keys_is_error_dict(reg):
+    out = reg.call("echo", {1: "a"}, engine="concierge")
+    assert "invalid arguments" in out["error"]

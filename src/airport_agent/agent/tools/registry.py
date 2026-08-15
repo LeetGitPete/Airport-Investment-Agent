@@ -45,12 +45,16 @@ class ToolRegistry:
                 "invalid arguments: "
                 + "; ".join(f"{'.'.join(map(str, x['loc']))}: {x['msg']}" for x in e.errors())
             )
+        except TypeError as e:  # e.g. non-string argument keys from a malformed tool call
+            return err(f"invalid arguments: {e}")
         try:
             out = spec.fn(params)
         except LLMError:
             raise
         except (KeyError, ValueError, TypeError) as e:
             return err(f"{type(e).__name__}: {e}")
+        if not isinstance(out, dict):
+            return err(f"TypeError: tool {name!r} returned non-dict result")
         out.setdefault("provenance", [])
         out.setdefault("truncated", False)
         return out
