@@ -22,6 +22,7 @@ from airport_agent.data.adapters import bts_socrata as _bts_socrata  # noqa: E40
 from airport_agent.data.adapters import bts_t100 as _bts_t100  # noqa: E402, F401
 from airport_agent.data.adapters import census_cbsa as _census_cbsa  # noqa: E402, F401
 from airport_agent.data.adapters import curated as _curated  # noqa: E402, F401
+from airport_agent.data.adapters import faa_aip as _faa_aip  # noqa: E402, F401
 from airport_agent.data.adapters import faa_nasstatus as _faa_nasstatus  # noqa: E402, F401
 from airport_agent.data.adapters import faa_npias as _faa_npias  # noqa: E402, F401
 from airport_agent.data.adapters import faa_taf as _faa_taf  # noqa: E402, F401

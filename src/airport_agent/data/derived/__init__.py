@@ -7,6 +7,15 @@ tier A/B id has no function at all; ids whose source was cut by the 2026-08-16 R
 (Option A Core-6) still have a function — it returns zero rows, always, with the reason
 recorded in `MISSING_REASONS` (mirrors the frozen contract suite's `od_share` allowance,
 extended to every cut source).
+
+Branch `feature/data-extras` (2026-08-16) un-cut `aip_per_enpl_10y` once the `faa_aip`
+adapter landed (see `docs/superpowers/plans/2026-08-15-plan2a-data.md` Task 11 and the
+RESCOPE addendum); `msa_gdp_per_capita`/`msa_gdp_cagr_5y` remain documented-missing on this
+branch — BEA publishes no keyless-bulk MSA-level real-GDP table (verified 2026-08-16: the
+`MARPP` zip named in Task 10 is *Real Personal Income and Regional Price Parities by MSA*,
+not GDP; BEA's regional GDP download catalog offers only State (`SAGDP`/`SQGDP`) and County
+(`CAGDP1/2/8/9/11`) — no `MAGDP`/`MGDP` MSA family exists, and `bea.gov/data/gdp/gdp-by-
+metropolitan-area` itself redirects to `gdp-by-county`).
 """
 from __future__ import annotations
 
@@ -28,10 +37,15 @@ MISSING_REASONS: dict[str, str] = {
     "nas_delay_share": "BTS Delay Cause cut by RESCOPE 2026-08-16 (Option A Core-6): no NAS-attributed delay source.",
     "cpe_usd": "FAA CATS Form 127 cut by RESCOPE 2026-08-16 (Option A Core-6).",
     "nonaero_rev_per_enpl": "FAA CATS Form 127 cut by RESCOPE 2026-08-16 (Option A Core-6).",
-    "aip_per_enpl_10y": "FAA AIP grant history cut by RESCOPE 2026-08-16 (Option A Core-6).",
     "od_share": "BTS DB1B timeboxed attempt did not land (design 01 open item; predates the RESCOPE).",
-    "msa_gdp_per_capita": "BEA cut by RESCOPE 2026-08-16 (census_cbsa kept for population/centroids only).",
-    "msa_gdp_cagr_5y": "BEA cut by RESCOPE 2026-08-16 (census_cbsa kept for population/centroids only).",
+    "msa_gdp_per_capita": (
+        "feature/data-extras (2026-08-16) confirmed BEA publishes no keyless-bulk MSA real-GDP "
+        "table (MARPP is MSA personal income/price parity, not GDP; only State/County GDP zips exist)."
+    ),
+    "msa_gdp_cagr_5y": (
+        "feature/data-extras (2026-08-16) confirmed BEA publishes no keyless-bulk MSA real-GDP "
+        "table (MARPP is MSA personal income/price parity, not GDP; only State/County GDP zips exist)."
+    ),
 }
 
 
@@ -84,7 +98,7 @@ METRIC_FUNCS: dict[str, MetricFn] = {
     "msa_gdp_cagr_5y": _missing(MISSING_REASONS["msa_gdp_cagr_5y"]),
     # P5 Financeability & Pipeline
     "npias_dev_per_enpl": p5_finance.npias_dev_per_enpl,
-    "aip_per_enpl_10y": _missing(MISSING_REASONS["aip_per_enpl_10y"]),
+    "aip_per_enpl_10y": p5_finance.aip_per_enpl_10y,
     "cpe_usd": _missing(MISSING_REASONS["cpe_usd"]),
     "nonaero_rev_per_enpl": _missing(MISSING_REASONS["nonaero_rev_per_enpl"]),
 }

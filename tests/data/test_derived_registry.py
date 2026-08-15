@@ -33,8 +33,11 @@ class TestRegistryCoverage:
         assert set(MISSING_REASONS) <= ab_ids
 
     def test_missing_reasons_matches_the_rescope_cut_sources(self) -> None:
+        # `aip_per_enpl_10y` was un-cut on branch `feature/data-extras` (2026-08-16) once
+        # `faa_aip` landed; `msa_gdp_per_capita`/`msa_gdp_cagr_5y` remain missing — BEA
+        # publishes no keyless-bulk MSA-level real-GDP table (verified on the same branch).
         assert set(MISSING_REASONS) == {
-            "nas_delay_share", "cpe_usd", "nonaero_rev_per_enpl", "aip_per_enpl_10y",
+            "nas_delay_share", "cpe_usd", "nonaero_rev_per_enpl",
             "od_share", "msa_gdp_per_capita", "msa_gdp_cagr_5y",
         }
 
@@ -88,6 +91,15 @@ class Test5yDeclaredCoverage:
     @pytest.mark.parametrize("metric_id", IDS_5Y)
     def test_non_none(self, snapshot_con, metric_id: str, iata: str) -> None:
         assert _current(snapshot_con, metric_id, "5y", iata) is not None, f"{metric_id}/{iata}"
+
+
+class Test10yDeclaredCoverage:
+    """`aip_per_enpl_10y` — un-cut on `feature/data-extras`; non-None for BOS/SFO/ANC at its
+    only declared horizon (10y) once `faa_aip`'s fixture (FY2016-2025) is in the snapshot."""
+
+    @pytest.mark.parametrize("iata", CHECK_AIRPORTS)
+    def test_non_none(self, snapshot_con, iata: str) -> None:
+        assert _current(snapshot_con, "aip_per_enpl_10y", "10y", iata) is not None
 
 
 class TestStaticForecastPresent:
