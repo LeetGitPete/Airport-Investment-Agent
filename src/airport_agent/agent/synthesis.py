@@ -20,6 +20,7 @@ from airport_agent.agent.specialists.runner import compact_deterministic, fit_to
 from airport_agent.agent.tables import (
     citations_from,
     data_matrix,
+    peer_label,
     ranking_table,
     specialist_ranking_table,
     tool_result_tables,
@@ -45,8 +46,12 @@ FALLBACK_HEADLINE = "Results below."
 FALLBACK_FOLLOW_UPS = ["Compare with peer airports?", "Try another horizon?", "Try another preset?"]
 BASELINE_ASSUMPTION = ("Every number shown comes from a cited source at the vintage listed; nothing "
                        "is estimated or adjusted by the model")
-TIER_ASSUMPTION = "Tier B metrics only where curated data exists; tier C never scored"
 CONVENTION_MARKERS = ("convention", "spill model", "long-haul", "percentile")
+#: QA task 7 (human decision 2026-08-16): assumptions/uncertainty are condensed DETERMINISTICALLY
+#: to a hard cap — the LLM may add lines via the specialist but can never remove one. Build-level
+#: standing tradeoffs live in the docs, not in every answer.
+MAX_ASSUMPTIONS = 7  # + the baseline line = 8 rows max
+MAX_NOTES = 8
 
 SYNTHESIS_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -212,6 +217,10 @@ class Synthesizer:
                                + ", ".join(f"{k}={v}" for k, v in defaults.items() if v))
         if degraded:
             notes.append(FALLBACK_NOTE)
+        # QA task 7 (human decision 2026-08-16): condense deterministically — the LLM never picks.
+        assumptions = _condense(_unique(assumptions), MAX_ASSUMPTIONS,
+                                "further standing conventions apply (documented in KEY-TRADEOFFS.md)")
+        notes = _condense(_unique(notes), MAX_NOTES, "further minor notes omitted")
         assumptions.append(BASELINE_ASSUMPTION)  # the assumptions block is never empty (product rule)
 
         headline = synthesis.headline.strip()
@@ -240,7 +249,10 @@ class Synthesizer:
         preset = (rep.preset if rep else None) or (req.scoring_preset if req else None) or "engine default"
         horizon = (rep.horizon if rep else None) or (req.horizons[0] if req and req.horizons else "-")
         peer_group = (rep.peer_group if rep else None) or (req.peer_group if req else None) or "hub_class"
-        out = [f"Preset {preset}", f"Horizon {horizon}", f"Peer group {peer_group}", TIER_ASSUMPTION]
+        # QA task 7: one line for the request-shaping choices instead of three; standing build
+        # facts (tier policy etc.) live in the docs, not in every answer.
+        out = [f"Scored with preset {preset}, time period {horizon}, "
+               f"percentiles among {peer_label(peer_group)}"]
         if rep is not None:
             out += [c for c in rep.caveats if any(m in c.lower() for m in CONVENTION_MARKERS)]
         return out
@@ -251,9 +263,15 @@ class Synthesizer:
         low = sum(1 for row in rep.rows if row.low_confidence)
         if low:
             notes.append(f"{low} of {len(rep.rows)} airports low confidence (thin metric coverage)")
+        # QA task 7: quality flags aggregated per code (was one row per metric per flag).
+        by_code: dict[str, tuple[int, str]] = {}
         for metric in rep.evidence:
             for flag in metric.quality:
-                notes.append(f"{flag.code}: {flag.message}")
+                count, message = by_code.get(flag.code, (0, flag.message))
+                by_code[flag.code] = (count + 1, message)
+        for code, (count, message) in by_code.items():
+            suffix = f" ({count} metrics affected)" if count > 1 else ""
+            notes.append(f"{code}: {message}{suffix}")
         return notes
 
     @staticmethod
@@ -274,6 +292,18 @@ class Synthesizer:
         for note in out.get("data_quality_notes") or []:
             notes.append(str(note))
         return notes
+
+
+def _condense(items: list[str], cap: int, tail: str) -> list[str]:
+    """Keep the first `cap` lines (they are appended in priority order); summarize the rest.
+
+    Deterministic by design: nothing decides per-line importance at runtime, so the cut is
+    predictable and the omitted count is always disclosed.
+    """
+    if len(items) <= cap:
+        return items
+    kept = items[: cap - 1]
+    return [*kept, f"+{len(items) - len(kept)} {tail}"]
 
 
 def _unique(items: list[str]) -> list[str]:

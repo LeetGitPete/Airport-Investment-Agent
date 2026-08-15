@@ -34,7 +34,9 @@ def test_synthesize_analytical_structure_and_no_altered_numbers(fake_analyst, sp
     scores = {row[rank_tbl.columns.index("airport")]: row[rank_tbl.columns.index("score")] for row in rank_tbl.rows}
     assert scores == {r.ref.iata: r.score for r in det.rows}  # numbers verbatim from the report
     assert ans.analyst_view == "Narrative." and "agrees" in ans.agreement_line and "weather" in ans.agreement_line
-    assert any(a.startswith("Preset") for a in ans.assumptions) and any(a.startswith("Horizon 12m") for a in ans.assumptions)
+    # QA task 7: the request-shaping choices are one combined line, capped block overall
+    assert any(a.startswith("Scored with preset") and "12m" in a for a in ans.assumptions)
+    assert len(ans.assumptions) <= 8 and len(ans.uncertainty_notes) <= 8
     assert "a1" in ans.assumptions and any("confidence 0.60" in u for u in ans.uncertainty_notes)
     assert ans.citations and all(c.source_id and c.vintage for c in ans.citations)
     assert ans.follow_ups == SYN["follow_ups"]
