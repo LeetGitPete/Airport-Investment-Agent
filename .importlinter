@@ -20,6 +20,17 @@ modules =
     airport_agent.scoring
     airport_agent.llm
     airport_agent.ui
+# The composition root (agent.app) is the ONE sanctioned place that wires every layer
+# (design 03/04: "agent may import everything"). Chains that pass through it are the
+# integration working as designed, not a workstream reaching into a sibling.
+ignore_imports =
+    airport_agent.agent.app -> airport_agent.data
+    airport_agent.agent.app -> airport_agent.data.paths
+    airport_agent.agent.app -> airport_agent.scoring
+    airport_agent.agent.app -> airport_agent.llm
+    airport_agent.agent.planner -> airport_agent.llm
+    airport_agent.agent.synthesis -> airport_agent.llm
+    airport_agent.agent.specialists.runner -> airport_agent.llm
 
 [importlinter:contract:ui-only-via-agent]
 name = ui may import only agent and contracts
@@ -29,6 +40,16 @@ forbidden_modules =
     airport_agent.data
     airport_agent.scoring
     airport_agent.llm
+# Same sanction as above: ui reaching data/scoring/llm THROUGH the composition root is
+# design 04's wiring; only a direct ui import of those layers is a violation.
+ignore_imports =
+    airport_agent.agent.app -> airport_agent.data
+    airport_agent.agent.app -> airport_agent.data.paths
+    airport_agent.agent.app -> airport_agent.scoring
+    airport_agent.agent.app -> airport_agent.llm
+    airport_agent.agent.planner -> airport_agent.llm
+    airport_agent.agent.synthesis -> airport_agent.llm
+    airport_agent.agent.specialists.runner -> airport_agent.llm
 
 [importlinter:contract:lower-layers-do-not-import-agent]
 name = data / scoring / llm never import the composition root (ui may: design 04)
