@@ -63,3 +63,11 @@ highlighting in the final deliverable; `[AI]` = where/how AI was used; `[COURSE-
 - Specialist roster fixed only after the registry: expansion_analyst, capacity_analyst, market_analyst, plus a
   general_analyst fallback with a wider (600-char) but still structured dispatch. Sample questions mapped to
   intent → engines → specialist. Long-haul % is informational (no specialist).
+
+### `[DECISION]` Deliverables & provider scope
+- The three assignment-required explanations (scoring methodology, key tradeoffs, where/how AI is used) become
+  standalone docs *and* sections of DESIGN.md, generated from one source. "Out of scope / with more time" lives at
+  the end of KEY-TRADEOFFS.md.
+- Runtime LLM: **Gemini free tier only** for now; Groq/NIM fail-over deferred to end-of-project if time remains
+  (LiteLLM router keeps it a config change). No silent degradation; no cross-request caching.
+- Design docs 00–06 + limitations log committed and pushed; design phase closed pending human review.

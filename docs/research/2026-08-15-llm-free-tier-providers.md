@@ -17,7 +17,9 @@ Purpose: choose a runtime LLM provider chain for the Airport Investment Agent (P
 | **GitHub Models** | — | **Retired 30 Jul 2026** | — | — | — | — | Excluded |
 | **Anthropic** | — | No permanent free tier (small trial credit) | — | — | — | — | Paid only |
 
-## Recommended chain
+## Decision (2026-08-15): Gemini only for now; Groq/NIM fallbacks deferred to end-of-project if time remains.
+
+## Recommended chain (reference)
 1. **Primary: Gemini 3.x Flash** (OpenAI-compat endpoint). 250K TPM absorbs agent tool loops; 1,500 RPD is the most generous daily allowance; best tool-calling/structured output; 1M context.
 2. **Fallback 1: Groq `openai/gpt-oss-120b`** (or `qwen/qwen3.6-27b`). Fast burst absorber on Gemini 429s. Never pin deprecated Llama names.
 3. **Fallback 2: NVIDIA NIM.** 40 RPM, effectively no token cap — the deep tail. Validate tool calling per model.

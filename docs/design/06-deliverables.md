@@ -4,7 +4,7 @@ Status: DRAFT (brainstorm 2026-08-15).
 
 ## What is sent (zip; reviewer receives files, not the repo link)
 Included: `src/`, `config/`, `data/snapshot/` (DuckDB, ≤100MB), `data/curated/`, `tests/`, `docs/`, `.claude/`,
-`pyproject.toml` (+ `requirements.txt` export), `.env` (throwaway-account Gemini key + optional Groq/NIM keys),
+`pyproject.toml` (+ `requirements.txt` export), `.env` (throwaway-account Gemini key only),
 `.env.example`, `README.md`.
 Excluded: `.venv/`, raw download cache, `data/sessions/`, `.git/`.
 A `scripts/make_zip.py` (or `/make-zip`) produces it and prints a checklist: hidden dirs included, only the intended
@@ -21,7 +21,9 @@ A `scripts/make_zip.py` (or `/make-zip`) produces it and prints a checklist: hid
     Deterministic Analyst methods, sensitivity table (rank stability across presets/horizons), worked examples for
     the four sample questions.
   - `docs/KEY-TRADEOFFS.md` — from the limitations log: every Constraint vs Decision with impact, mitigation and
-    outcome (incl. one-day timebox choices, free-tier LLM choice, data gaps, what we'd change with more time).
+    outcome (one-day timebox choices, single free-tier LLM provider, data gaps), ending with an **"Out of scope /
+    with more time"** section: extra LLM providers (Groq/NIM fail-over), voice (if not merged), hosting, MCP
+    wrapper, DB1B if not landed, auth/multi-user, richer charts.
   - `docs/WHERE-HOW-AI-IS-USED.md` — **runtime**: Concierge, Plan, structured dispatch, specialists, provider chain,
     what the LLM may/may not do (cannot alter numbers, invent weights, hide disagreements), call budget, failure
     policy; **dev-time**: subagent roster with models per task, phases/gates/worktrees, review gates, escalation
@@ -29,8 +31,8 @@ A `scripts/make_zip.py` (or `/make-zip`) produces it and prints a checklist: hid
 - `docs/DESIGN.md` — the required short design/architecture document (target 4–6 pages + the three embedded
   sections): 1 Problem, scope, assumptions · 2 Architecture (diagram, contracts, runtime roles) ·
   3 Scoring methodology (= SCORING-METHODOLOGY.md) · 4 Key tradeoffs (= KEY-TRADEOFFS.md) ·
-  5 Where/how AI is used (= WHERE-HOW-AI-IS-USED.md) · 6 Assumptions/uncertainty/scoping as product behaviour ·
-  7 With more time. Detailed `docs/design/*`, `docs/research/*` and `docs/process-log.md` remain as appendices.
+  5 Where/how AI is used (= WHERE-HOW-AI-IS-USED.md) · 6 Assumptions/uncertainty/scoping as product behaviour
+  ("With more time" lives at the end of KEY-TRADEOFFS.md). Detailed `docs/design/*`, `docs/research/*` and `docs/process-log.md` remain as appendices.
 - `docs/process-log.md` — the AI-native build narrative (scribe).
 - `docs/research/*` — the three research notes (LLM providers, data sources, investment metrics).
 

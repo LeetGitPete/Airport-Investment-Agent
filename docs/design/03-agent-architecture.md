@@ -96,11 +96,12 @@ return a helpful message so the model self-corrects.
 
 ## Call budget & rate limits
 Analytical question ≈ Plan (1) + specialist loop (2–4) + synthesis narration (1) = 4–6 LLM calls; informational
-≈ 2. Primary provider ~10 RPM ⇒ ~2 analytical q/min. Mitigations: follow-ups reuse SessionState.last_reports
-instead of re-dispatching; compact tool schemas; provider fail-over. No cross-request caching of LLM outputs.
+≈ 2. Gemini free tier ~10 RPM ⇒ ~2 analytical q/min. Mitigations: follow-ups reuse SessionState.last_reports
+instead of re-dispatching; compact tool schemas. No cross-request caching of LLM outputs. Extra providers only if time remains.
 
 ## Failure policy (no silent degradation)
-- Resilience = the provider chain (Gemini → Groq → NIM) with retries/cooldowns inside LiteLLM.
+- Resilience = LiteLLM retries/cooldowns on the configured provider(s). **For now only Gemini is configured**;
+  additional fallbacks (Groq, NIM) are an optional later addition via `config/providers.yaml`.
 - If every provider fails for a step that needs the LLM, the app **fails loudly**: a built-in message names the
   provider(s) and status ("LLM provider error — gemini: 429 quota exceeded; groq: 401 invalid key. Check the API
   keys in `.env`, your quota, or add a fallback in `config/providers.yaml`."). No partial deterministic output is

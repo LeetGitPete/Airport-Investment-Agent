@@ -36,7 +36,7 @@ escalation protocol, and the report-back format (`changed / tested / untested / 
 | `contract-architect` | Fable/Opus | Write & freeze `contracts/`, `tests/fakes.py::FakeDataService`, contract tests, and the metric registry `config/metrics.yaml` — first task, reviewed | 00–03 | `contracts/`, `tests/fakes.py`, `tests/contracts/`, `config/metrics.yaml` |
 | `data-engineer` | Opus (adapters) / Sonnet (fixtures) | Adapters, store, derived metrics, refresh, snapshot; verify T-100 intl code; DB1B timeboxed attempt; curated YAML skeleton | 01, 02, research | `data/`, `config/sources.yaml`, `data/snapshot`, `data/curated`, fixtures |
 | `scoring-engineer` | Opus | Scorer, presets, Deterministic Analyst methods, templated explanations (reads the frozen registry) | 02 | `scoring/`, `config/scoring_presets.yaml` |
-| `agent-engineer` | Opus | LiteLLM router, ToolRegistry, Concierge (Plan → dispatch → synthesis), specialist configs, sessions | 03, LLM research | `agent/`, `llm/`, `config/providers.yaml`, `config/specialists/` |
+| `agent-engineer` | Opus | LiteLLM router (Gemini only), ToolRegistry, Concierge (Plan → dispatch → synthesis), specialist configs, sessions | 03, LLM research | `agent/`, `llm/`, `config/providers.yaml`, `config/specialists/` |
 | `ui-engineer` | Sonnet | Streamlit app (multi-chat, rendering, sidebar), CLI harness | 04 | `ui/` |
 | `voice-engineer` | Sonnet | `feature/voice` branch, timeboxed | 04 | branch only |
 | `reviewer` | Fable/Opus | Boundary + correctness review per workstream before merge; checks design conformance | diff + docs | review notes (no code edits) |

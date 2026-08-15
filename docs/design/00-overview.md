@@ -35,7 +35,7 @@ tradeoffs, where/how AI is used).
                        │ data/  adapters → DuckDB snapshot │
                        │        + live adapters + refresh  │
                        └───────────────────────────────────┘
-                 llm/  LiteLLM router (Gemini → Groq → NVIDIA NIM) — shared infra
+                 llm/  LiteLLM router — Gemini Flash only for now (Groq/NIM addable via config) — shared infra
 ```
 
 Rules:
@@ -96,8 +96,10 @@ Deterministic: `score_airports`, `compare_airports`, `diagnose_unmet_demand`. Di
 (specialist). Thin, pydantic-validated, compact JSON out with provenance.
 
 ## Runtime LLM
-Free-tier provider chain via LiteLLM Router: Gemini 3.x Flash (primary) → Groq gpt-oss-120b → NVIDIA NIM.
-Config-driven model names; startup health check; ≤4 LLM calls per answer budget. See research note.
+LiteLLM Router with **Gemini 3.x Flash (free tier) as the only configured provider for now** — decision 2026-08-15.
+The router supports adding Groq / NVIDIA NIM as fallbacks later purely via `config/providers.yaml` + keys (see
+research note); not in scope unless time remains. Config-driven model names; startup health check; ≤6 LLM calls
+per answer budget.
 
 ## Documents in this folder
 00 overview · 01 data layer · 02 scoring methodology · 03 LLM ranker & agent · 04 UI · 05 AI-native dev process ·
