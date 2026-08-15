@@ -61,9 +61,28 @@ class FakeDataService:
         self._refs = {a.iata: a for a in AIRPORTS}
 
     # --- helpers ---
+    def _spec(self, metric_id: str) -> MetricSpec:
+        if metric_id not in self._by_id:
+            raise KeyError(f"unknown metric id: {metric_id!r}")
+        return self._by_id[metric_id]
+
+    def _ref(self, iata: str) -> AirportRef:
+        key = iata.upper()
+        if key not in self._refs:
+            raise KeyError(f"unknown airport: {iata!r}")
+        return self._refs[key]
+
+    def _stamped_horizon(self, spec: MetricSpec, horizon: str) -> str:
+        """The horizon a value is reported AT: the requested one only if the spec declares it."""
+        return horizon if horizon in spec.horizons else spec.horizons[0]
+
     def _value(self, iata: str, metric_id: str, horizon: str) -> float | None:
-        spec = self._by_id[metric_id]  # KeyError for unknown ids (contract)
+        spec = self._spec(metric_id)
         if spec.tier == "C":
+            return None
+        # Contract: never relabel another horizon as the requested one. Horizon-invariant metrics
+        # ("static"/"forecast") answer any request; everything else must declare the horizon or be None.
+        if horizon not in spec.horizons and not ({"static", "forecast"} & set(spec.horizons)):
             return None
         if spec.tier == "B":
             row = TIER_B.get(iata, {})
@@ -74,16 +93,16 @@ class FakeDataService:
         v = base.get(metric_id)  # absent => attempted but unavailable (od_share)
         if v is None:
             return None
-        k = _HORIZON_STEP.get(horizon, 0)
+        # scale only along a horizon the metric actually declares; invariant metrics never move
+        k = _HORIZON_STEP.get(horizon, 0) if horizon in spec.horizons else 0
         if spec.unit in ("pct", "ratio") and metric_id not in UNSCALED_IDS:
             return float(v * (1 + 0.01 * k))
         return float(v)
 
     def _metric(self, iata: str, metric_id: str, horizon: str) -> Metric:
-        spec = self._by_id[metric_id]
-        known = ("12m", "3y", "5y", "10y", "static", "forecast")
+        spec = self._spec(metric_id)
         return Metric(id=metric_id, value=self._value(iata, metric_id, horizon), unit=spec.unit,
-                      horizon=horizon if horizon in known else "static",
+                      horizon=self._stamped_horizon(spec, horizon),
                       period_start="2025-05", period_end=VINT, source_id=spec.sources[0], vintage=VINT)
 
     # --- DataService ---
@@ -108,16 +127,15 @@ class FakeDataService:
 
     def get_feature_matrix(self, airports: list[str], metric_ids: list[str], horizon: Horizon,
                            peer_group: PeerGroup = "hub_class") -> FeatureMatrix:
-        refs = [self._refs[i.upper()] for i in airports]
+        refs = [self._ref(i) for i in airports]
         for m in metric_ids:
-            if m not in self._by_id:
-                raise KeyError(f"unknown metric id: {m}")
+            self._spec(m)
         values = [[self._value(r.iata, m, horizon) for m in metric_ids] for r in refs]
         return FeatureMatrix(airports=refs, metric_ids=metric_ids, horizon=horizon, values=values,
                              peer_group=peer_group, vintages=self.source_vintages())
 
     def get_profile(self, iata: str, horizons: tuple[Horizon, ...] = ("12m", "5y")) -> AirportProfile:
-        ref = self._refs[iata.upper()]
+        ref = self._ref(iata)
         base = BASE[ref.iata]
         metrics = {h: [self._metric(ref.iata, s.id, h) for s in self._specs if s.tier != "C"] for h in horizons}
         slot_url = ("https://www.faa.gov/about/office_org/headquarters_offices/ato/service_units/systemops/"
@@ -142,11 +160,12 @@ class FakeDataService:
                           vintage=VINT, rows=rows[:top_n], truncated=len(rows) > top_n)
 
     def get_metric_series(self, iata: str, metric_id: str) -> list[Metric]:
-        spec = self._by_id[metric_id]
-        base = self._value(iata.upper(), metric_id, "12m")
+        spec = self._spec(metric_id)
+        h = self._stamped_horizon(spec, "12m")  # a 5y-only metric has a 5y series, not a 12m one
+        base = self._value(self._ref(iata).iata, metric_id, h)
         if base is None:  # metric unavailable here (tier C, or tier B outside the curated set) - no invented numbers
             return []
-        return [Metric(id=metric_id, value=base * (1 - 0.01 * (2026 - y)), unit=spec.unit, horizon="12m",
+        return [Metric(id=metric_id, value=base * (1 - 0.01 * (2026 - y)), unit=spec.unit, horizon=h,
                        period_start=f"{y}-01", period_end=f"{y}-12", source_id=spec.sources[0], vintage=VINT)
                 for y in range(2016, 2027)]
 

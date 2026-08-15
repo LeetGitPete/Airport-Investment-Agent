@@ -32,7 +32,7 @@ class AirportRef(_Frozen):
     lat: float
     lon: float
 
-    @field_validator("iata", "faa_locid", "state", mode="before")
+    @field_validator("iata", "faa_locid", "state", "faa_region", mode="before")
     @classmethod
     def _upper(cls, v: str) -> str:
         return v.strip().upper() if isinstance(v, str) else v
@@ -93,7 +93,7 @@ class AirportFilter(BaseModel):
     name_contains: str | None = None
     limit: int = Field(default=50, ge=1, le=600)
 
-    @field_validator("states", "iatas", mode="before")
+    @field_validator("states", "faa_regions", "cbsa_codes", "iatas", mode="before")
     @classmethod
     def _upper_list(cls, v: list[str]) -> list[str]:
         if not isinstance(v, list):

@@ -1,4 +1,6 @@
-from airport_agent.contracts.registry import PILLAR_NAMES, load_registry, registry_by_id
+import pytest
+
+from airport_agent.contracts.registry import PILLAR_NAMES, load_pillars, load_registry, registry_by_id
 
 EXPECTED_IDS = {
     "enpl_cagr_3y", "enpl_cagr_5y", "enpl_cagr_10y", "taf_cagr_10y", "taf_vs_actual_gap", "load_factor", "spill_proxy",
@@ -27,3 +29,30 @@ def test_registry_pillars_and_tiers():
     assert by["asv_utilization"].tier == "C"
     assert all(s.sources for s in by.values()) and all(s.horizons for s in by.values())
     assert any("unaudited" in c.lower() for c in by["cpe_usd"].caveats)
+
+
+def test_pillars_match_names_and_weights_sum_to_one():
+    pillars = load_pillars()
+    assert set(pillars) == set(PILLAR_NAMES)
+    assert {k: v["name"] for k, v in pillars.items()} == PILLAR_NAMES
+    assert abs(sum(v["default_weight"] for v in pillars.values()) - 1.0) < 1e-9
+
+
+
+
+DUP_YAML = """
+pillars:
+  P1: {name: Demand Pressure, default_weight: 1.0}
+metrics:
+  - {id: load_factor, name: LF, definition: d, formula: f, unit: ratio, direction: up, pillar: P1,
+     tier: A, sources: [bts_t100], horizons: [12m]}
+  - {id: load_factor, name: LF again, definition: d, formula: f, unit: ratio, direction: up, pillar: P1,
+     tier: A, sources: [bts_t100], horizons: [12m]}
+"""
+
+
+def test_duplicate_metric_ids_rejected(tmp_path):
+    dup = tmp_path / "metrics.yaml"
+    dup.write_text(DUP_YAML, encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate"):
+        load_registry(dup)

@@ -21,8 +21,14 @@ def ref(iata="BOS"):
 
 def test_airport_ref_normalizes_codes():
     r = AirportRef(iata="bos", icao=None, faa_locid="bos", name="Logan", city="Boston", state="ma",
-                   faa_region="ANE", hub_size="large", lat=42.36, lon=-71.01)
-    assert r.iata == "BOS" and r.faa_locid == "BOS" and r.state == "MA"
+                   faa_region=" ane ", hub_size="large", lat=42.36, lon=-71.01)
+    assert r.iata == "BOS" and r.faa_locid == "BOS" and r.state == "MA" and r.faa_region == "ANE"
+
+
+def test_airport_filter_normalizes_code_lists():
+    f = AirportFilter(states=["ma"], faa_regions=["ane"], cbsa_codes=[" 14460 "], iatas=["bos"])
+    assert f.faa_regions == ["ANE"] and f.cbsa_codes == ["14460"]
+    assert f.states == ["MA"] and f.iatas == ["BOS"]
 
 
 def test_metric_requires_provenance():
