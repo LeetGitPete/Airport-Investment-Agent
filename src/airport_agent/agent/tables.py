@@ -57,7 +57,9 @@ def evidence_table(rep: DeterministicReport, show: list[str],
     for metric in rep.evidence:
         if metric.id not in order:
             order.append(metric.id)
-    shown = [m for m in show if m in order] or ([] if show else list(order))
+    matched = [m for m in show if m in order]
+    unmatched = [m for m in show if m not in order]
+    shown = matched or list(order)  # ids we do not have must never collapse the evidence to nothing
     hidden = [m for m in order if m not in shown]
     single = rep.rows[0].ref.iata if len(rep.rows) == 1 else None
     columns = ["metric", *(["airport"] if single else []), *METRIC_PROVENANCE_COLUMNS]
@@ -67,6 +69,9 @@ def evidence_table(rep: DeterministicReport, show: list[str],
                                    "comparison table for per-airport values."]
     if hidden:
         footnotes.append(f"{len(hidden)} further metrics collected but not shown: {', '.join(hidden)}.")
+    if unmatched:
+        footnotes.append(f"Requested metrics not in this report, so everything is shown: "
+                         f"{', '.join(unmatched)}.")
     return Table(title=f"Evidence — {len(shown)} of {len(order)} metrics", columns=columns, rows=rows,
                  footnotes=footnotes), hidden
 

@@ -81,11 +81,19 @@ class Concierge:
         return Plan(intent="clarify", engines=[], filters=filters.model_dump(), tools_to_call=[],
                     specialist=None, presentation_notes=text)
 
-    def _clarify_answer(self, filters: PlanFilters, text: str) -> Answer:
+    def _clarify_answer(self, state: SessionState, message: str, filters: PlanFilters, text: str) -> Answer:
+        """A clarifying question is a real turn: it is recorded so the next message has its antecedent.
+
+        Only the transcript is touched — `last_reports`, `last_airports` and `last_preset` keep the previous
+        turn's analysis, because nothing new was computed.
+        """
         plan = self._clarify_plan(filters, text)
-        return Answer(plan=plan, plan_line=Planner.plan_line(plan, filters), headline=text, evidence_tables=[],
-                      analyst_view=None, agreement_line=None, assumptions=[], uncertainty_notes=[],
-                      citations=[], follow_ups=[], tool_trace=[])
+        answer = Answer(plan=plan, plan_line=Planner.plan_line(plan, filters), headline=text,
+                        evidence_tables=[], analyst_view=None, agreement_line=None, assumptions=[],
+                        uncertainty_notes=[], citations=[], follow_ups=[], tool_trace=[])
+        state.messages.append(ChatMessage(role="user", content=message))
+        state.messages.append(ChatMessage(role="assistant", content=text, answer=answer))
+        return answer
 
     # ---------------- execution ----------------
 
@@ -148,7 +156,7 @@ class Concierge:
         if on_plan is not None:
             on_plan(plan)
         if plan.intent == "clarify":
-            return self._clarify_answer(filters, plan.presentation_notes or CLARIFY_TEXT)
+            return self._clarify_answer(state, message, filters, plan.presentation_notes or CLARIFY_TEXT)
 
         tool_results, trace = self._run_tools(plan, filters)
         req: AnalysisRequest | None = None
@@ -159,12 +167,13 @@ class Concierge:
             try:
                 req = self.planner.to_analysis_request(plan, filters, defaults)
             except ValueError as exc:
-                return self._clarify_answer(filters, f"{CLARIFY_TEXT} ({exc})")
+                return self._clarify_answer(state, message, filters, f"{CLARIFY_TEXT} ({exc})")
             if "deterministic" in plan.engines:
                 try:
                     deterministic, entry = self._run_deterministic(req)
                 except ValueError as exc:  # unknown preset, empty filter, unusable metric set
-                    return self._clarify_answer(filters, f"I could not run that analysis: {exc}")
+                    return self._clarify_answer(state, message, filters,
+                                                f"I could not run that analysis: {exc}")
                 trace.append(entry)
             if plan.specialist:
                 specialist, entry = self._run_specialist(req, deterministic)

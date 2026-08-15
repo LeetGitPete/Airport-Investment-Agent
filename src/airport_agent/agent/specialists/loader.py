@@ -30,7 +30,8 @@ class SpecialistConfig(BaseModel):
     name: str
     allowed_tools: list[str]
     default_preset: str | None = None
-    max_turns: int = Field(default=2, ge=1, le=6)
+    # budget: plan (1) + loop (max_turns) + specialist final (1) + synthesis (1) <= 6 calls per question
+    max_turns: int = Field(default=2, ge=1, le=3)
     metric_pillars: list[str] = Field(default_factory=list)
     metric_ids: list[str] = Field(default_factory=list)
     body: str

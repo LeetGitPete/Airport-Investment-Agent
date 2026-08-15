@@ -127,7 +127,12 @@ def test_unparseable_plan_becomes_a_clarify_without_further_calls(fake_data, fak
     state = SessionState(session_id="s", title="t")
     ans = c.answer("???", state)
     assert ans.plan.intent == "clarify" and len(llm.calls) == 1
-    assert "Which airports or region" in ans.headline and state.messages == []
+    assert "Which airports or region" in ans.headline
+    # The clarify exchange is a real turn: recorded so the next message has its antecedent,
+    # but no analysis state is touched.
+    assert [m.role for m in state.messages] == ["user", "assistant"]
+    assert state.messages[0].content == "???" and state.messages[1].answer is ans
+    assert state.last_reports == {} and state.last_airports == []
 
 
 def test_informational_turn_keeps_previous_reports(fake_data, fake_analyst, specs):
