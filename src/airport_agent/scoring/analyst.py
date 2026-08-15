@@ -15,7 +15,9 @@ from airport_agent.contracts import (
     ScoreRow,
 )
 from airport_agent.contracts.data_service import DataService
-from airport_agent.scoring.explain import Evidence, explain_rank
+from airport_agent.scoring.calculators import distance_bands as _bands
+from airport_agent.scoring.calculators import long_haul_share as _lhs
+from airport_agent.scoring.explain import Evidence, explain_compare, explain_rank
 from airport_agent.scoring.presets import Preset, load_presets
 from airport_agent.scoring.scorer import Scorer, ScoringResult
 
@@ -162,3 +164,40 @@ class Analyst:
             explanation=explain_rank(res, self.by_id, ev, preset.name, horizon, peer_group,
                                      absent_weight=absent_weight),
             caveats=caveats, curated_facts=facts, percentiles=res.percentiles)
+
+    def compare(self, req: AnalysisRequest) -> DeterministicReport:
+        if not req.horizons:
+            raise ValueError("horizons must not be empty")
+        horizon: Horizon = req.horizons[0]
+        preset = self._preset(req.scoring_preset)
+        peer_group: PeerGroup = req.peer_group or "hub_class"
+        targets = self._resolve_airports(req)
+        candidates = list(dict.fromkeys(req.focus_metrics)) if req.focus_metrics else []
+        wanted = [m for m in candidates if m in self.by_id] or self.scorer.scoreable_ids(preset)
+        if not wanted:
+            raise ValueError(f"no known metrics for this request: focus_metrics={req.focus_metrics!r}")
+        scoreable = self.scorer.scoreable_ids(preset, wanted)
+        res, n_uni = self._score_targets(targets, scoreable, horizon, peer_group, preset)
+        evidence, ev, facts = self._evidence(targets, wanted, horizon)
+        comparison = {m: {i: (ev[(i, m)].value if (i, m) in ev else None) for i in targets} for m in wanted}
+        caveats = self._caveats(scoreable, peer_group, n_uni)
+        unknown = [m for m in candidates if m not in self.by_id]
+        if unknown:
+            caveats.append(f"focus_metrics dropped: {unknown!r} (unknown ids)")
+        for m in wanted:
+            if self.by_id[m].tier == "C":
+                caveats.append(f"{m} ({self.by_id[m].name}) is a documented gap (tier C): not computable "
+                               "from public data — reported as not available")
+        return DeterministicReport(
+            question_type=req.question_type, preset=preset.name, weights=res.weights, horizon=horizon,
+            peer_group=peer_group, rows=res.rows, comparison=comparison, evidence=evidence,
+            explanation=explain_compare(res, self.by_id, ev, targets, horizon, peer_group),
+            caveats=caveats, curated_facts=facts, percentiles=res.percentiles)
+
+    def distance_bands(self, iata: str, horizon: Horizon = "12m", freight: bool = False) -> dict[str, float]:
+        return _bands(self.data.get_routes(iata, horizon=horizon, top_n=1000), freight=freight)
+
+    def long_haul_share(self, iata: str, threshold_mi: float = 1500, horizon: Horizon = "12m",
+                        freight: bool = False) -> Metric:
+        return _lhs(self.data.get_routes(iata, horizon=horizon, top_n=1000), threshold_mi=threshold_mi,
+                    freight=freight, horizon=horizon)
