@@ -8,6 +8,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from airport_agent.contracts.reports import DeterministicReport, SpecialistReport
 
 Intent = Literal["informational", "analytical", "followup", "clarify"]
+#: How this turn's tables are shown (contracts-v2). `auto` = a table whose content was already shown in
+#: full earlier in the session collapses to a pointer; `repeat` = show everything in full (the user asked
+#: to see it again); `minimal` = pointers as in auto AND new tables go behind a collapsed data section
+#: so prose leads. Numbers are never dropped — a pointer names the earlier turn that still holds them.
+TableDisplay = Literal["auto", "repeat", "minimal"]
 
 
 class Plan(BaseModel):
@@ -18,6 +23,7 @@ class Plan(BaseModel):
     tools_to_call: list[str]
     specialist: str | None
     presentation_notes: str
+    table_display: TableDisplay = "auto"
 
 
 class Table(BaseModel):
@@ -26,6 +32,11 @@ class Table(BaseModel):
     columns: list[str]
     rows: list[list[Any]]
     footnotes: list[str] = Field(default_factory=list)
+    #: Set by the display policy, never by the LLM. `pointer` = identical content (same columns and
+    #: rows, by content hash) was shown in full at `first_shown_turn`; renderers show a one-line
+    #: reference instead of the grid.
+    shown_as: Literal["full", "pointer"] = "full"
+    first_shown_turn: int | None = None
 
 
 class Citation(BaseModel):
@@ -80,3 +91,7 @@ class SessionState(BaseModel):
     last_reports: dict[
         str, Annotated[DeterministicReport | SpecialistReport, Field(discriminator="report_type")]
     ] = Field(default_factory=dict)
+    #: Content hash of every table shown in full -> the 1-based answer turn where it first appeared.
+    #: Read by the display policy so a rebuilt table (typically a follow-up answered from memory)
+    #: becomes a pointer instead of the same grid again.
+    shown_tables: dict[str, int] = Field(default_factory=dict)

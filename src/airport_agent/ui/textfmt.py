@@ -38,6 +38,15 @@ def table_to_text(table: Table) -> str:
     return "\n".join(lines)
 
 
+def pointer_line(table: Table) -> str:
+    """A `pointer` table (identical content shown earlier in the chat) prints as one line."""
+    return f"^ {table.title} -- unchanged since answer #{table.first_shown_turn} above (not repeated)"
+
+
+def _table_block(table: Table) -> str:
+    return pointer_line(table) if table.shown_as == "pointer" else table_to_text(table)
+
+
 def answer_to_text(a: Answer) -> str:
     lines: list[str] = []
     lines.append(f"PLAN: {a.plan_line}")
@@ -61,7 +70,7 @@ def answer_to_text(a: Answer) -> str:
         lines.append("== ANALYST VIEW (AI specialist interpretation) ==")
         lines.append("")
     for table in analyst_tables:
-        lines.append(table_to_text(table))
+        lines.append(_table_block(table))
         lines.append("")
     if a.analyst_view:
         lines.append(f"ANALYST VIEW: {a.analyst_view}")
@@ -72,8 +81,14 @@ def answer_to_text(a: Answer) -> str:
     if computed:
         lines.append("== COMPUTED ANALYSIS (every number computed from the cited data) ==")
         lines.append("")
+    # `minimal` (a narrow follow-up): pointers first, then the new tables under a DATA heading so
+    # the prose reads first; nothing is dropped.
+    if a.plan.table_display == "minimal":
+        computed = sorted(computed, key=lambda t: t.shown_as != "pointer")
+        if any(t.shown_as == "full" for t in computed):
+            lines.append("-- DATA (new tables for this turn) --")
     for table in computed:
-        lines.append(table_to_text(table))
+        lines.append(_table_block(table))
         lines.append("")
     # QA task 19 (2026-08-16): a section with nothing in it is not printed — a conversational turn
     # computes nothing, and four dead headings trailing every reply read as an error.

@@ -76,3 +76,19 @@ def test_follow_ups_survive_when_they_are_the_only_extra_section():
     t = answer_to_text(a)
     assert "FOLLOW-UPS:" in t and "Rank New England for expansion" in t
     assert "ASSUMPTIONS:" not in t and "SOURCES:" not in t
+
+
+def test_pointer_table_prints_as_one_line_and_never_the_grid():
+    a = make_answer("compare")
+    table = a.evidence_tables[0].model_copy(update={"shown_as": "pointer", "first_shown_turn": 1})
+    a = a.model_copy(update={"evidence_tables": [table]})
+    text = answer_to_text(a)
+    assert "unchanged since answer #1" in text and table.title in text
+    assert "12.9" not in text.split("== COMPUTED ANALYSIS")[1].split("ASSUMPTIONS:")[0]
+
+
+def test_minimal_mode_puts_new_tables_under_a_data_heading():
+    a = make_answer("compare")
+    a = a.model_copy(update={"plan": a.plan.model_copy(update={"table_display": "minimal"})})
+    text = answer_to_text(a)
+    assert "-- DATA (new tables for this turn) --" in text and "12.9" in text  # nothing dropped

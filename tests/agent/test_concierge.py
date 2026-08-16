@@ -377,3 +377,56 @@ def test_a_turn_within_the_cap_says_nothing(fake_data, fake_analyst, specs):
 def _live_budget_note_for(budget):
     from airport_agent.agent.concierge import _live_budget_note
     return _live_budget_note(budget)
+
+
+# table display across turns (contracts-v2): the same grid is never shown twice
+
+
+def _followup(**over):
+    return _plan_json(intent="followup", engines=[], question_type="none", faa_regions=[], **over)
+
+
+def test_followup_from_memory_points_at_the_tables_it_would_repeat(fake_data, fake_analyst, specs):
+    c, _ = _concierge([_plan_json(), LLMResult(text="ok", provider="f", model="m"), FINAL, SYN,
+                       _followup(), SYN], fake_data, fake_analyst, specs)
+    state = SessionState(session_id="s", title="t")
+    first = c.answer("rank NE", state)
+    assert first.evidence_tables and all(t.shown_as == "full" for t in first.evidence_tables)
+    assert len(state.shown_tables) == len(first.evidence_tables)
+    second = c.answer("why is the top one first?", state)
+    # Same reports -> same content -> every table is a pointer to answer #1, none is dropped.
+    assert [t.title for t in second.evidence_tables] == [t.title for t in first.evidence_tables]
+    assert all(t.shown_as == "pointer" and t.first_shown_turn == 1 for t in second.evidence_tables)
+    assert second.plan.table_display == "auto"
+
+
+def test_repeat_mode_shows_the_grids_again_and_keeps_the_original_turn(fake_data, fake_analyst, specs):
+    c, _ = _concierge([_plan_json(), LLMResult(text="ok", provider="f", model="m"), FINAL, SYN,
+                       _followup(), SYN, _followup(table_display="repeat"), SYN], fake_data, fake_analyst, specs)
+    state = SessionState(session_id="s", title="t")
+    c.answer("rank NE", state)
+    c.answer("why?", state)
+    third = c.answer("show me that ranking again", state)
+    assert third.plan.table_display == "repeat"
+    assert all(t.shown_as == "full" for t in third.evidence_tables)
+    assert set(state.shown_tables.values()) == {1}  # re-showing did not move the pointer target
+
+
+def test_a_new_analysis_after_a_pointer_turn_shows_in_full(fake_data, fake_analyst, specs):
+    narrowed = _plan_json(question_type="compare", airports=["SFO", "LAX"], faa_regions=[],
+                          engines=["deterministic", "specialist:capacity_analyst"], scoring_preset="congestion_relief")
+    c, _ = _concierge([_plan_json(), LLMResult(text="ok", provider="f", model="m"), FINAL, SYN,
+                       narrowed, LLMResult(text="ok", provider="f", model="m"), FINAL, SYN], fake_data, fake_analyst, specs)
+    state = SessionState(session_id="s", title="t")
+    c.answer("rank NE", state)
+    second = c.answer("compare SFO and LAX congestion", state)
+    scores = [t for t in second.evidence_tables if t.title.lower().startswith(("rank", "score"))]
+    assert scores and all(t.shown_as == "full" for t in scores)  # different rows, different content
+    assert max(state.shown_tables.values()) == 2
+
+
+def test_an_unknown_table_display_label_degrades_to_auto(fake_data, fake_analyst, specs):
+    c, _ = _concierge([_plan_json(table_display="everything"), LLMResult(text="ok", provider="f", model="m"),
+                       FINAL, SYN], fake_data, fake_analyst, specs)
+    ans = c.answer("rank NE", SessionState(session_id="s", title="t"))
+    assert ans.plan.table_display == "auto"

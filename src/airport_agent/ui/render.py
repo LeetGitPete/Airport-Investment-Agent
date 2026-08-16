@@ -43,7 +43,15 @@ def render_plan_line(plan_line: str) -> None:
     st.caption(plan_line)
 
 
+def pointer_line(table: Table) -> str:
+    """The one line a `pointer` table renders as: where the identical grid already is."""
+    return f"↑ {table.title} — unchanged since answer #{table.first_shown_turn} above (not repeated)"
+
+
 def _render_table(table: Table, specs_by_id: dict[str, MetricSpec]) -> None:
+    if table.shown_as == "pointer":
+        st.caption(pointer_line(table))
+        return
     st.markdown(f"*{table.title}*")
     df = table_df(table)
     st.dataframe(df, column_config=column_help(table.columns, specs_by_id), hide_index=True)
@@ -93,9 +101,21 @@ def render_answer(
     if computed:
         st.subheader("📊 Computed analysis")
         st.caption("Every number below is computed from the cited data; the AI cannot alter it.")
-    # Every computed table renders in place — data is never tucked behind an expander.
-    for table in computed:
-        _render_table(table, specs_by_id)
+    # Computed tables render in place. The one exception is `table_display == "minimal"` (a narrow
+    # follow-up where prose should lead): NEW tables then sit behind a collapsed data section — still
+    # in the answer, one click away, never dropped. Pointers (grids already shown earlier in the
+    # chat, by content hash) always render as their one line, so nothing repeats.
+    fresh = [t for t in computed if t.shown_as == "full"]
+    if answer.plan.table_display == "minimal" and fresh:
+        for table in computed:
+            if table.shown_as == "pointer":
+                _render_table(table, specs_by_id)
+        with st.expander(f"Data ({len(fresh)} table{'s' if len(fresh) != 1 else ''})", expanded=False):
+            for table in fresh:
+                _render_table(table, specs_by_id)
+    else:
+        for table in computed:
+            _render_table(table, specs_by_id)
 
     # QA task 19 (2026-08-16): a conversational turn computes nothing, so these sections would be
     # empty headings and a "none stated" caption trailing every reply. An analytical answer always

@@ -127,6 +127,14 @@ collapsed) and states what it hid and why; quotes vs summarizes the specialist; 
 It cannot change numbers, drop the assumptions block, hide a disagreement, or omit citations.
 Informational answers: headline · value/table with provenance · conventions used · follow-ups.
 
+Table display across turns (contracts-v2, 2026-08-16): a table's identity is a content hash (columns + rows,
+not title/footnotes) kept in `SessionState.shown_tables` with the answer turn where it first appeared in full.
+A table with identical content later in the session (typically a follow-up answered from memory, which rebuilds
+its tables from the same reports) renders as a one-line pointer to that turn instead of the grid; different rows
+show in full. The Concierge steers only the mode via `Plan.table_display`: `auto` (the rule), `repeat` (the
+user asked to see it again — everything in full, pointer targets unchanged), `minimal` (a narrow follow-up —
+pointers as in auto, and NEW tables go behind a collapsed data section so prose leads). No mode drops a number.
+
 ## Testing
 - Concierge: golden Plans for the four sample questions + 6 follow-ups (structured-output assertions).
 - Deterministic Analyst: unit + golden ordering tests (see 02).

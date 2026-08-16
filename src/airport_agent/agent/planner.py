@@ -31,6 +31,7 @@ from airport_agent.contracts import (
     Plan,
     QuestionType,
     SessionState,
+    TableDisplay,
 )
 from airport_agent.llm import parse_json_text
 
@@ -87,6 +88,8 @@ _ROUTING_TABLE = [
     ("is DEN's cargo growth sustainable? (maps to no specialist cleanly)", "analytical / custom",
      "deterministic + specialist:general_analyst", "airports=[DEN], question_type=custom"),
 ]
+
+TABLE_DISPLAY_MODES = ["auto", "repeat", "minimal"]
 
 PLAN_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -149,6 +152,14 @@ PLAN_SCHEMA: dict[str, Any] = {
                                                "questions THIS agent can answer, phrased as the user would "
                                                "ask them and aimed at what they seemed to want. Use real US "
                                                "airports, regions or hub classes. Empty otherwise."},
+        "table_display": {"type": "string", "enum": TABLE_DISPLAY_MODES,
+                          "description": "How to show this turn's tables. 'auto' (the default for almost "
+                                         "every turn) = a table identical to one already shown earlier in "
+                                         "this chat collapses to a one-line pointer to it, new tables show "
+                                         "in full. 'repeat' = the user asked to see a table again ('show me "
+                                         "that ranking again'). 'minimal' = a narrow follow-up ('just BOS's "
+                                         "score', 'in one line') where prose should lead and new tables can "
+                                         "sit behind a collapsed data section. Never used to hide numbers."},
     },
 }
 PLAN_SCHEMA["required"] = list(PLAN_SCHEMA["properties"])
@@ -253,6 +264,12 @@ class PlanFilters(BaseModel):
                 return call.args()
         return {}
 
+
+
+def _table_display(value: Any) -> TableDisplay:
+    """Model output -> display mode; anything unknown or missing is 'auto', never an error, because a
+    bad label here must not fail a turn whose plan is otherwise fine."""
+    return value if value in TABLE_DISPLAY_MODES else "auto"
 
 def _unset(value: Any) -> str | None:
     """Map the schema's sentinels ('none', '', absent) to None."""
@@ -440,6 +457,12 @@ class Planner:
             "- horizon defaults: 5y for rank/compare of investment candidates, 12m for congestion "
             "compare/diagnose and for informational lookups.",
 
+            "TABLE DISPLAY (table_display): 'auto' almost always — the system itself collapses any "
+            "table already shown in this chat to a pointer, so a follow-up answered from memory does not "
+            "repeat the grids the user has on screen. 'repeat' only when the user asks to see a table "
+            "again. 'minimal' for a narrow follow-up that wants a sentence, not a report. You choose the "
+            "mode, never individual tables, and no mode removes a number.",
+
             self._routing_block(),
             self._defaults_block(defaults),
             self._session_block(state),
@@ -525,7 +548,8 @@ class Planner:
         plan = Plan(intent=raw.get("intent"), engines=engines, filters=filters.model_dump(),
                     tools_to_call=[c.tool for c in filters.tool_calls],
                     specialist=chosen[0] if chosen else None,
-                    presentation_notes=raw.get("presentation_notes") or "")
+                    presentation_notes=raw.get("presentation_notes") or "",
+                    table_display=_table_display(raw.get("table_display")))
         return plan, filters
 
     # dispatch

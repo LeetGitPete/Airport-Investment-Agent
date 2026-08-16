@@ -312,11 +312,17 @@ class Concierge:
         answer = self.synthesizer.synthesize(
             message=message, plan=plan, plan_line=Planner.plan_line(plan, filters, req), req=req,
             deterministic=deterministic, specialist=specialist, tool_results=tool_results, trace=trace,
-            defaults=defaults, extra_notes=_live_budget_note(budget))
+            defaults=defaults, extra_notes=_live_budget_note(budget),
+            shown_tables=state.shown_tables, turn=self._turn_number(state))
         self._remember(state, message, answer, plan, req, deterministic, specialist)
         return answer
 
     # memory
+
+    @staticmethod
+    def _turn_number(state: SessionState) -> int:
+        """1-based number of the answer being produced: what a pointer's "turn N" refers to."""
+        return sum(1 for m in state.messages if m.role == "assistant") + 1
 
     @staticmethod
     def _remember(state: SessionState, message: str, answer: Answer, plan: Plan,

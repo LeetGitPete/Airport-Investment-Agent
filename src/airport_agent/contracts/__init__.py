@@ -9,6 +9,7 @@ from airport_agent.contracts.conversation import (
     Plan,
     SessionState,
     Table,
+    TableDisplay,
     ToolCallTrace,
 )
 from airport_agent.contracts.data_service import DataService
@@ -106,6 +107,7 @@ __all__ = [
     "SpecialistReport",
     "SpecialistRunner",
     "Table",
+    "TableDisplay",
     "Tier",
     "ToolCall",
     "ToolCallTrace",

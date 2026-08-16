@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from airport_agent.agent.planner import is_national_scope
 from airport_agent.agent.specialists.runner import compact_deterministic, fit_tool_result
+from airport_agent.agent.table_display import apply_display_policy
 from airport_agent.agent.tables import (
     citations_from,
     data_matrix,
@@ -217,9 +218,14 @@ class Synthesizer:
                    deterministic: DeterministicReport | None, specialist: SpecialistReport | None,
                    tool_results: list[tuple[str, dict, dict]], trace: list[ToolCallTrace],
                    defaults: dict[str, str] | None,
-                   extra_notes: list[str] | None = None) -> Answer:
+                   extra_notes: list[str] | None = None,
+                   shown_tables: dict[str, int] | None = None, turn: int = 1) -> Answer:
         """`extra_notes` are uncertainty lines the orchestrator knows and the reports cannot see —
-        currently the live-call ceiling (QA task 20). They are condensed with the rest, never above it."""
+        currently the live-call ceiling (QA task 20). They are condensed with the rest, never above it.
+
+        `shown_tables` is the session's table memory (content hash -> first turn) and `turn` this
+        answer's 1-based number; together with `plan.table_display` they decide which tables render
+        in full and which collapse to a pointer. Passing neither means "first turn, show everything"."""
         synthesis, degraded = self._prose(self._user_message(
             message=message, plan=plan, req=req, deterministic=deterministic, specialist=specialist,
             tool_results=tool_results, defaults=defaults))
@@ -284,6 +290,9 @@ class Synthesizer:
                                          provenance_notes)
         if sources_table is not None:
             tables.append(sources_table)
+        # Last, so every table (computed, analyst, tool, sources) goes through the same rule.
+        tables = apply_display_policy(tables, shown_tables if shown_tables is not None else {},
+                                      plan.table_display, turn=turn)
         # Condense deterministically — the LLM never picks which lines survive.
         assumptions = _condense(_unique(assumptions), MAX_ASSUMPTIONS,
                                 "further standing conventions apply (documented in docs/DESIGN.md)")
