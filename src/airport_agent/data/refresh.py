@@ -50,10 +50,6 @@ _PERIOD_COLUMN: dict[str, str] = {
     "airport_year": "year",
 }
 
-#: Sources whose `normalize()` output needs an enrichment UPDATE (`apply_*_enrichment`)
-#: instead of a plain `Store.replace_rows` for one or more of its returned tables.
-_ENRICHMENT_SOURCES = {"faa_taf", "census_cbsa"}
-
 #: Fallback trailing-months window for bts_t100 if `config/sources.yaml` doesn't set
 #: `t100_months` (design 01's original default).
 _DEFAULT_T100_MONTHS = 24

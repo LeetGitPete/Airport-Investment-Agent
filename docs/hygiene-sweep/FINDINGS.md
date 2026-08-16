@@ -5,6 +5,37 @@ file, or otherwise a human's call. Trivial fixes were applied directly and are l
 
 Format per the project escalation protocol: what · why it matters · options · recommendation · blocked.
 
+Ordered by severity (high first). Ids are stable; they are not in discovery order.
+
+### F-006 — `docs/DESIGN.md` does not exist, but the packaging script, the UI and design 06 all require it   [severity: high] [docs/]
+what:            `docs/` contains SCORING-METHODOLOGY.md, KEY-TRADEOFFS.md, WHERE-HOW-AI-IS-USED.md
+                 and process-log.md. There is no `DESIGN.md`. Five places assume there is:
+
+                   scripts/make_zip.py:57      checklist entry "DESIGN.md present" -> fails, main() returns 1
+                   src/airport_agent/ui/sidebar.py:130  st.caption("Design: docs/DESIGN.md") — a dead pointer in the app
+                   docs/design/06-deliverables.md:31    "`docs/DESIGN.md` — the required short design/architecture document"
+                   docs/design/06-deliverables.md:43    the release check: "DESIGN.md exists and the three standalone docs ... match its sections 3-5"
+                   docs/design/04-ui.md:18              the sidebar must "Link to `docs/DESIGN.md`"
+
+                 So `uv run python scripts/make_zip.py` builds the deliverable zip and exits 1 with an
+                 unticked checklist line, and the shipped Streamlit app shows the user a path to a file
+                 that is not in the zip.
+why it matters:  Design 06 names DESIGN.md as *the* required design/architecture deliverable for the
+                 assignment ("deliver source + short design doc"), with the three standalone docs
+                 embedded as its sections 3-5. Its absence is a missing deliverable, not a tidiness
+                 problem, and the one automated check that would have caught it (make_zip's checklist)
+                 is advisory output rather than something CI runs.
+options:         1) Assemble `docs/DESIGN.md` from `docs/design/00-06`, the limitations log and the three
+                    standalone docs — this is exactly the `doc-assembler` subagent's job per design 05.
+                 2) Drop DESIGN.md from the plan: point the sidebar caption and make_zip at
+                    `docs/design/` and the three standalone docs, and amend design 04/06 to match.
+                 3) Ship as-is and fix the dangling references only.
+recommendation:  Option 1. The three standalone docs exist, so the content largely does; what is missing
+                 is the assembled overview the assignment asks for. Writing it is authoring work well
+                 outside a hygiene sweep, so I did not attempt it — but nothing else in this report is
+                 as likely to matter at delivery.
+blocked:         the deliverable zip: `scripts/make_zip.py` exits non-zero until this is resolved either way.
+
 ### F-001 — `otp_peak` day-grid spans every month in the refresh, not each month's own days   [severity: medium] [src/airport_agent/data/adapters/bts_otp.py:299]
 what:            `_peak_frame` builds ONE zero-fill grid for all periods in the call:
 
@@ -71,42 +102,6 @@ recommendation:  Option 1. The removal reads as a deliberate de-cluttering with 
                  but it is the human's call, and I did not touch the design docs.
 blocked:         nothing.
 
-### F-003 — `ProvenanceSpec.derived(reason)` validates a user-facing reason that is never shown   [severity: low] [src/airport_agent/agent/tools/provenance.py:97]
-what:            `derived()` rejects an empty reason with "needs a reason the user can read", and
-                 five tools supply one ("cites the sources of every metric that entered the score").
-                 `ToolRegistry._apply_provenance` surfaces `no_external_source` as
-                 `out["provenance_note"]`, which synthesis renders into the provenance table's
-                 footnotes — but `derived_from` is never read anywhere. It is write-only.
-why it matters:  Small, but it is the kind of thing that quietly rots: the validator's message
-                 promises the string reaches a user, and a future maintainer will believe it.
-                 Either the reason should be shown or it should be documented as author-facing.
-options:         1) Render it like `no_external_source` when a derived tool returns no provenance
-                    (today that case only produces the generic `provenance_gap` note).
-                 2) Keep it author-facing and reword the validation message to say so.
-                 3) Drop the field and let `derived()` take no argument.
-recommendation:  Option 1 — it is the behaviour the code already implies, and it makes a tool that
-                 legitimately cannot declare a source floor explain itself instead of tripping a
-                 generic gap note. Behaviour-visible, so not done here.
-blocked:         nothing.
-
-### F-004 — synthesis accepts 4 follow-ups where the schema asks the model for exactly 3   [severity: low] [src/airport_agent/agent/synthesis.py:307]
-what:            `SYNTHESIS_SCHEMA` tells the model "Exactly 3 short follow-up questions" and
-                 `FALLBACK_FOLLOW_UPS` has three, but the assembly slices `[:4]`:
-
-                     follow_ups = [f for f in synthesis.follow_ups if f.strip()][:4] or list(FALLBACK_FOLLOW_UPS)
-
-why it matters:  A compliant model gives 3 and nothing differs; a model that returns 4+ ships a
-                 fourth chip the prompt never sanctioned, so the UI's follow-up row is 3 or 4
-                 items depending on model behaviour rather than on a decision. Cosmetic, but it
-                 is an unintended inconsistency between the stated contract and the code.
-options:         1) Slice `[:3]` to match the schema.
-                 2) Change the schema description to "at most 4".
-                 3) Leave it — a 4th useful follow-up is harmless.
-recommendation:  Option 1: the schema is the stated contract and 3 is what the fallback provides,
-                 so the rendered count stops depending on which model answered. It changes what a
-                 user can see, so it is logged rather than applied.
-blocked:         nothing.
-
 ### F-005 — `terminal_expansion` up-weights two metrics that have no data for any airport   [severity: medium] [config/scoring_presets.yaml:11]
 what:            `terminal_expansion` is the preset behind the assignment's first sample question
                  ("Which airports in New England are strong candidates for terminal expansion?").
@@ -153,35 +148,6 @@ recommendation:  Option 3 plus option 1. Option 3 is the general fix — it catc
 blocked:         nothing — rankings today are internally consistent and coverage is reported. This is
                  about the preset meaning what it claims.
 
-### F-006 — `docs/DESIGN.md` does not exist, but the packaging script, the UI and design 06 all require it   [severity: high] [docs/]
-what:            `docs/` contains SCORING-METHODOLOGY.md, KEY-TRADEOFFS.md, WHERE-HOW-AI-IS-USED.md
-                 and process-log.md. There is no `DESIGN.md`. Five places assume there is:
-
-                   scripts/make_zip.py:57      checklist entry "DESIGN.md present" -> fails, main() returns 1
-                   src/airport_agent/ui/sidebar.py:130  st.caption("Design: docs/DESIGN.md") — a dead pointer in the app
-                   docs/design/06-deliverables.md:31    "`docs/DESIGN.md` — the required short design/architecture document"
-                   docs/design/06-deliverables.md:43    the release check: "DESIGN.md exists and the three standalone docs ... match its sections 3-5"
-                   docs/design/04-ui.md:18              the sidebar must "Link to `docs/DESIGN.md`"
-
-                 So `uv run python scripts/make_zip.py` builds the deliverable zip and exits 1 with an
-                 unticked checklist line, and the shipped Streamlit app shows the user a path to a file
-                 that is not in the zip.
-why it matters:  Design 06 names DESIGN.md as *the* required design/architecture deliverable for the
-                 assignment ("deliver source + short design doc"), with the three standalone docs
-                 embedded as its sections 3-5. Its absence is a missing deliverable, not a tidiness
-                 problem, and the one automated check that would have caught it (make_zip's checklist)
-                 is advisory output rather than something CI runs.
-options:         1) Assemble `docs/DESIGN.md` from `docs/design/00-06`, the limitations log and the three
-                    standalone docs — this is exactly the `doc-assembler` subagent's job per design 05.
-                 2) Drop DESIGN.md from the plan: point the sidebar caption and make_zip at
-                    `docs/design/` and the three standalone docs, and amend design 04/06 to match.
-                 3) Ship as-is and fix the dangling references only.
-recommendation:  Option 1. The three standalone docs exist, so the content largely does; what is missing
-                 is the assembled overview the assignment asks for. Writing it is authoring work well
-                 outside a hygiene sweep, so I did not attempt it — but nothing else in this report is
-                 as likely to matter at delivery.
-blocked:         the deliverable zip: `scripts/make_zip.py` exits non-zero until this is resolved either way.
-
 ### F-007 — `get_routes` truncates a tie-broken-by-nothing ordering, so "top routes" is not reproducible   [severity: medium] [src/airport_agent/data/service.py:310]
 what:            The route query orders by one column and the result is then sliced:
 
@@ -219,6 +185,42 @@ recommendation:  Option 1 — it matches `_airport_universe` and the Scorer, and
                  sort, so the fake is already deterministic and would not need changing.
 blocked:         nothing.
 
+### F-003 — `ProvenanceSpec.derived(reason)` validates a user-facing reason that is never shown   [severity: low] [src/airport_agent/agent/tools/provenance.py:97]
+what:            `derived()` rejects an empty reason with "needs a reason the user can read", and
+                 five tools supply one ("cites the sources of every metric that entered the score").
+                 `ToolRegistry._apply_provenance` surfaces `no_external_source` as
+                 `out["provenance_note"]`, which synthesis renders into the provenance table's
+                 footnotes — but `derived_from` is never read anywhere. It is write-only.
+why it matters:  Small, but it is the kind of thing that quietly rots: the validator's message
+                 promises the string reaches a user, and a future maintainer will believe it.
+                 Either the reason should be shown or it should be documented as author-facing.
+options:         1) Render it like `no_external_source` when a derived tool returns no provenance
+                    (today that case only produces the generic `provenance_gap` note).
+                 2) Keep it author-facing and reword the validation message to say so.
+                 3) Drop the field and let `derived()` take no argument.
+recommendation:  Option 1 — it is the behaviour the code already implies, and it makes a tool that
+                 legitimately cannot declare a source floor explain itself instead of tripping a
+                 generic gap note. Behaviour-visible, so not done here.
+blocked:         nothing.
+
+### F-004 — synthesis accepts 4 follow-ups where the schema asks the model for exactly 3   [severity: low] [src/airport_agent/agent/synthesis.py:307]
+what:            `SYNTHESIS_SCHEMA` tells the model "Exactly 3 short follow-up questions" and
+                 `FALLBACK_FOLLOW_UPS` has three, but the assembly slices `[:4]`:
+
+                     follow_ups = [f for f in synthesis.follow_ups if f.strip()][:4] or list(FALLBACK_FOLLOW_UPS)
+
+why it matters:  A compliant model gives 3 and nothing differs; a model that returns 4+ ships a
+                 fourth chip the prompt never sanctioned, so the UI's follow-up row is 3 or 4
+                 items depending on model behaviour rather than on a decision. Cosmetic, but it
+                 is an unintended inconsistency between the stated contract and the code.
+options:         1) Slice `[:3]` to match the schema.
+                 2) Change the schema description to "at most 4".
+                 3) Leave it — a 4th useful follow-up is harmless.
+recommendation:  Option 1: the schema is the stated contract and 3 is what the fallback provides,
+                 so the rendered count stops depending on which model answered. It changes what a
+                 user can see, so it is logged rather than applied.
+blocked:         nothing.
+
 ### F-008 — the `llm` marker is declared but no live smoke test exists   [severity: low] [pyproject.toml]
 what:            `pyproject.toml` registers `llm: tests that call a live LLM provider (need
                  GEMINI_API_KEY)`, and design 03 §Testing asks for "one recorded live smoke test per
@@ -238,4 +240,3 @@ recommendation:  Option 2 as the cheap version of the commitment: one live test 
                  for a fraction of the quota. Writing tests is outside a hygiene sweep, so I left the
                  marker in place rather than removing the hook.
 blocked:         nothing.
-
