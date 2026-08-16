@@ -43,9 +43,7 @@ REPORT_TOOLS = {"score_airports", "compare_airports", "diagnose_unmet_demand"}
 FINAL_INSTRUCTION = "Produce the final report now as JSON matching the schema. Do not call tools."
 
 
-# --------------------------------------------------------------------------------------------------
 # the model's final JSON (mirrors SPECIALIST_SCHEMA; defaults keep a terse model from failing the run)
-# --------------------------------------------------------------------------------------------------
 class _FinalRanking(BaseModel):
     iata: str
     rank: int

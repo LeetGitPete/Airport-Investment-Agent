@@ -164,144 +164,144 @@ Total files: **182**
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `tests/contracts/__init__.py` | 0 | pending | |
-| `tests/contracts/conftest.py` | 41 | pending | |
-| `tests/contracts/test_data_service_contract.py` | 113 | pending | |
-| `tests/contracts/test_factories_extension.py` | 37 | pending | |
-| `tests/contracts/test_models.py` | 97 | pending | |
-| `tests/contracts/test_protocols.py` | 33 | pending | |
-| `tests/contracts/test_registry.py` | 56 | pending | |
-| `tests/contracts/test_requests.py` | 118 | pending | |
+| `tests/contracts/__init__.py` | 0 | done | |
+| `tests/contracts/conftest.py` | 41 | done | |
+| `tests/contracts/test_data_service_contract.py` | 113 | done | |
+| `tests/contracts/test_factories_extension.py` | 37 | done | |
+| `tests/contracts/test_models.py` | 97 | done | |
+| `tests/contracts/test_protocols.py` | 33 | done | |
+| `tests/contracts/test_registry.py` | 56 | done | |
+| `tests/contracts/test_requests.py` | 118 | done | |
 
 ## 9b. tests/data
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `tests/data/__init__.py` | 0 | pending | |
-| `tests/data/build_test_snapshot.py` | 110 | pending | |
-| `tests/data/conftest.py` | 42 | pending | |
-| `tests/data/conftest_plugin.py` | 17 | pending | |
-| `tests/data/test_base.py` | 183 | pending | |
-| `tests/data/test_bts_otp.py` | 165 | pending | |
-| `tests/data/test_bts_socrata.py` | 164 | pending | |
-| `tests/data/test_bts_t100.py` | 159 | pending | |
-| `tests/data/test_census_cbsa.py` | 194 | pending | |
-| `tests/data/test_curated.py` | 111 | pending | |
-| `tests/data/test_derived_common.py` | 160 | pending | |
-| `tests/data/test_derived_p1.py` | 138 | pending | |
-| `tests/data/test_derived_p2.py` | 102 | pending | |
-| `tests/data/test_derived_p3.py` | 117 | pending | |
-| `tests/data/test_derived_p4.py` | 79 | pending | |
-| `tests/data/test_derived_p5.py` | 135 | pending | |
-| `tests/data/test_derived_registry.py` | 172 | pending | |
-| `tests/data/test_faa_aip.py` | 121 | pending | |
-| `tests/data/test_faa_nasstatus.py` | 156 | pending | |
-| `tests/data/test_faa_npias.py` | 171 | pending | |
-| `tests/data/test_faa_taf.py` | 281 | pending | |
-| `tests/data/test_http_pacer.py` | 107 | pending | |
-| `tests/data/test_ourairports.py` | 290 | pending | |
-| `tests/data/test_quality.py` | 66 | pending | |
-| `tests/data/test_refresh.py` | 176 | pending | |
-| `tests/data/test_service.py` | 99 | pending | |
-| `tests/data/test_store.py` | 358 | pending | |
+| `tests/data/__init__.py` | 0 | done | |
+| `tests/data/build_test_snapshot.py` | 110 | done | |
+| `tests/data/conftest.py` | 42 | done | |
+| `tests/data/conftest_plugin.py` | 17 | done | |
+| `tests/data/test_base.py` | 183 | done | |
+| `tests/data/test_bts_otp.py` | 165 | done | |
+| `tests/data/test_bts_socrata.py` | 164 | done | |
+| `tests/data/test_bts_t100.py` | 159 | done | |
+| `tests/data/test_census_cbsa.py` | 194 | done | |
+| `tests/data/test_curated.py` | 111 | done | |
+| `tests/data/test_derived_common.py` | 160 | done | |
+| `tests/data/test_derived_p1.py` | 138 | done | |
+| `tests/data/test_derived_p2.py` | 102 | done | |
+| `tests/data/test_derived_p3.py` | 117 | done | |
+| `tests/data/test_derived_p4.py` | 79 | done | |
+| `tests/data/test_derived_p5.py` | 135 | done | |
+| `tests/data/test_derived_registry.py` | 172 | done | |
+| `tests/data/test_faa_aip.py` | 121 | done | |
+| `tests/data/test_faa_nasstatus.py` | 156 | done | |
+| `tests/data/test_faa_npias.py` | 171 | done | |
+| `tests/data/test_faa_taf.py` | 281 | done | |
+| `tests/data/test_http_pacer.py` | 107 | done | |
+| `tests/data/test_ourairports.py` | 290 | done | |
+| `tests/data/test_quality.py` | 66 | done | |
+| `tests/data/test_refresh.py` | 176 | done | |
+| `tests/data/test_service.py` | 99 | done | |
+| `tests/data/test_store.py` | 358 | done | |
 
 ## 9c. tests/scoring
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `tests/scoring/__init__.py` | 0 | pending | |
-| `tests/scoring/conftest.py` | 21 | pending | |
-| `tests/scoring/test_analyst_compare.py` | 60 | pending | |
-| `tests/scoring/test_analyst_diagnose.py` | 44 | pending | |
-| `tests/scoring/test_analyst_rank.py` | 142 | pending | |
-| `tests/scoring/test_calculators.py` | 66 | pending | |
-| `tests/scoring/test_explain.py` | 98 | pending | |
-| `tests/scoring/test_goldens.py` | 53 | pending | |
-| `tests/scoring/test_percentiles.py` | 49 | pending | |
-| `tests/scoring/test_presets.py` | 52 | pending | |
-| `tests/scoring/test_protocol.py` | 9 | pending | |
-| `tests/scoring/test_scorer.py` | 203 | pending | |
+| `tests/scoring/__init__.py` | 0 | done | |
+| `tests/scoring/conftest.py` | 21 | done | |
+| `tests/scoring/test_analyst_compare.py` | 60 | done | |
+| `tests/scoring/test_analyst_diagnose.py` | 44 | done | |
+| `tests/scoring/test_analyst_rank.py` | 142 | done | |
+| `tests/scoring/test_calculators.py` | 66 | done | |
+| `tests/scoring/test_explain.py` | 98 | done | |
+| `tests/scoring/test_goldens.py` | 53 | done | |
+| `tests/scoring/test_percentiles.py` | 49 | done | |
+| `tests/scoring/test_presets.py` | 52 | done | |
+| `tests/scoring/test_protocol.py` | 9 | done | |
+| `tests/scoring/test_scorer.py` | 203 | done | |
 
 ## 9d. tests/agent
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `tests/agent/__init__.py` | 0 | pending | |
-| `tests/agent/conftest.py` | 22 | pending | |
-| `tests/agent/fake_analyst.py` | 134 | pending | |
-| `tests/agent/fake_llm.py` | 38 | pending | |
-| `tests/agent/test_analysis_tools.py` | 38 | pending | |
-| `tests/agent/test_app.py` | 79 | pending | |
-| `tests/agent/test_concierge.py` | 254 | pending | |
-| `tests/agent/test_data_tools.py` | 64 | pending | |
-| `tests/agent/test_fakes.py` | 33 | pending | |
-| `tests/agent/test_planner.py` | 227 | pending | |
-| `tests/agent/test_provenance.py` | 28 | pending | |
-| `tests/agent/test_provenance_sweep.py` | 147 | pending | |
-| `tests/agent/test_registry.py` | 112 | pending | |
-| `tests/agent/test_schemas.py` | 49 | pending | |
-| `tests/agent/test_sessions.py` | 97 | pending | |
-| `tests/agent/test_specialist_loader.py` | 101 | pending | |
-| `tests/agent/test_specialist_runner.py` | 158 | pending | |
-| `tests/agent/test_synthesis.py` | 111 | pending | |
-| `tests/agent/test_tables.py` | 196 | pending | |
+| `tests/agent/__init__.py` | 0 | done | |
+| `tests/agent/conftest.py` | 22 | done | |
+| `tests/agent/fake_analyst.py` | 134 | done | |
+| `tests/agent/fake_llm.py` | 38 | done | |
+| `tests/agent/test_analysis_tools.py` | 38 | done | |
+| `tests/agent/test_app.py` | 79 | done | |
+| `tests/agent/test_concierge.py` | 254 | done | |
+| `tests/agent/test_data_tools.py` | 64 | done | |
+| `tests/agent/test_fakes.py` | 33 | done | |
+| `tests/agent/test_planner.py` | 227 | done | |
+| `tests/agent/test_provenance.py` | 28 | done | |
+| `tests/agent/test_provenance_sweep.py` | 147 | done | |
+| `tests/agent/test_registry.py` | 112 | done | |
+| `tests/agent/test_schemas.py` | 49 | done | |
+| `tests/agent/test_sessions.py` | 97 | done | |
+| `tests/agent/test_specialist_loader.py` | 101 | done | |
+| `tests/agent/test_specialist_runner.py` | 158 | done | |
+| `tests/agent/test_synthesis.py` | 111 | done | |
+| `tests/agent/test_tables.py` | 196 | done | |
 
 ## 9e. tests/llm
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `tests/llm/__init__.py` | 0 | pending | |
-| `tests/llm/test_client.py` | 106 | pending | |
-| `tests/llm/test_config.py` | 33 | pending | |
+| `tests/llm/__init__.py` | 0 | done | |
+| `tests/llm/test_client.py` | 106 | done | |
+| `tests/llm/test_config.py` | 33 | done | |
 
 ## 9f. tests/fixtures (fixture builders)
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `tests/fixtures/bts_otp/make_fixture.py` | 63 | pending | |
-| `tests/fixtures/bts_socrata/make_fixture.py` | 53 | pending | |
-| `tests/fixtures/bts_t100/make_fixture.py` | 65 | pending | |
-| `tests/fixtures/bts_t100/make_fixture_extra_months.py` | 56 | pending | |
-| `tests/fixtures/census_cbsa/make_fixture.py` | 91 | pending | |
-| `tests/fixtures/faa_aip/make_fixture.py` | 95 | pending | |
-| `tests/fixtures/faa_nasstatus/make_fixture.py` | 30 | pending | |
-| `tests/fixtures/faa_npias/make_fixture.py` | 41 | pending | |
-| `tests/fixtures/faa_taf/make_fixture.py` | 51 | pending | |
-| `tests/fixtures/ourairports/make_fixture.py` | 47 | pending | |
+| `tests/fixtures/bts_otp/make_fixture.py` | 63 | done | |
+| `tests/fixtures/bts_socrata/make_fixture.py` | 53 | done | |
+| `tests/fixtures/bts_t100/make_fixture.py` | 65 | done | |
+| `tests/fixtures/bts_t100/make_fixture_extra_months.py` | 56 | done | |
+| `tests/fixtures/census_cbsa/make_fixture.py` | 91 | done | |
+| `tests/fixtures/faa_aip/make_fixture.py` | 95 | done | |
+| `tests/fixtures/faa_nasstatus/make_fixture.py` | 30 | done | |
+| `tests/fixtures/faa_npias/make_fixture.py` | 41 | done | |
+| `tests/fixtures/faa_taf/make_fixture.py` | 51 | done | |
+| `tests/fixtures/ourairports/make_fixture.py` | 47 | done | |
 
 ## 9g. tests/ui
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `tests/ui/__init__.py` | 0 | pending | |
-| `tests/ui/conftest.py` | 16 | pending | |
-| `tests/ui/fake_app.py` | 275 | pending | |
-| `tests/ui/test_cli.py` | 64 | pending | |
-| `tests/ui/test_persistence.py` | 50 | pending | |
-| `tests/ui/test_render.py` | 34 | pending | |
-| `tests/ui/test_sidebar.py` | 143 | pending | |
-| `tests/ui/test_streamlit_smoke.py` | 114 | pending | |
-| `tests/ui/test_textfmt.py` | 43 | pending | |
+| `tests/ui/__init__.py` | 0 | done | |
+| `tests/ui/conftest.py` | 16 | done | |
+| `tests/ui/fake_app.py` | 275 | done | |
+| `tests/ui/test_cli.py` | 64 | done | |
+| `tests/ui/test_persistence.py` | 50 | done | |
+| `tests/ui/test_render.py` | 34 | done | |
+| `tests/ui/test_sidebar.py` | 143 | done | |
+| `tests/ui/test_streamlit_smoke.py` | 114 | done | |
+| `tests/ui/test_textfmt.py` | 43 | done | |
 
 ## 9h. tests/golden
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `tests/golden/scripts.py` | 195 | pending | |
-| `tests/golden/test_sample_questions.py` | 175 | pending | |
+| `tests/golden/scripts.py` | 195 | done | |
+| `tests/golden/test_sample_questions.py` | 175 | done | |
 
 ## 9i. tests/hooks
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `tests/hooks/__init__.py` | 0 | pending | |
-| `tests/hooks/test_hooks.py` | 61 | pending | |
+| `tests/hooks/__init__.py` | 0 | done | |
+| `tests/hooks/test_hooks.py` | 61 | done | |
 
 ## 9j. tests (root)
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `tests/__init__.py` | 0 | pending | |
-| `tests/conftest.py` | 31 | pending | |
-| `tests/fakes.py` | 389 | pending | |
-| `tests/test_smoke.py` | 11 | pending | |
+| `tests/__init__.py` | 0 | done | |
+| `tests/conftest.py` | 31 | done | |
+| `tests/fakes.py` | 389 | done | |
+| `tests/test_smoke.py` | 11 | done | |

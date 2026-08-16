@@ -13,7 +13,7 @@ from airport_agent.data.geo import haversine_mi
 from airport_agent.data.sources_config import SourceConfig, load_sources
 from airport_agent.data.store import TABLE_NAMES, Store
 
-# --- paths ---------------------------------------------------------------
+# paths
 
 
 def test_default_snapshot_path_is_under_repo_root() -> None:
@@ -26,7 +26,7 @@ def test_raw_cache_dir_and_curated_dir_under_repo_root() -> None:
     assert paths.curated_dir() == paths.repo_root() / "data" / "curated"
 
 
-# --- store schema ----------------------------------------------------------
+# store schema
 
 
 def test_ensure_schema_creates_all_tables(tmp_store: Store) -> None:
@@ -289,7 +289,7 @@ def test_table_names_returns_list(tmp_store: Store) -> None:
     assert tmp_store.table_names() == list(TABLE_NAMES)
 
 
-# --- geo ---------------------------------------------------------------
+# geo
 
 BOS = (42.3656, -71.0096)
 JFK = (40.6413, -73.7781)
@@ -300,7 +300,7 @@ def test_haversine_bos_jfk_within_tolerance() -> None:
     assert 184 <= dist <= 190
 
 
-# --- sources config ----------------------------------------------------
+# sources config
 
 EXPECTED_CADENCE_DAYS = {
     "ourairports": 1,

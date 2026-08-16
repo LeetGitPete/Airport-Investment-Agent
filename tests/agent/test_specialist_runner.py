@@ -82,7 +82,7 @@ def test_missing_specialist_name(fake_data, fake_analyst, specs):
         runner.run(AnalysisRequest(question_type="rank", airports=["BOS"]), None)
 
 
-# --- beyond the brief: transport shape, truncation and evidence honesty ----------------------------------
+# beyond the brief: transport shape, truncation and evidence honesty
 
 def test_tool_result_message_is_valid_json_within_budget(fake_data, fake_analyst, specs):
     tool_turn = LLMResult(text="", provider="f", model="m",

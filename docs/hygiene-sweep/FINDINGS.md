@@ -182,3 +182,60 @@ recommendation:  Option 1. The three standalone docs exist, so the content large
                  as likely to matter at delivery.
 blocked:         the deliverable zip: `scripts/make_zip.py` exits non-zero until this is resolved either way.
 
+### F-007 — `get_routes` truncates a tie-broken-by-nothing ordering, so "top routes" is not reproducible   [severity: medium] [src/airport_agent/data/service.py:310]
+what:            The route query orders by one column and the result is then sliced:
+
+                     ORDER BY departures DESC        -- service.py, get_routes
+                 ...
+                     rows[:top_n]                    -- truncated = len(rows) > top_n
+
+                 SQL gives no ordering guarantee among rows with equal `departures`, and the slice
+                 makes that ordering decide *membership*, not just position. Measured on the shipped
+                 snapshot over the trailing 12 months:
+
+                     252 airports have a departures tie straddling the default top_n=10 cutoff
+                     169 airports have one straddling top_n=25
+
+                 So for roughly a quarter of the airport universe, which destinations appear in the
+                 "top routes" table is decided by DuckDB's execution order rather than by any stated
+                 rule. Nothing else in the codebase leaves this open: `_airport_universe` orders
+                 `... DESC, a.iata ASC`, and `Scorer.score` sorts on `(-score, iata)`.
+why it matters:  The route table is user-visible output and feeds an assignment sample question
+                 ("percentage of long haul flights out of Anchorage"). Two runs against the same
+                 snapshot may show different destinations, and a rebuilt snapshot or a DuckDB upgrade
+                 can silently change the answer with no data change behind it. It also makes any
+                 golden test over route membership quietly fragile. (`long_haul_share` and
+                 `distance_bands` are unaffected: the Analyst calls `get_routes` with top_n=1000, so
+                 no truncation occurs and the shares are computed over the whole network.)
+options:         1) Add the tie-break the rest of the codebase already uses: `ORDER BY departures DESC,
+                    dest ASC`.
+                 2) Tie-break on a second meaningful measure first, e.g. `departures DESC, seats DESC,
+                    dest ASC`, so a tie resolves toward the larger route.
+                 3) Leave it and document that the top-N cut is arbitrary among equal-departure routes.
+recommendation:  Option 1 — it matches `_airport_universe` and the Scorer, and `dest` is unique per
+                 grouped row so the order becomes total. It changes which routes some airports show
+                 (that is the point), so it is a behaviour change and logged rather than applied.
+                 `tests/fakes.py::FakeDataService.get_routes` sorts a fixed list with Python's stable
+                 sort, so the fake is already deterministic and would not need changing.
+blocked:         nothing.
+
+### F-008 — the `llm` marker is declared but no live smoke test exists   [severity: low] [pyproject.toml]
+what:            `pyproject.toml` registers `llm: tests that call a live LLM provider (need
+                 GEMINI_API_KEY)`, and design 03 §Testing asks for "one recorded live smoke test per
+                 specialist". No test anywhere carries `@pytest.mark.llm`; every LLM test injects
+                 `completion_fn`, so nothing has ever exercised the real provider path
+                 (`LiteLLMClient._router_completion`, the LiteLLM Router construction, the real
+                 response shape) under test.
+why it matters:  The one code path that talks to Gemini is the one path with no coverage, and it is
+                 also where a provider change bites first. The 9 network-marked data tests show the
+                 pattern works; the LLM equivalent was simply never written. Low severity because a
+                 manual run of the CLI exercises it, but it is a stated design commitment that is not met.
+options:         1) Add one `@pytest.mark.llm` smoke test per specialist as design 03 asks.
+                 2) Add a single `@pytest.mark.llm` test that plans one sample question end to end.
+                 3) Drop the marker from pyproject.toml and amend design 03.
+recommendation:  Option 2 as the cheap version of the commitment: one live test that proves the router
+                 builds, authenticates and returns a schema-valid Plan catches nearly all of the risk
+                 for a fraction of the quota. Writing tests is outside a hygiene sweep, so I left the
+                 marker in place rather than removing the hook.
+blocked:         nothing.
+

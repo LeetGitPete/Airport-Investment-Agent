@@ -68,7 +68,7 @@ def test_bad_synthesis_json_falls_back_to_report_text_and_notes_it(fake_analyst,
     assert ans.headline and any("synthesis text unavailable" in u for u in ans.uncertainty_notes)
 
 
-# --- beyond the brief: coverage notes, loud provider failure, hidden-metric honesty ----------------------
+# beyond the brief: coverage notes, loud provider failure, hidden-metric honesty
 
 def test_tool_coverage_and_truncation_reach_uncertainty_notes(fake_analyst, fake_data, specs):
     from airport_agent.agent.tools.data_tools import build_registry

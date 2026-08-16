@@ -85,7 +85,7 @@ class CuratedFactsAdapter:
         self._vintage: str | None = None
         self._fetched_at: str | None = None
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """A local file: nothing to download — return the curated YAML's path."""
         path = curated_dir() / FACTS_FILE
@@ -94,7 +94,7 @@ class CuratedFactsAdapter:
         self._set_vintage([path])
         return [path]
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"curated_facts": df, "curated_inputs": df}`."""
         if len(paths) != 1:
@@ -134,7 +134,7 @@ class CuratedFactsAdapter:
         inputs = pd.DataFrame(input_rows, columns=list(INPUTS_COLUMNS))
         return {"curated_facts": facts, "curated_inputs": inputs}
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         self._vintage, self._fetched_at = file_vintage(paths)
 

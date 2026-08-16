@@ -193,14 +193,14 @@ class FaaNpiasAdapter:
             self._capacity_lists = load_capacity_lists()
         return self._capacity_lists
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """Download Appendix A (cached). `period` is ignored: one edition covers 2025-2029."""
         path = download(NPIAS_URL, cache_dir, filename=NPIAS_FILENAME)
         self._set_vintage([path])
         return [path]
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"npias": df}` with the columns of the store's `npias` table."""
         if len(paths) != 1:
@@ -227,7 +227,7 @@ class FaaNpiasAdapter:
         out["capacity_label"] = out["capacity_label"].astype("int64")
         return {"npias": out[list(NPIAS_COLUMNS)].sort_values("faa_locid").reset_index(drop=True)}
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         """Derive vintage/fetched_at from the raw file's mtime (see `file_vintage`)."""
         self._vintage, self._fetched_at = file_vintage(paths)

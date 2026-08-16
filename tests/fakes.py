@@ -60,7 +60,7 @@ class FakeDataService:
         self._by_id = {s.id: s for s in self._specs}
         self._refs = {a.iata: a for a in AIRPORTS}
 
-    # --- helpers ---
+    # helpers
     def _spec(self, metric_id: str) -> MetricSpec:
         if metric_id not in self._by_id:
             raise KeyError(f"unknown metric id: {metric_id!r}")
@@ -110,7 +110,7 @@ class FakeDataService:
                       horizon=self._stamped_horizon(spec, horizon),
                       period_start="2025-05", period_end=VINT, source_id=spec.sources[0], vintage=VINT)
 
-    # --- DataService ---
+    # DataService
     def list_airports(self, filter: AirportFilter) -> list[AirportRef]:
         out = []
         for a in AIRPORTS:
@@ -192,9 +192,7 @@ class FakeDataService:
                               fetched_at=FETCHED, url=None) for s in ids]
 
 
-# ---------------------------------------------------------------------------------------
 # canned data tables
-# ---------------------------------------------------------------------------------------
 
 # Tier-A base values at the 12m horizon; `enpl_cagr` feeds the enpl_cagr_{3y,5y,10y} family.
 # `od_share` is deliberately absent everywhere - it is an attempted-but-unavailable metric (DB1B).

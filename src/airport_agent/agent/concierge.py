@@ -113,7 +113,7 @@ class Concierge:
         self.synthesizer = synthesizer
         self.provider_name: str = getattr(llm, "provider_name", None) or "llm"
 
-    # ---------------- plan ----------------
+    # plan
 
     def _plan(self, message: str, state: SessionState,
               defaults: dict[str, str] | None) -> tuple[Plan, PlanFilters]:
@@ -149,7 +149,7 @@ class Concierge:
         state.messages.append(ChatMessage(role="assistant", content=text, answer=answer))
         return answer
 
-    # ---------------- execution ----------------
+    # execution
 
     @staticmethod
     def _planned_calls(plan: Plan, filters: PlanFilters) -> list[tuple[str, dict[str, Any]]]:
@@ -235,7 +235,7 @@ class Concierge:
         return (stored_det if isinstance(stored_det, DeterministicReport) else None,
                 stored_spec if isinstance(stored_spec, SpecialistReport) else None, trace)
 
-    # ---------------- the turn ----------------
+    # the turn
 
     def answer(self, message: str, state: SessionState, *, defaults: dict[str, str] | None = None,
                on_plan: Callable[[Plan], None] | None = None) -> Answer:
@@ -276,7 +276,7 @@ class Concierge:
         self._remember(state, message, answer, plan, req, deterministic, specialist)
         return answer
 
-    # ---------------- memory ----------------
+    # memory
 
     @staticmethod
     def _remember(state: SessionState, message: str, answer: Answer, plan: Plan,

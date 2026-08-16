@@ -98,7 +98,7 @@ def test_custom_with_airports_uses_compare(fake_data, fake_analyst, specs):
     assert ans.tool_trace[0].tool == "deterministic:compare"
 
 
-# --- beyond the brief: shown plan matches what ran, tool order, memory hygiene ---------------------------
+# beyond the brief: shown plan matches what ran, tool order, memory hygiene
 
 def test_plan_line_shows_the_resolved_request(fake_data, fake_analyst, specs):
     js = _plan_json(horizons=[], scoring_preset="none", peer_group="none")

@@ -105,13 +105,13 @@ class DuckDBDataService:
         self._universe: list[AirportRef] | None = None
         self._nasstatus = FaaNasStatusLiveAdapter()
 
-    # -- registry helpers ------------------------------------------------------
+    # registry helpers
     def _spec(self, metric_id: str) -> MetricSpec:
         if metric_id not in self._by_id:
             raise KeyError(f"unknown metric id: {metric_id!r}")
         return self._by_id[metric_id]
 
-    # -- airport lookups ---------------------------------------------------------
+    # airport lookups
     def _airport_universe(self) -> list[AirportRef]:
         """Every commercial airport (see `data/commercial.py`), ordered by latest annual
         enplanements desc then iata — computed once per process."""
@@ -162,7 +162,7 @@ class DuckDBDataService:
             raise KeyError(f"unknown airport: {iata!r}")
         return ref
 
-    # -- metric value lookups ------------------------------------------------
+    # metric value lookups
     def _value(self, iata: str, metric_id: str, horizon: str) -> float | None:
         spec = self._spec(metric_id)
         if spec.tier == "C":
@@ -204,7 +204,7 @@ class DuckDBDataService:
             quality=[QualityFlag(**f) for f in flags],
         )
 
-    # -- DataService -----------------------------------------------------------
+    # DataService
     def get_feature_matrix(
         self, airports: list[str], metric_ids: list[str], horizon: Horizon, peer_group: PeerGroup = "hub_class"
     ) -> FeatureMatrix:

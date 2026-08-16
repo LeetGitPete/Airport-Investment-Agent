@@ -60,8 +60,9 @@ def test_roundtrip_keeps_answers_and_reports(tmp_path, fake_analyst):
 def test_list_is_newest_first(tmp_path):
     store = SessionStore(tmp_path)
     first = store.new("one")
-    time.sleep(0.01)
     second = store.new("two")
+    # Stamp the second file forward rather than sleeping: the ordering is by mtime, and two
+    # writes in the same millisecond would otherwise tie.
     os.utime(tmp_path / f"{second.session_id}.json", (time.time() + 5, time.time() + 5))
     assert [s.session_id for s in store.list()][:2] == [second.session_id, first.session_id]
 

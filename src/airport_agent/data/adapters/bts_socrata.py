@@ -158,7 +158,7 @@ class BtsSocrataAdapter:
         self._period_start: str | None = None
         self._period_end: str | None = None
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """Page through the API (cached per page) for `period`, or all of history if `None`."""
         where = _where_clause(period)
@@ -174,7 +174,7 @@ class BtsSocrataAdapter:
         self._set_vintage(paths)
         return paths
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"airport_month": df, "airport_year": df}`."""
         self._set_vintage(paths)
@@ -257,7 +257,7 @@ class BtsSocrataAdapter:
             .reset_index(drop=True)
         )
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         """Derive vintage/fetched_at from the raw pages' mtimes (see `file_vintage`)."""
         self._vintage, self._fetched_at = file_vintage(paths)

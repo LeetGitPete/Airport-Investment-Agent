@@ -217,7 +217,7 @@ class CensusCbsaAdapter:
         self._period_start: str | None = None
         self._period_end: str | None = None
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """Download both population vintages and the gazetteer (cached). `period` is ignored."""
         pop_paths = [
@@ -248,7 +248,7 @@ class CensusCbsaAdapter:
         os.utime(dest, (stamp, stamp))
         return dest
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"cbsa_population": df, "cbsa_centroids": df}` (feed `apply_cbsa_enrichment`)."""
         self._set_vintage(paths)
@@ -281,7 +281,7 @@ class CensusCbsaAdapter:
             .reset_index(drop=True),
         }
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         """Derive vintage/fetched_at from the raw files' mtimes (see `file_vintage`)."""
         self._vintage, self._fetched_at = file_vintage(paths)

@@ -178,7 +178,7 @@ class Synthesizer:
         self.specs = list(specs)
         self.by_id = registry_by_id(self.specs)
 
-    # ---------------- prose ----------------
+    # prose
 
     def _user_message(self, *, message: str, plan: Plan, req: AnalysisRequest | None,
                       deterministic: DeterministicReport | None, specialist: SpecialistReport | None,
@@ -211,7 +211,7 @@ class Synthesizer:
         except ValueError:
             return _Synthesis(headline="", follow_ups=list(FALLBACK_FOLLOW_UPS)), True
 
-    # ---------------- assembly (numbers never pass through the model) ----------------
+    # assembly (numbers never pass through the model)
 
     def synthesize(self, *, message: str, plan: Plan, plan_line: str, req: AnalysisRequest | None,
                    deterministic: DeterministicReport | None, specialist: SpecialistReport | None,
@@ -316,7 +316,7 @@ class Synthesizer:
                       citations=citations_from(metrics, provenance), follow_ups=follow_ups,
                       tool_trace=list(trace))
 
-    # ---------------- assumption / uncertainty sources ----------------
+    # assumption / uncertainty sources
 
     @staticmethod
     def _report_assumptions(req: AnalysisRequest | None,

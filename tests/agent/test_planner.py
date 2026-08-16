@@ -95,7 +95,7 @@ def test_plan_filters_args_for_bad_json_is_empty():
     assert f.args_for("x") == {} and f.args_for("y") == {}
 
 
-# --- behaviours beyond the brief's list: loud failures and prompt assembly -------------------------------
+# behaviours beyond the brief's list: loud failures and prompt assembly
 
 def test_clarify_intent_drops_engines(fake_data, fake_analyst, specs):
     js = _plan_json(intent="clarify", question_type="none", faa_regions=[], horizons=[], scoring_preset="none")

@@ -29,7 +29,7 @@ class FakeAnalyst:
     def __init__(self, data: DataService) -> None:
         self.data = data
 
-    # --- shared plumbing ---
+    # shared plumbing
     def _targets(self, req: AnalysisRequest) -> list[str]:
         if req.airports:
             return list(req.airports)

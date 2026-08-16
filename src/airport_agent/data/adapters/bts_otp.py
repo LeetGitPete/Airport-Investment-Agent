@@ -172,7 +172,7 @@ class BtsOtpAdapter:
         self._period_start: str | None = None
         self._period_end: str | None = None
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """Download one month's PREZIP zip (cached) and extract its data CSV.
 
@@ -187,7 +187,7 @@ class BtsOtpAdapter:
         self._set_vintage([csv_path])
         return [csv_path]
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"airport_month": df, "otp_taxi_hist": df, "otp_peak": df}`.
 
@@ -315,7 +315,7 @@ class BtsOtpAdapter:
         out["vintage"] = self.row_vintage()
         return out[list(OTP_PEAK_COLUMNS)].sort_values(["iata", "period"]).reset_index(drop=True)
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         """Derive vintage/fetched_at from the raw file's mtime (see `file_vintage`)."""
         self._vintage, self._fetched_at = file_vintage(paths)

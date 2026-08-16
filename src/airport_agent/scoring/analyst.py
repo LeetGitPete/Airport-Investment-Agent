@@ -47,7 +47,7 @@ class Analyst:
         self.presets = load_presets(presets_path)
         self.scorer = Scorer(self.specs)
 
-    # ---- helpers -------------------------------------------------------------------------------
+    # helpers
     def _preset(self, name: str | None) -> Preset:
         key = name or "balanced"
         if key not in self.presets:
@@ -161,7 +161,7 @@ class Analyst:
                     out.append(c)
         return out
 
-    # ---- DeterministicAnalyst -------------------------------------------------------------------
+    # DeterministicAnalyst
     def rank(self, req: AnalysisRequest) -> DeterministicReport:
         if not req.horizons:
             raise ValueError("horizons must not be empty")

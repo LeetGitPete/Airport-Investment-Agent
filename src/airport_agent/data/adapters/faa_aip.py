@@ -143,7 +143,7 @@ class FaaAipAdapter:
         self._vintage: str = now.date().isoformat()
         self._fetched_at: str = now.isoformat()
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """Download all 10 fiscal years' grant workbooks (cached). `period` is ignored."""
         urls = self._resolve_urls(cache_dir)
@@ -172,7 +172,7 @@ class FaaAipAdapter:
             urls[fy] = _absolute(sub_hrefs[0])
         return urls
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"aip_grants": df}`: one row per (faa_locid, fy) with amounts summed."""
         self._set_vintage(paths)
@@ -201,7 +201,7 @@ class FaaAipAdapter:
             .reset_index(drop=True)
         }
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         """Derive vintage/fetched_at from the raw files' mtimes (see `file_vintage`)."""
         xlsx_paths = [p for p in paths if p.suffix.lower() == ".xlsx"] or list(paths)

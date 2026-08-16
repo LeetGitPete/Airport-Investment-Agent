@@ -179,7 +179,7 @@ class BtsT100SegmentAdapter:
         self._period_start: str | None = None
         self._period_end: str | None = None
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """Submit the DL_SelectFields form for `period` (required) and cache the extracted CSV.
 
@@ -217,7 +217,7 @@ class BtsT100SegmentAdapter:
         self._set_vintage([csv_path])
         return [csv_path]
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"routes_month": df}`. Every row is `is_international=False`."""
         self._set_vintage(paths)
@@ -256,7 +256,7 @@ class BtsT100SegmentAdapter:
             drop=True
         )
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         """Derive vintage/fetched_at from the raw file's mtime (see `file_vintage`)."""
         self._vintage, self._fetched_at = file_vintage(paths)

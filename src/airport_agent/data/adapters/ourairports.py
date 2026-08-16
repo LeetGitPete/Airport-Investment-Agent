@@ -86,7 +86,7 @@ class OurAirportsAdapter:
         self._vintage: str = now.date().isoformat()
         self._fetched_at: str = now.isoformat()
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """Download both CSVs (cached on disk). `period` is ignored: the files are a full nightly snapshot."""
         paths = [
@@ -96,7 +96,7 @@ class OurAirportsAdapter:
         self._set_vintage(paths)
         return paths
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"airports": df, "runways": df}` matching the store schema."""
         airports_path, runways_path = _split(paths)
@@ -172,7 +172,7 @@ class OurAirportsAdapter:
         )
         return out[list(RUNWAY_COLUMNS)].sort_values(["faa_locid", "runway_id"]).reset_index(drop=True)
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         """Derive vintage/fetched_at from the raw files' mtimes (cached download => file's date)."""
         self._vintage, self._fetched_at = file_vintage(paths)

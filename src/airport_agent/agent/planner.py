@@ -269,7 +269,7 @@ class Planner:
         self.presets = list(presets)
         self.specialists = list(specialists)
 
-    # ---------------- prompt (assembled from live objects) ----------------
+    # prompt (assembled from live objects)
 
     def _tools_block(self) -> str:
         # Argument names come from the live tool models: planning args_json without them is guesswork,
@@ -400,7 +400,7 @@ class Planner:
         ]
         return "\n\n".join(blocks)
 
-    # ---------------- planning ----------------
+    # planning
 
     def plan(self, message: str, state: SessionState,
              defaults: dict[str, str] | None = None) -> tuple[Plan, PlanFilters]:
@@ -475,7 +475,7 @@ class Planner:
                     presentation_notes=raw.get("presentation_notes") or "")
         return plan, filters
 
-    # ---------------- dispatch ----------------
+    # dispatch
 
     def to_analysis_request(self, plan: Plan, filters: PlanFilters,
                             defaults: dict[str, str] | None) -> AnalysisRequest:
