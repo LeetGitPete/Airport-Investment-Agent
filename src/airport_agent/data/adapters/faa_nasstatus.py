@@ -37,6 +37,7 @@ import httpx
 
 from airport_agent.contracts.models import SourceVintage
 from airport_agent.data.adapters import register
+from airport_agent.data.http import PACER
 
 NASSTATUS_URL = "https://nasstatus.faa.gov/api/airport-status-information"
 DTD_URL = "https://nasstatus.faa.gov/AirportStatus.dtd"
@@ -140,6 +141,10 @@ class FaaNasStatusLiveAdapter:
         """
         owns_client = client is None
         http_client = client or httpx.Client(timeout=timeout, follow_redirects=True)
+        # QA task 17: the one live endpoint we read per question, and the easiest one to get blocked
+        # on. Paced through the same process-wide gate as the bulk downloads; still never cached, so
+        # the status quoted is always what the FAA is serving right now.
+        PACER.wait(NASSTATUS_URL)
         try:
             response = http_client.get(NASSTATUS_URL, timeout=timeout, follow_redirects=True)
             response.raise_for_status()

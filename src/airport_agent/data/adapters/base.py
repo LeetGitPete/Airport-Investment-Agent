@@ -18,6 +18,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
 from airport_agent.contracts.models import SourceVintage
+from airport_agent.data.http import PACER
 
 
 class Period(BaseModel):
@@ -114,6 +115,9 @@ def download(
     owns_client = client is None
     http_client = client or httpx.Client(follow_redirects=True, timeout=timeout)
     part = dest.with_suffix(dest.suffix + ".part")
+    # QA task 17: pace only a real request. A cache hit returned above never waits, so a re-run of
+    # a refresh over already-downloaded files is as fast as it ever was.
+    PACER.wait(url)
     try:
         with http_client.stream(method, url, data=data, headers=headers, follow_redirects=True) as response:
             response.raise_for_status()
