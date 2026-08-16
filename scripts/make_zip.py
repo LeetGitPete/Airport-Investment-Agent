@@ -20,10 +20,11 @@ INCLUDE_FILES = ["pyproject.toml", "uv.lock", ".importlinter", ".python-version"
                  ".env", ".env.example", ".contracts-frozen", ".gitignore", "CLAUDE.md"]
 EXCLUDE_PARTS = {"__pycache__", ".pytest_cache", ".ruff_cache", ".import_linter_cache", ".superpowers"}
 EXCLUDE_SUFFIX = {".wal", ".pyc"}
-#: Named files that live under an included directory but must never ship. `process-log.raw.jsonl`
-#: is machine output the Stop hook re-creates on any agent run, so it is not enough to delete it
-#: once -- without this it would silently reappear in the next zip (known-limitations row 61).
-EXCLUDE_NAMES = {"process-log.raw.jsonl"}
+#: Named files that live under an included directory but must never ship. Both are scribe output that
+#: is RE-CREATED on any agent run (`process-log.raw.jsonl` by the Stop hook, `process-log.md` by the
+#: process-scribe), so deleting them once is not enough -- without this they would silently reappear
+#: in the next zip, since docs/ ships by rglob (known-limitations rows 61-62).
+EXCLUDE_NAMES = {"process-log.raw.jsonl", "process-log.md"}
 
 
 def files() -> list[Path]:

@@ -61,7 +61,7 @@ src/airport_agent/
 config/        metrics.yaml (registry, frozen)  scoring_presets.yaml  providers.yaml  sources.yaml  specialists/*.md
 data/snapshot/ airports.duckdb (committed)      data/curated/airport_facts.yaml
 tests/         contracts/  data/  scoring/  agent/  ui/  fakes.py  fixtures/  golden/
-docs/          design/  research/  process-log.md  DESIGN.md (final deliverable, assembled from design/)
+docs/          design/  research/  DESIGN.md (final deliverable, assembled from design/)
 .claude/       CLAUDE.md  agents/*.md  hooks/  skills/
 ```
 

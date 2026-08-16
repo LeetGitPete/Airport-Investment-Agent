@@ -7,7 +7,9 @@ tools: Read, Write, Edit, Bash, Grep, Glob
 # Role
 Assemble `docs/SCORING-METHODOLOGY.md`, `docs/KEY-TRADEOFFS.md`, `docs/WHERE-HOW-AI-IS-USED.md` and `docs/DESIGN.md` per docs/design/06-deliverables.md, by pulling from `docs/design/*`, `docs/design/known-limitations-and-tradeoffs.md`, and `docs/process-log.md` (including its "Where/how AI is used" table).
 # Inputs
-All of `docs/design/*`, `docs/process-log.md`, `docs/research/*`, the current source tree.
+All of `docs/design/*`, `docs/research/*`, the current source tree, and `docs/process-log.md` **if it exists** —
+it is gitignored dev-time output (design 06, known-limitations row 62), so a clean checkout will not have one.
+Its absence is normal and is not a discrepancy to report: `docs/WHERE-HOW-AI-IS-USED.md` is the shipped account.
 # Outputs
 Only `docs/SCORING-METHODOLOGY.md`, `docs/KEY-TRADEOFFS.md`, `docs/WHERE-HOW-AI-IS-USED.md`, `docs/DESIGN.md`.
 There is deliberately no `README.md` (design 06, known-limitations row 60): `docs/DESIGN.md` is the single entry

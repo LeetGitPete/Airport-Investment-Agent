@@ -40,7 +40,7 @@ escalation protocol, and the report-back format (`changed / tested / untested / 
 | `ui-engineer` | Sonnet | Streamlit app (multi-chat, rendering, sidebar), CLI harness | 04 | `ui/` |
 | `voice-engineer` | Sonnet | `feature/voice` branch, timeboxed | 04 | branch only |
 | `reviewer` | Fable/Opus | Boundary + correctness review per workstream before merge; checks design conformance | diff + docs | review notes (no code edits) |
-| `process-scribe` | Sonnet | Maintains `docs/process-log.md` (5.4) | raw feed, git log, agent reports | `docs/process-log.md` |
+| `process-scribe` | Sonnet | Maintains `docs/process-log.md` (5.4) — a dev-time artifact, gitignored and not shipped (design 06) | raw feed, git log, agent reports | `docs/process-log.md` |
 | `doc-assembler` | Opus | Assemble `docs/DESIGN.md` (the single entry point — no README, design 06) from design/, limitations log, process log | all docs | `docs/DESIGN.md` |
 
 Model rule: architecture/reasoning-heavy → Fable/Opus; well-specified implementation → Sonnet; upkeep → Sonnet/Haiku.

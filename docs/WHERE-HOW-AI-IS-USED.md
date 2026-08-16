@@ -166,7 +166,8 @@ stated reason in code, so the product tells the truth about what it no longer kn
 
 ## What AI got wrong, and what we did about it
 
-An honest list, mined from `docs/process-log.md`, the git history and the review ledgers.
+An honest list, mined from the build's raw hook feed, the git history and the review ledgers. (The scribe's
+running narrative is a dev-time artifact and is not shipped — design 06; this section is what it was for.)
 
 1. **A research agent died on a spurious safety-filter error** and had to be relaunched on a different model — a
    practical reliability note for anyone running multi-agent research.

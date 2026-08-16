@@ -35,8 +35,11 @@ A `scripts/make_zip.py` (or `/make-zip`) produces it and prints a checklist: hid
   sections): 1 Problem, scope, assumptions · 2 Architecture (diagram, contracts, runtime roles) ·
   3 Scoring methodology (= SCORING-METHODOLOGY.md) · 4 Key tradeoffs (= KEY-TRADEOFFS.md) ·
   5 Where/how AI is used (= WHERE-HOW-AI-IS-USED.md) · 6 Assumptions/uncertainty/scoping as product behaviour
-  ("With more time" lives at the end of KEY-TRADEOFFS.md). Detailed `docs/design/*`, `docs/research/*` and `docs/process-log.md` remain as appendices.
-- `docs/process-log.md` — the AI-native build narrative (scribe).
+  ("With more time" lives at the end of KEY-TRADEOFFS.md). Detailed `docs/design/*` and `docs/research/*` remain as appendices.
+- **No `docs/process-log.md`** (revised 2026-08-16, human decision; known-limitations row 62). The scribe's
+  running build narrative is a dev-time artifact: `WHERE-HOW-AI-IS-USED.md` already carries the parts a reviewer
+  needs (the runtime/dev-time table and the "what AI got wrong" list), so shipping the log too meant maintaining
+  the same story twice. The scribe and its hooks stay — their output is gitignored and excluded from the zip.
 - `docs/research/*` — the three research notes (LLM providers, data sources, investment metrics).
 
 ## Definition of done
