@@ -50,6 +50,15 @@ def test_ranking_table_row_per_report_row_with_pillar_columns(fake_analyst):
     assert ranks == sorted(ranks)
 
 
+def test_humanize_metric_ids_rewrites_llm_prose(by_id):
+    from airport_agent.agent.tables import humanize_metric_ids
+    text = "High `imc_capacity_ratio` and pct_arr_delay_gt15 drive the case; enpl_cagr_5y is flat."
+    out = humanize_metric_ids(text, by_id)
+    assert "imc_capacity_ratio" not in out and "pct_arr_delay_gt15" not in out
+    assert by_id["imc_capacity_ratio"].name in out and by_id["pct_arr_delay_gt15"].name in out
+    assert by_id["enpl_cagr_5y"].name in out and "`" not in out
+
+
 def test_single_airport_report_gets_scores_without_a_rank_column(fake_analyst, by_id):
     req = AnalysisRequest(question_type="diagnose", airports=["SFO"], horizons=["12m"])
     rep = fake_analyst.diagnose(req)

@@ -10,7 +10,7 @@ def test_default_config_is_gemini_only():
     cfg = load_llm_config()
     assert [p.name for p in cfg.providers] == ["gemini"]
     p = cfg.providers[0]
-    assert p.model.startswith("gemini/") and p.api_key_env == "GEMINI_API_KEY" and p.rpm == 10
+    assert p.model.startswith("gemini/") and p.api_key_env == "GEMINI_API_KEY" and p.rpm >= 10
     assert cfg.default_temperature == 0.2
     assert default_providers_path().name == "providers.yaml"
 

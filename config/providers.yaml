@@ -3,10 +3,12 @@
 providers:
   - name: gemini
     # gemini-2.5-flash was retired for new accounts (404, verified 2026-08-16); the -latest
-    # alias is Google-maintained and always points at a currently-served flash model.
-    model: gemini/gemini-flash-latest
+    # aliases are Google-maintained and always point at a currently-served model.
+    # QA 2026-08-16: flash-LITE — the most generous free-tier limits of the Gemini family
+    # (higher RPM/RPD than flash), so interactive QA doesn't trip 429s as fast.
+    model: gemini/gemini-flash-lite-latest
     api_key_env: GEMINI_API_KEY
-    rpm: 10
+    rpm: 15
     max_retries: 2
     timeout_s: 60
 default_temperature: 0.2

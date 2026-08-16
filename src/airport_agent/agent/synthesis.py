@@ -20,6 +20,7 @@ from airport_agent.agent.specialists.runner import compact_deterministic, fit_to
 from airport_agent.agent.tables import (
     citations_from,
     data_matrix,
+    humanize_metric_ids,
     peer_label,
     ranking_table,
     specialist_ranking_table,
@@ -196,7 +197,7 @@ class Synthesizer:
             assumptions.extend(self._report_assumptions(req, None))
 
         if specialist is not None:
-            analyst_table = specialist_ranking_table(specialist)
+            analyst_table = specialist_ranking_table(specialist, self.by_id)
             if analyst_table is not None:
                 tables.append(analyst_table)
             metrics.extend(specialist.evidence)
@@ -234,6 +235,14 @@ class Synthesizer:
             agreement_line = (f"Formula vs analyst: {specialist.agreement or 'no statement given'}. "
                               f"Disagreements: {disagreements}")
         follow_ups = [f for f in synthesis.follow_ups if f.strip()][:4] or list(FALLBACK_FOLLOW_UPS)
+
+        # QA task 9: LLM prose never shows internal metric ids — deterministic backstop over
+        # every text surface (the tables already use display names by construction).
+        headline = humanize_metric_ids(headline, self.by_id)
+        analyst_view = humanize_metric_ids(analyst_view, self.by_id) if analyst_view else None
+        agreement_line = humanize_metric_ids(agreement_line, self.by_id) if agreement_line else None
+        assumptions = [humanize_metric_ids(a, self.by_id) for a in assumptions]
+        notes = [humanize_metric_ids(n, self.by_id) for n in notes]
 
         return Answer(plan=plan, plan_line=plan_line, headline=headline, evidence_tables=tables,
                       analyst_view=analyst_view, agreement_line=agreement_line,

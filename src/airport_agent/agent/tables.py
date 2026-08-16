@@ -5,6 +5,7 @@ a value, a unit or a citation, because the LLM never touches this module's input
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from airport_agent.contracts import (
@@ -91,6 +92,21 @@ def peer_label(peer_group: str | None) -> str:
 def _metric_name(metric_id: str, specs_by_id: dict[str, MetricSpec]) -> str:
     spec = specs_by_id.get(metric_id)
     return spec.name if spec else metric_id
+
+
+def humanize_metric_ids(text: str, specs_by_id: dict[str, MetricSpec]) -> str:
+    """Replace internal metric ids with display names in LLM-written prose (QA task 9).
+
+    The specialist is prompted to use display names, but this is the deterministic backstop —
+    ids are distinctive snake_case tokens, replaced longest-first on word boundaries so
+    e.g. `enpl_cagr_5y` never partially matches inside `enpl_cagr_5y_x`.
+    """
+    if not text:
+        return text
+    for metric_id in sorted(specs_by_id, key=len, reverse=True):
+        if metric_id in text:
+            text = re.sub(rf"`?\b{re.escape(metric_id)}\b`?", specs_by_id[metric_id].name, text)
+    return text
 
 
 def _metric_row(metric: Metric) -> list[Any]:
@@ -199,11 +215,13 @@ def data_matrix(rep: DeterministicReport, specs_by_id: dict[str, MetricSpec]) ->
 comparison_table = data_matrix
 
 
-def specialist_ranking_table(rep: SpecialistReport) -> Table | None:
+def specialist_ranking_table(rep: SpecialistReport,
+                             specs_by_id: dict[str, MetricSpec] | None = None) -> Table | None:
     """The analyst's own ordering, kept separate from the formula's so the two can be compared."""
     if not rep.ranking:
         return None
-    rows = [[item.rank, item.iata, item.rationale, item.confidence]
+    rows = [[item.rank, item.iata, humanize_metric_ids(item.rationale, specs_by_id or {}),
+             item.confidence]
             for item in sorted(rep.ranking, key=lambda i: i.rank)]
     return Table(title=f"Analyst ranking — {rep.specialist}",
                  columns=["rank", "airport", "rationale", "confidence"], rows=rows,

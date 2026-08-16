@@ -52,10 +52,15 @@ class SpecialistConfig(BaseModel):
 
     def system_prompt(self, specs: list[MetricSpec]) -> str:
         """The body with its placeholders filled from live objects (registry, schema, front matter)."""
-        return (self.body
-                .replace("{METRIC_SLICE}", self.metric_slice(specs))
-                .replace("{ALLOWED_TOOLS}", ", ".join(self.allowed_tools))
-                .replace("{OUTPUT_SCHEMA}", schema_doc()))
+        prompt = (self.body
+                  .replace("{METRIC_SLICE}", self.metric_slice(specs))
+                  .replace("{ALLOWED_TOOLS}", ", ".join(self.allowed_tools))
+                  .replace("{OUTPUT_SCHEMA}", schema_doc()))
+        # QA task 9: prose readability — ids stay in structured refs, names go in text
+        # (code also enforces this downstream, but the model should write it right first).
+        return (prompt + "\n\nIn narrative, rationale and caveat TEXT, refer to metrics by their "
+                "display name (e.g. 'Weather fragility'), never by their id "
+                "(e.g. 'imc_capacity_ratio'); ids belong only in evidence_refs.")
 
 
 def _split_front_matter(text: str, path: Path) -> tuple[dict, str]:
