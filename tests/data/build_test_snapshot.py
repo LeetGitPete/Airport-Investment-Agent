@@ -15,6 +15,7 @@ from airport_agent.data.adapters.bts_socrata import BtsSocrataAdapter
 from airport_agent.data.adapters.bts_t100 import BtsT100SegmentAdapter
 from airport_agent.data.adapters.census_cbsa import CensusCbsaAdapter, apply_cbsa_enrichment
 from airport_agent.data.adapters.curated import CuratedFactsAdapter
+from airport_agent.data.adapters.faa_aip import FISCAL_YEARS, FaaAipAdapter
 from airport_agent.data.adapters.faa_npias import FaaNpiasAdapter
 from airport_agent.data.adapters.faa_taf import FaaTafAdapter, apply_taf_enrichment
 from airport_agent.data.adapters.ourairports import OurAirportsAdapter
@@ -54,6 +55,11 @@ def build_test_snapshot(path: Path) -> Path:
     npias = npias_adapter.normalize([FIXTURES_DIR / "faa_npias" / "appendix_a_subset.xlsx"])
     store.replace_rows("npias", npias["npias"], None)
     store.upsert_vintage(npias_adapter.vintage())
+
+    aip_adapter = FaaAipAdapter()
+    aip = aip_adapter.normalize([FIXTURES_DIR / "faa_aip" / f"FY{fy}.xlsx" for fy in FISCAL_YEARS])
+    store.replace_rows("aip_grants", aip["aip_grants"], None)
+    store.upsert_vintage(aip_adapter.vintage())
 
     curated_adapter = CuratedFactsAdapter()
     curated = curated_adapter.normalize([FIXTURES_DIR / "curated" / "airport_facts_small.yaml"])
