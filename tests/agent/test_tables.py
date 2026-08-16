@@ -40,9 +40,11 @@ def test_ranking_table_row_per_report_row_with_pillar_columns(fake_analyst):
     rep = _rank_report(fake_analyst)
     table = ranking_table(rep)
     assert table.title.startswith("Ranking") and "balanced" in table.title and "12m" in table.title
-    # only pillars the preset actually weights appear (QA task 6)
-    expected = [p for p in ("P1", "P2", "P3", "P4", "P5") if rep.weights.get(p)]
-    assert [c for c in table.columns if c.startswith("P")] == expected
+    assert "preset" not in table.title  # internal word, never shown (QA task 12)
+    # only pillars the preset actually weights appear (QA task 6), under user-facing names (task 12)
+    from airport_agent.contracts import PILLAR_NAMES
+    expected = [PILLAR_NAMES[p] for p in ("P1", "P2", "P3", "P4", "P5") if rep.weights.get(p)]
+    assert [c for c in table.columns if c in PILLAR_NAMES.values()] == expected
     assert len(table.rows) == len(rep.rows)
     scores = {row[table.columns.index("airport")]: row[table.columns.index("score")] for row in table.rows}
     assert scores == {r.ref.iata: r.score for r in rep.rows}  # verbatim, not reformatted

@@ -46,7 +46,7 @@ def test_plan_analytical_rank(fake_data, fake_analyst, specs):
     assert req.question_type == "rank" and req.filter.faa_regions == ["ANE"] and req.horizons == ["5y"]
     assert req.scoring_preset == "terminal_expansion" and req.specialist == "expansion_analyst" and req.airports is None
     line = Planner.plan_line(plan, f)
-    assert line.startswith("How I'm approaching this: analytical · rank · region ANE · horizon 5y")
+    assert line.startswith("How I'm approaching this: analytical · rank · region ANE · time period 5y")
     # the LLM call carried the schema and the system prompt mentions tools, presets, metric ids, samples
     call = p.llm.calls[0]
     assert call["response_schema"] == PLAN_SCHEMA

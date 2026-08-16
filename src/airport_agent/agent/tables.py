@@ -9,6 +9,7 @@ import re
 from typing import Any
 
 from airport_agent.contracts import (
+    PILLAR_NAMES,
     Citation,
     DeterministicReport,
     Metric,
@@ -106,6 +107,8 @@ def humanize_metric_ids(text: str, specs_by_id: dict[str, MetricSpec]) -> str:
     for metric_id in sorted(specs_by_id, key=len, reverse=True):
         if metric_id in text:
             text = re.sub(rf"`?\b{re.escape(metric_id)}\b`?", specs_by_id[metric_id].name, text)
+    # Pillar ids are internal too (QA task 12): P2 -> "Congestion & Physical Constraint" etc.
+    text = re.sub(r"`?\bP([1-5])\b`?", lambda m: PILLAR_NAMES[f"P{m.group(1)}"], text)
     return text
 
 
@@ -122,18 +125,19 @@ def ranking_table(rep: DeterministicReport) -> Table:
     """
     single = len(rep.rows) == 1
     pillars = [p for p in PILLARS if rep.weights.get(p)] or PILLARS
-    columns = [*([] if single else ["rank"]), "airport", "name", "hub", "score", "coverage",
-               "low_confidence", *pillars]
+    # QA task 12: user-facing pillar names in columns; "P1..P5" stay internal.
+    columns = [*([] if single else ["rank"]), "airport", "name", "airport size", "score", "coverage",
+               "low_confidence", *[PILLAR_NAMES[p] for p in pillars]]
     rows = [[*([] if single else [row.rank]), row.ref.iata, row.ref.name, row.ref.hub_size, row.score,
              row.coverage, row.low_confidence, *[row.pillar_contrib.get(p) for p in pillars]]
             for row in sorted(rep.rows, key=lambda r: r.rank)]
-    preset = rep.preset or "engine default"
+    focus = (rep.preset or "balanced").replace("_", " ")
     kind = "Scores" if single else "Ranking"
-    footnotes = ["Score = how strong the case is under this preset (0-100 within the peer group); "
+    footnotes = ["Score = how strong the investment case is (0-100 within the peer group); "
                  "it is a relative standing, not a dollar figure."] if single else [rank_legend(rep.preset)]
     footnotes.append("Pillar columns are contributions to the score (weight x percentile x 100).")
-    return Table(title=f"{kind} — preset {preset}, time period {rep.horizon} "
-                       f"(percentiles among {peer_label(rep.peer_group)})",
+    return Table(title=f"{kind} — {focus} focus, time period {rep.horizon}, "
+                       f"percentiles among {peer_label(rep.peer_group)}",
                  columns=columns, rows=rows, footnotes=footnotes)
 
 
@@ -220,7 +224,7 @@ SCORE_FORMULA_CAPTION = ("Score = sum over pillars of (pillar weight × metric w
                          "among peers) × 100, so 100 = the strongest case among peers under this "
                          "preset. The pillar split is in the Scores table.")
 
-_SCORE_TITLE = re.compile(r"^(?:Ranking|Scores) — preset (\S+?),")
+_SCORE_TITLE = re.compile(r"^(?:Ranking|Scores) — (.+?) focus,")
 
 
 def score_summary(tables: list[Table]) -> dict[str, Any] | None:
@@ -291,7 +295,8 @@ def _profile_tables(result: dict[str, Any], specs_by_id: dict[str, MetricSpec]) 
                  m.get("horizon"), m.get("period_end"), source_name(m.get("source_id")),
                  m.get("vintage")] for m in present]
         missing = len(metrics) - len(present)
-        footnotes = [f"{missing} metrics have no value at this airport/horizon."] if missing else []
+        footnotes = ([f"{missing} metrics have no value for this airport in this time period."]
+                     if missing else [])
         tables.append(Table(title=f"Metrics — {iata} ({horizon})",
                             columns=["metric", *METRIC_PROVENANCE_COLUMNS], rows=rows, footnotes=footnotes))
     facts = result.get("curated_facts") or []
@@ -307,7 +312,8 @@ def _airports_table(result: dict[str, Any]) -> Table:
     airports = result.get("airports") or []
     count = result.get("count", len(airports))
     footnotes = ["Truncated at the requested limit; more airports may match."] if result.get("truncated") else []
-    return Table(title=f"Airports ({count})", columns=["iata", "name", "city", "state", "region", "hub"],
+    return Table(title=f"Airports ({count})",
+                 columns=["iata", "name", "city", "state", "FAA region", "airport size"],
                  rows=[[a.get("iata"), a.get("name"), a.get("city"), a.get("state"), a.get("faa_region"),
                         a.get("hub_size")] for a in airports], footnotes=footnotes)
 

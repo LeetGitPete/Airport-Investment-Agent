@@ -111,7 +111,7 @@ def test_q1_ranks_new_england_with_both_engines(session):
     ranking = next(t for t in answer.evidence_tables if t.title.startswith("Ranking"))
     assert {row[ranking.columns.index("airport")] for row in ranking.rows} == {"BOS", "BDL", "PVD", "MHT",
                                                                               "PWM"}
-    assert "terminal_expansion" in ranking.title
+    assert "terminal expansion focus" in ranking.title  # prose, never the internal preset id
     assert answer.analyst_view and answer.agreement_line and "gate scarcity" in answer.agreement_line
     _check_answer(answer, state, registry)
 

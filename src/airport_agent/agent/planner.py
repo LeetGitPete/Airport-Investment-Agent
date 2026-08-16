@@ -426,11 +426,13 @@ class Planner:
         """
         engines = ", ".join(plan.engines) or "none"
         if req is not None:
+            focus = (req.scoring_preset or "balanced").replace("_", " ")
             return (f"How I'm approaching this: {plan.intent} · {req.question_type} · "
-                    f"{_request_targets(req)} · horizon {', '.join(req.horizons) or '-'} · "
-                    f"preset {req.scoring_preset or 'engine default'} · "
+                    f"{_request_targets(req)} · time period {', '.join(req.horizons) or '-'} · "
+                    f"{focus} focus · "
                     f"peers: {PEER_GROUP_PROSE.get(req.peer_group or 'hub_class', req.peer_group)} · "
                     f"engines: {engines}")
+        focus = (filters.scoring_preset or "-").replace("_", " ")
         return (f"How I'm approaching this: {plan.intent} · {filters.question_type or 'lookup'} · "
-                f"{_targets(filters)} · horizon {', '.join(filters.horizons) or '-'} · "
-                f"preset {filters.scoring_preset or '-'} · engines: {engines}")
+                f"{_targets(filters)} · time period {', '.join(filters.horizons) or '-'} · "
+                f"{focus} focus · engines: {engines}")
