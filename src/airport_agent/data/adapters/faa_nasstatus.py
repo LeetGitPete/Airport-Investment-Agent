@@ -37,7 +37,7 @@ import httpx
 
 from airport_agent.contracts.models import SourceVintage
 from airport_agent.data.adapters import register
-from airport_agent.data.http import PACER
+from airport_agent.data.http import PACER, claim_live_call
 
 NASSTATUS_URL = "https://nasstatus.faa.gov/api/airport-status-information"
 DTD_URL = "https://nasstatus.faa.gov/AirportStatus.dtd"
@@ -139,6 +139,11 @@ class FaaNasStatusLiveAdapter:
         "live status unavailable — snapshot only" note). There is no bulk `fetch`/`normalize`
         here — a live source is read at question time and never written to the snapshot.
         """
+        # QA task 20: the per-turn ceiling is checked BEFORE the pacer — a refused call must cost
+        # nothing, not three seconds of sleeping. Returning None is the documented "unknown" answer,
+        # so the caller degrades to snapshot data with provenance that no longer claims a live read.
+        if not claim_live_call():
+            return None
         owns_client = client is None
         http_client = client or httpx.Client(timeout=timeout, follow_redirects=True)
         # QA task 17: the one live endpoint we read per question, and the easiest one to get blocked

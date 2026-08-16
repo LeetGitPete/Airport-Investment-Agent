@@ -225,3 +225,50 @@ def test_presentation_notes_pass_through(fake_data, fake_analyst, specs):
                  fake_data, fake_analyst, specs)
     plan, _ = p.plan(SAMPLE_QUESTIONS[0], SessionState(session_id="s", title="t"))
     assert plan.presentation_notes == "lead with the top 5 rows, collapse the rest"
+
+
+# --- QA task 19: conversational classification ------------------------------------------------------------
+
+def test_conversation_kind_and_suggestions_are_parsed_on_a_clarify(fake_data, fake_analyst, specs):
+    js = _plan_json(intent="clarify", engines=[], question_type="none", faa_regions=[], horizons=[],
+                    scoring_preset="none", conversation_kind="needs_direction",
+                    suggested_questions=["a?", "b?", "c?", "d?"])
+    p = _planner([js], fake_data, fake_analyst, specs)
+    plan, f = p.plan("what is interesting?", SessionState(session_id="s", title="t"))
+    assert f.conversation_kind == "needs_direction" and f.is_conversational
+    assert f.suggested_questions == ["a?", "b?", "c?"]  # capped at 3
+    assert PlanFilters(**plan.filters) == f  # rides in the free-form filters dict, not the contract
+    assert plan.intent == "clarify"  # the frozen Intent literal is untouched
+
+
+def test_conversation_kind_is_ignored_when_the_intent_dispatches(fake_data, fake_analyst, specs):
+    js = _plan_json(conversation_kind="off_topic", suggested_questions=["x?"])
+    p = _planner([js], fake_data, fake_analyst, specs)
+    _plan, f = p.plan("rank New England", SessionState(session_id="s", title="t"))
+    assert f.conversation_kind == "none" and not f.is_conversational and f.suggested_questions == []
+
+
+def test_an_unknown_kind_degrades_rather_than_raising(fake_data, fake_analyst, specs):
+    js = _plan_json(intent="clarify", engines=[], question_type="none", faa_regions=[],
+                    conversation_kind="banana")
+    p = _planner([js], fake_data, fake_analyst, specs)
+    _plan, f = p.plan("???", SessionState(session_id="s", title="t"))
+    assert f.conversation_kind == "none" and not f.is_conversational
+
+
+def test_the_prompt_orders_conversational_before_the_national_default(fake_data, fake_analyst, specs):
+    """Getting this order wrong is how this feature would regress task 15."""
+    p = _planner([_plan_json()], fake_data, fake_analyst, specs)
+    sysmsg = p.system_prompt(None)
+    assert "ORDER MATTERS" in sysmsg
+    assert sysmsg.index("off_topic") < sysmsg.index("commercial-service airport")
+    assert "needs_direction" in sysmsg
+
+
+def test_the_plan_schema_stays_portable_with_the_new_fields():
+    dumped = json.dumps(PLAN_SCHEMA)
+    for bad in ("anyOf", "$ref", "additionalProperties", "nullable", "oneOf"):
+        assert bad not in dumped
+    assert set(PLAN_SCHEMA["required"]) == set(PLAN_SCHEMA["properties"])
+    assert "conversation_kind" in PLAN_SCHEMA["properties"]
+    assert PLAN_SCHEMA["properties"]["conversation_kind"]["enum"] == ["none", "off_topic", "needs_direction"]

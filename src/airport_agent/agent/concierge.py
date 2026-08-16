@@ -15,7 +15,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from airport_agent.agent.planner import PlanFilters, Planner
+from airport_agent.agent.planner import NEEDS_DIRECTION, OFF_TOPIC, PlanFilters, Planner
 from airport_agent.agent.synthesis import Synthesizer
 from airport_agent.agent.tools.registry import ToolRegistry
 from airport_agent.contracts import (
@@ -31,6 +31,7 @@ from airport_agent.contracts import (
     SpecialistRunner,
     ToolCallTrace,
 )
+from airport_agent.data.http import DEFAULT_LIVE_BUDGET, LiveBudget, live_budget
 
 CONCIERGE = "concierge"
 NEW_CHAT_TITLE = "New chat"
@@ -51,6 +52,12 @@ _PYDANTIC_TAIL = re.compile(r"\s*For further information visit https?://\S+", re
 _PYDANTIC_META = re.compile(r"\s*\[type=[^\]]*\]\s*$")
 ANALYSIS_FAILED_TEXT = ("I couldn't run that analysis on the data I have. Try naming the airports or "
                         "region directly, or a different time period.")
+#: QA task 19 (2026-08-16): the decline is a constant, not model prose. The whole point of "one
+#: consistent reply" is that the voice cannot drift between turns, which it does the moment the model
+#: writes it. Off-topic gets no suggested questions — the redirect sentence carries the turn.
+OFF_TOPIC_TEXT = ("I fail to see how this relates to airport investments. I analyse US airports as "
+                  "capacity-expansion investments using public aviation data — ask me about that and "
+                  "I'll be glad to help.")
 
 
 def clarify_text(note: str | None) -> str:
@@ -85,6 +92,18 @@ def _and(items: list[str]) -> str:
         return f"'{items[0]}'"
     quoted = [f"'{i}'" for i in items]
     return ", ".join(quoted[:-1]) + f" and {quoted[-1]}"
+
+
+def _live_budget_note(budget: LiveBudget) -> list[str]:
+    """Told to the user only when the ceiling actually bit (QA task 20).
+
+    After scoring stopped asking for live data this should be rare, which is the point: a guard rail
+    that fires on every turn is a limitation, and one that never fires quietly is a lie.
+    """
+    if not budget.exhausted:
+        return []
+    return [f"Live airport status was checked for {budget.used} airports (the limit per question); "
+            f"{budget.blocked} more fell back to the most recent snapshot instead"]
 
 
 def _rows(out: dict[str, Any]) -> int | None:
@@ -139,12 +158,16 @@ class Concierge:
         `detail` is why the turn could not run. It goes to the uncertainty notes, condensed (QA task 16):
         the headline stays a plain question, and the reason is still recorded rather than swallowed.
         """
-        text = clarify_text(text)
+        # QA task 19: a conversational turn is a clarify with a flavour. Off-topic answers with the
+        # fixed decline; a question that needs direction keeps the model's reply and hands over three
+        # things this agent can actually do, which the UI renders as clickable questions.
+        text = OFF_TOPIC_TEXT if filters.conversation_kind == OFF_TOPIC else clarify_text(text)
+        follow_ups = list(filters.suggested_questions) if filters.conversation_kind == NEEDS_DIRECTION else []
         plan = self._clarify_plan(filters, text)
         answer = Answer(plan=plan, plan_line=Planner.plan_line(plan, filters), headline=text,
                         evidence_tables=[], analyst_view=None, agreement_line=None, assumptions=[],
                         uncertainty_notes=[f"Why I stopped: {detail}"] if detail else [],
-                        citations=[], follow_ups=[], tool_trace=[])
+                        citations=[], follow_ups=follow_ups, tool_trace=[])
         state.messages.append(ChatMessage(role="user", content=message))
         state.messages.append(ChatMessage(role="assistant", content=text, answer=answer))
         return answer
@@ -210,7 +233,13 @@ class Concierge:
         method = {"rank": self.analyst.rank, "compare": self.analyst.compare,
                   "diagnose": self.analyst.diagnose}[name]
         started = time.perf_counter()
-        report = method(req)
+        # QA task 20 (human decision 2026-08-16): scoring needs no live data — it reads metrics and
+        # curated facts, and `AirportProfile.live` is fetched then discarded. Ranking 140 airports
+        # therefore pulled the national FAA feed 140 times. A zero budget says "no live calls in
+        # here" from the composition root, which keeps `scoring/` free of any data-layer import and
+        # holds for every DataService implementation, not just DuckDB's.
+        with live_budget(0):
+            report = method(req)
         trace = ToolCallTrace(tool=f"deterministic:{name}", args=req.model_dump(exclude_none=True),
                               rows=len(report.rows), provider=None, latency_ms=_ms(started), note=None)
         return report, trace
@@ -239,6 +268,17 @@ class Concierge:
 
     def answer(self, message: str, state: SessionState, *, defaults: dict[str, str] | None = None,
                on_plan: Callable[[Plan], None] | None = None) -> Answer:
+        """One user turn, under one live-call ceiling (QA task 20).
+
+        The budget binds by context rather than by signature, so every path inside this turn is
+        capped — tools, specialists, and anything added later — without each of them having to
+        remember to ask.
+        """
+        with live_budget(DEFAULT_LIVE_BUDGET) as budget:
+            return self._answer(message, state, defaults=defaults, on_plan=on_plan, budget=budget)
+
+    def _answer(self, message: str, state: SessionState, *, defaults: dict[str, str] | None,
+                on_plan: Callable[[Plan], None] | None, budget: LiveBudget) -> Answer:
         plan, filters = self._plan(message, state, defaults)
         if on_plan is not None:
             on_plan(plan)
@@ -273,7 +313,7 @@ class Concierge:
         answer = self.synthesizer.synthesize(
             message=message, plan=plan, plan_line=Planner.plan_line(plan, filters, req), req=req,
             deterministic=deterministic, specialist=specialist, tool_results=tool_results, trace=trace,
-            defaults=defaults)
+            defaults=defaults, extra_notes=_live_budget_note(budget))
         self._remember(state, message, answer, plan, req, deterministic, specialist)
         return answer
 

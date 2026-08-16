@@ -252,3 +252,128 @@ def test_informational_turn_keeps_previous_reports(fake_data, fake_analyst, spec
     c.answer("long haul out of ANC?", state)
     assert set(state.last_reports) == {"deterministic", "specialist"}  # never cleared by a lookup
     assert state.last_preset == "terminal_expansion" and len(state.messages) == 4
+
+
+# --- QA task 19: conversational turns ---------------------------------------------------------------------
+
+def _conversational(kind, notes="", suggestions=None):
+    return _plan_json(intent="clarify", engines=[], question_type="none", faa_regions=[], horizons=[],
+                      scoring_preset="none", presentation_notes=notes, conversation_kind=kind,
+                      suggested_questions=suggestions or [])
+
+
+def test_off_topic_answers_with_the_fixed_decline(fake_data, fake_analyst, specs):
+    from airport_agent.agent.concierge import OFF_TOPIC_TEXT
+    # the model's own prose is discarded: one consistent voice, turn after turn
+    c, llm = _concierge([_conversational("off_topic", notes="Sorry, I only do airports I guess?")],
+                        fake_data, fake_analyst, specs)
+    state = SessionState(session_id="s", title="t")
+    ans = c.answer("what's a good recipe for carbonara?", state)
+    assert ans.headline == OFF_TOPIC_TEXT
+    assert ans.evidence_tables == [] and ans.follow_ups == [] and ans.tool_trace == []
+    assert ans.assumptions == [] and ans.uncertainty_notes == [] and ans.citations == []
+    assert "outside what I cover" in ans.plan_line
+    assert len(llm.calls) == 1  # one call for the whole turn, no dispatch, no synthesis
+    assert state.last_reports == {}  # a decline never touches the analysis memory
+
+
+def test_needs_direction_hands_back_questions_the_agent_can_answer(fake_data, fake_analyst, specs):
+    suggestions = ["Which large hubs score highest for terminal expansion?",
+                   "Which airports show the most unmet demand?",
+                   "Compare congestion at LAX and SNA"]
+    c, _ = _concierge([_conversational("needs_direction",
+                                       notes="I can rank US airports on expansion potential. "
+                                             "Which of these is closest?",
+                                       suggestions=suggestions)],
+                      fake_data, fake_analyst, specs)
+    ans = c.answer("what is the most interesting data point about airports?",
+                   SessionState(session_id="s", title="t"))
+    assert ans.headline.startswith("I can rank US airports")
+    assert ans.follow_ups == suggestions  # the UI renders these as clickable questions
+    assert "no data lookup needed" in ans.plan_line
+    assert "time period" not in ans.plan_line and "focus" not in ans.plan_line
+
+
+def test_a_conversational_turn_never_becomes_a_national_ranking(fake_data, fake_analyst, specs):
+    """The task 15 guard: 'rank everything' must not swallow a question with no theme and no target."""
+    c, _ = _concierge([_conversational("needs_direction", notes="What would you like to look at?",
+                                       suggestions=["Rank New England for expansion"])],
+                      fake_data, fake_analyst, specs)
+    ans = c.answer("what is most interesting?", SessionState(session_id="s", title="t"))
+    assert ans.tool_trace == [] and ans.evidence_tables == []
+    assert "commercial-service airports" not in ans.plan_line
+
+
+def test_suggestions_are_ignored_when_the_turn_is_not_conversational(fake_data, fake_analyst, specs):
+    # a stray label on a dispatchable question must not divert it
+    js = _plan_json(conversation_kind="needs_direction", suggested_questions=["nope"])
+    c, _ = _concierge([js, LLMResult(text="ok", provider="f", model="m"), FINAL, SYN],
+                      fake_data, fake_analyst, specs)
+    ans = c.answer("rank New England for terminal expansion", SessionState(session_id="s", title="t"))
+    assert ans.plan.intent == "analytical"
+    assert ans.tool_trace[0].tool == "deterministic:rank" and ans.follow_ups != ["nope"]
+
+
+def test_an_unknown_conversation_kind_degrades_to_an_ordinary_clarify(fake_data, fake_analyst, specs):
+    c, _ = _concierge([_conversational("banana", notes="Which airports did you mean?")],
+                      fake_data, fake_analyst, specs)
+    ans = c.answer("rank them", SessionState(session_id="s", title="t"))
+    assert ans.headline == "Which airports did you mean?"
+    assert "outside what I cover" not in ans.plan_line
+
+
+# --- QA task 20: live calls happen only where they are needed ---------------------------------------------
+
+class _CountingLive:
+    """Wraps the fake data service and counts live reads, honouring the budget the way the real one does."""
+
+    def __init__(self, inner):
+        self._inner = inner
+        self.calls = 0
+        self.refused = 0
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+    def get_live_status(self, iata):
+        from airport_agent.data.http import claim_live_call
+        if not claim_live_call():
+            self.refused += 1
+        else:
+            self.calls += 1
+        return self._inner.get_live_status(iata)
+
+
+def test_scoring_makes_no_live_calls_at_all(fake_data, fake_analyst, specs):
+    """The 140-airport stall: ranking used to fetch the national FAA feed once per airport."""
+    counting = _CountingLive(fake_data)
+    from tests.agent.fake_analyst import FakeAnalyst
+    analyst = FakeAnalyst(counting)
+    c, _ = _concierge([_plan_json(), LLMResult(text="ok", provider="f", model="m"), FINAL, SYN],
+                      counting, analyst, specs)
+    c.answer("rank New England for terminal expansion", SessionState(session_id="s", title="t"))
+    assert counting.calls == 0, "scoring fetched live status it never reads"
+
+
+def test_a_turn_is_capped_and_says_so_when_the_cap_bites(fake_data, fake_analyst, specs):
+    from airport_agent.data.http import DEFAULT_LIVE_BUDGET, claim_live_call, live_budget
+    calls = []
+    with live_budget(DEFAULT_LIVE_BUDGET) as budget:
+        for _ in range(9):
+            calls.append(claim_live_call())
+        note = _live_budget_note_for(budget)
+    assert calls.count(True) == DEFAULT_LIVE_BUDGET
+    assert note and "fell back to the most recent snapshot" in note[0]
+    assert str(DEFAULT_LIVE_BUDGET) in note[0] and "4 more" in note[0]
+
+
+def test_a_turn_within_the_cap_says_nothing(fake_data, fake_analyst, specs):
+    from airport_agent.data.http import claim_live_call, live_budget
+    with live_budget(5) as budget:
+        claim_live_call()
+        assert _live_budget_note_for(budget) == []
+
+
+def _live_budget_note_for(budget):
+    from airport_agent.agent.concierge import _live_budget_note
+    return _live_budget_note(budget)

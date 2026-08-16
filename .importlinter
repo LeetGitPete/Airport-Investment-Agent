@@ -31,6 +31,7 @@ ignore_imports =
     airport_agent.agent.planner -> airport_agent.llm
     airport_agent.agent.synthesis -> airport_agent.llm
     airport_agent.agent.specialists.runner -> airport_agent.llm
+    airport_agent.agent.concierge -> airport_agent.data.http
 
 [importlinter:contract:ui-only-via-agent]
 name = ui may import only agent and contracts
@@ -50,6 +51,7 @@ ignore_imports =
     airport_agent.agent.planner -> airport_agent.llm
     airport_agent.agent.synthesis -> airport_agent.llm
     airport_agent.agent.specialists.runner -> airport_agent.llm
+    airport_agent.agent.concierge -> airport_agent.data.http
 
 [importlinter:contract:lower-layers-do-not-import-agent]
 name = data / scoring / llm never import the composition root (ui may: design 04)

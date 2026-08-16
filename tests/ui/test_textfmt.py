@@ -41,3 +41,38 @@ def test_footnotes_rendered():
     t = table_to_text(table)
     assert "note one" in t and "note two" in t
     assert t.splitlines()[-2:] == ["note one", "note two"]
+
+
+def test_empty_sections_are_not_printed_at_all():
+    """QA task 19: a conversational turn computes nothing — dead headings read as a broken answer."""
+    from airport_agent.contracts import Answer, Plan
+    plan = Plan(intent="clarify", engines=[], filters={}, tools_to_call=[], specialist=None,
+                presentation_notes="")
+    a = Answer(plan=plan, plan_line="How I'm approaching this: outside what I cover — no analysis run",
+               headline="I fail to see how this relates to airport investments.", evidence_tables=[],
+               analyst_view=None, agreement_line=None, assumptions=[], uncertainty_notes=[],
+               citations=[], follow_ups=[], tool_trace=[])
+    t = answer_to_text(a)
+    for heading in ("ASSUMPTIONS:", "UNCERTAINTY:", "SOURCES:", "FOLLOW-UPS:", "TOOL TRACE:"):
+        assert heading not in t
+    assert "PLAN:" in t and "HEADLINE:" in t
+    assert t.rstrip().endswith("airport investments.")
+
+
+def test_a_section_with_content_is_still_printed():
+    t = answer_to_text(make_answer("compare"))
+    for heading in ("ASSUMPTIONS:", "UNCERTAINTY:", "SOURCES:", "TOOL TRACE:"):
+        assert heading in t
+
+
+def test_follow_ups_survive_when_they_are_the_only_extra_section():
+    """needs_direction: no data, but three suggestions the user can click."""
+    from airport_agent.contracts import Answer, Plan
+    plan = Plan(intent="clarify", engines=[], filters={}, tools_to_call=[], specialist=None,
+                presentation_notes="")
+    a = Answer(plan=plan, plan_line="pl", headline="Which of these is closest?", evidence_tables=[],
+               analyst_view=None, agreement_line=None, assumptions=[], uncertainty_notes=[],
+               citations=[], follow_ups=["Rank New England for expansion"], tool_trace=[])
+    t = answer_to_text(a)
+    assert "FOLLOW-UPS:" in t and "Rank New England for expansion" in t
+    assert "ASSUMPTIONS:" not in t and "SOURCES:" not in t

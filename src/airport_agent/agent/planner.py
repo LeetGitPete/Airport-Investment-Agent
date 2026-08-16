@@ -38,6 +38,13 @@ CONCIERGE = "concierge"
 NONE = "none"  # sentinel for "unset" in the portable schema (no nullable types)
 
 INTENTS = ["informational", "analytical", "followup", "clarify"]
+#: QA task 19 (human decision 2026-08-16): a conversational turn is a FLAVOUR of clarify, carried in
+#: `Plan.filters` (a free-form dict) rather than a fifth `Intent` literal — `contracts/` is frozen and
+#: this feature did not justify unfreezing it.
+OFF_TOPIC = "off_topic"
+NEEDS_DIRECTION = "needs_direction"
+CONVERSATION_KINDS = [NONE_KIND := "none", OFF_TOPIC, NEEDS_DIRECTION]
+MAX_SUGGESTIONS = 3
 QUESTION_TYPES = ["rank", "compare", "diagnose", "custom"]
 HORIZON_VALUES = ["12m", "3y", "5y", "10y"]
 HUB_SIZES = ["large", "medium", "small", "nonhub"]
@@ -130,6 +137,18 @@ PLAN_SCHEMA: dict[str, Any] = {
                                               "it as a question addressed to them ('Which airports did you "
                                               "mean?'), never as an instruction about them ('Ask the user "
                                               "to...')."},
+        "conversation_kind": {"type": "string", "enum": CONVERSATION_KINDS,
+                              "description": "For intent 'clarify' only. 'off_topic' = the message is not "
+                                             "about US airports as investments and no data here can answer "
+                                             "it. 'needs_direction' = it IS about airports or investment but "
+                                             "names nothing this agent can dispatch on, so the answer should "
+                                             "steer the user towards what it can do. 'none' for every other "
+                                             "intent, and for a clarify that is missing one specific detail."},
+        "suggested_questions": {"type": "array", "items": {"type": "string"},
+                                "description": "For conversation_kind 'needs_direction': exactly 3 short "
+                                               "questions THIS agent can answer, phrased as the user would "
+                                               "ask them and aimed at what they seemed to want. Use real US "
+                                               "airports, regions or hub classes. Empty otherwise."},
     },
 }
 PLAN_SCHEMA["required"] = list(PLAN_SCHEMA["properties"])
@@ -199,6 +218,26 @@ class PlanFilters(BaseModel):
     hint: str = ""
     peer_group: PeerGroup | None = None
     tool_calls: list[PlannedToolCall] = Field(default_factory=list)
+    #: QA task 19: which kind of conversational turn this is, when the intent is clarify.
+    conversation_kind: str = NONE_KIND
+    suggested_questions: list[str] = Field(default_factory=list)
+
+    @property
+    def is_conversational(self) -> bool:
+        return self.conversation_kind in (OFF_TOPIC, NEEDS_DIRECTION)
+
+    @field_validator("conversation_kind", mode="before")
+    @classmethod
+    def _known_kind(cls, v: Any) -> str:
+        """An unknown kind degrades to 'none' — a bad label must not cost the user their answer."""
+        return v if v in CONVERSATION_KINDS else NONE_KIND
+
+    @field_validator("suggested_questions", mode="before")
+    @classmethod
+    def _clean_suggestions(cls, v: Any) -> list[str]:
+        if not isinstance(v, list):
+            return []
+        return [s.strip() for s in v if isinstance(s, str) and s.strip()][:MAX_SUGGESTIONS]
 
     @field_validator("airports", "states", "faa_regions", mode="before")
     @classmethod
@@ -353,12 +392,22 @@ class Planner:
             "specialist; the two views are synthesized (disagreements are shown, never hidden).\n"
             "- followup -> resolve against the session memory (last reports, airports, filters, preset); "
             "re-dispatch only if the answer is not already there.\n"
-            "- clarify -> ONLY when the message carries no answerable question at all (it is empty, "
-            "unintelligible, or names nothing this product covers). A missing region, airport list, hub "
-            "size or horizon is NEVER a reason to clarify: leave those keys unset and the engine ranks "
-            "every commercial-service airport at the default horizon, which the answer states as an "
-            "assumption. A themed question with no geography ('which airports gain most if Asian tourism "
-            "grows', 'best bets for long-haul') is analytical, not clarify.",
+            "- clarify -> the message cannot be dispatched as it stands. Set conversation_kind:\n"
+            "  * 'off_topic' — not about US airports as investments, and no data here can answer it "
+            "(recipes, airline safety, flight booking, sports). Say nothing else; the answer is fixed.\n"
+            "  * 'needs_direction' — it IS about airports or investing but names no target, metric or "
+            "comparison this agent can dispatch on ('what is the most interesting data point about "
+            "airports?', 'what should I invest in?'). Write presentation_notes as a short reply to the "
+            "user and give exactly 3 suggested_questions THIS agent can answer.\n"
+            "  * 'none' — one specific detail is missing and naming it is enough.\n"
+            "ORDER MATTERS: decide conversational FIRST. Only once a message is a real analytical "
+            "request does the next rule apply — and then a missing region, airport list, hub size or "
+            "horizon is NEVER a reason to clarify: leave those keys unset and the engine ranks every "
+            "commercial-service airport at the default horizon, stated as an assumption. A themed "
+            "question with no geography ('which airports gain most if Asian tourism grows', 'best bets "
+            "for long-haul') is analytical. A question with no theme AND no geography ('what is most "
+            "interesting?') is needs_direction — ranking the nation would answer a question nobody "
+            "asked.",
 
             "ENGINE RULES:\n"
             "- analytical => engines = ['deterministic', 'specialist:<one name>'] (both), unless the user asks "
@@ -460,6 +509,10 @@ class Planner:
             hint=raw.get("hint") or "",
             peer_group=_unset(raw.get("peer_group")),
             tool_calls=[] if clarify else (raw.get("tool_calls") or []),
+            # QA task 19: a conversational label only means anything on a clarify turn. Ignoring it
+            # elsewhere stops a stray label from diverting a question the engines could have answered.
+            conversation_kind=raw.get("conversation_kind") if clarify else NONE_KIND,
+            suggested_questions=raw.get("suggested_questions") if clarify else [],
         )
         engines = [] if clarify else list(raw.get("engines") or [])
         allowed = {"tools", "deterministic", *[f"specialist:{s}" for s in self.specialists]}
@@ -518,6 +571,12 @@ class Planner:
         With a resolved `AnalysisRequest` the line shows what will actually run (horizon, preset and peer
         group after defaults and engine rules), so the user is never shown a plan the engines did not get.
         """
+        # QA task 19: a conversational turn looks nothing up, so the horizon/focus/engine slots would
+        # be empty placeholders describing work that never happens. Say what is actually going on.
+        if filters.conversation_kind == OFF_TOPIC:
+            return "How I'm approaching this: outside what I cover — no analysis run"
+        if filters.conversation_kind == NEEDS_DIRECTION:
+            return "How I'm approaching this: answering directly — no data lookup needed"
         engines = ", ".join(plan.engines) or "none"
         if req is not None:
             focus = (req.scoring_preset or "balanced").replace("_", " ")

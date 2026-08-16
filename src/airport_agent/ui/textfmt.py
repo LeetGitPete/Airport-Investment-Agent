@@ -75,25 +75,25 @@ def answer_to_text(a: Answer) -> str:
     for table in computed:
         lines.append(table_to_text(table))
         lines.append("")
-    lines.append("ASSUMPTIONS:")
-    lines.extend(f"- {s}" for s in a.assumptions)
-    lines.append("")
-    lines.append("UNCERTAINTY:")
-    lines.extend(f"- {s}" for s in a.uncertainty_notes)
-    lines.append("")
-    lines.append("SOURCES:")
-    lines.extend(f"- {source_name(c.source_id)} ({c.vintage})" for c in a.citations)
-    lines.append("")
-    lines.append("FOLLOW-UPS:")
-    lines.extend(f"- {s}" for s in a.follow_ups)
-    lines.append("")
-    lines.append("TOOL TRACE:")
-    lines.extend(
-        f"- {t.tool} {t.args} rows={_cell(t.rows)} provider={_cell(t.provider)} "
+    # QA task 19 (2026-08-16): a section with nothing in it is not printed — a conversational turn
+    # computes nothing, and four dead headings trailing every reply read as an error.
+    def _section(title: str, items: list[str]) -> None:
+        if not items:
+            return
+        lines.append(title)
+        lines.extend(f"- {s}" for s in items)
+        lines.append("")
+
+    _section("ASSUMPTIONS:", list(a.assumptions))
+    _section("UNCERTAINTY:", list(a.uncertainty_notes))
+    _section("SOURCES:", [f"{source_name(c.source_id)} ({c.vintage})" for c in a.citations])
+    _section("FOLLOW-UPS:", list(a.follow_ups))
+    _section("TOOL TRACE:", [
+        f"{t.tool} {t.args} rows={_cell(t.rows)} provider={_cell(t.provider)} "
         f"latency_ms={t.latency_ms} note={_cell(t.note)}"
         for t in a.tool_trace
-    )
-    return "\n".join(lines)
+    ])
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def answer_to_json(a: Answer) -> str:

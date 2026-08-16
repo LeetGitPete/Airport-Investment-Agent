@@ -119,25 +119,31 @@ def render_answer(
     for table in computed:
         _render_table(table, specs_by_id)
 
-    with st.expander("Assumptions & uncertainty", expanded=assumptions_expanded(answer)):
-        st.markdown("**Assumptions**")
-        for line in answer.assumptions or ["none stated"]:
-            st.markdown(f"- {line}")
-        st.markdown("**Uncertainty**")
-        for line in answer.uncertainty_notes or ["none stated"]:
-            st.markdown(f"- {line}")
+    # QA task 19 (2026-08-16): a conversational turn computes nothing, so these sections would be
+    # empty headings and a "none stated" caption trailing every reply. An analytical answer always
+    # has assumptions (task 13 guarantees it), so hiding empties never hides a real disclosure.
+    if answer.assumptions or answer.uncertainty_notes:
+        with st.expander("Assumptions & uncertainty", expanded=assumptions_expanded(answer)):
+            if answer.assumptions:
+                st.markdown("**Assumptions**")
+                for line in answer.assumptions:
+                    st.markdown(f"- {line}")
+            if answer.uncertainty_notes:
+                st.markdown("**Uncertainty**")
+                for line in answer.uncertainty_notes:
+                    st.markdown(f"- {line}")
 
     if answer.citations:
         sources = ", ".join(f"{source_name(c.source_id)} ({c.vintage})" for c in answer.citations)
         st.caption(f"Sources: {sources}")
-    else:
-        st.caption("Sources: none stated")
 
     for i, text in enumerate(answer.follow_ups):
         if st.button(text, key=f"{key}-fu-{i}"):
             if on_followup is not None:
                 on_followup(text)
 
+    if not answer.tool_trace:  # QA task 19: nothing ran, so there is no work to show
+        return
     with st.expander("Show work"):
         trace_df = pd.DataFrame(
             [

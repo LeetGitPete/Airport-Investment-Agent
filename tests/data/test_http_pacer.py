@@ -105,3 +105,81 @@ def test_the_interval_is_read_at_call_time_not_import_time(monkeypatch):
     pacer = RequestPacer()
     monkeypatch.setenv(INTERVAL_ENV, "5")
     assert pacer.min_interval_s == 5.0
+
+
+# --- QA task 20: the per-turn live-call budget ------------------------------------------------------------
+
+def test_no_budget_in_context_means_no_ceiling():
+    from airport_agent.data.http import claim_live_call
+    assert all(claim_live_call() for _ in range(50))  # a refresh or a script is not a user turn
+
+
+def test_a_budget_allows_exactly_its_allowance_then_refuses():
+    from airport_agent.data.http import claim_live_call, live_budget
+    with live_budget(5) as budget:
+        assert [claim_live_call() for _ in range(7)] == [True] * 5 + [False] * 2
+        assert budget.used == 5 and budget.blocked == 2 and budget.exhausted
+
+
+def test_a_zero_budget_refuses_everything_and_is_how_scoring_asks_for_nothing():
+    from airport_agent.data.http import claim_live_call, live_budget
+    with live_budget(0) as budget:
+        assert claim_live_call() is False
+        assert budget.used == 0 and budget.blocked == 1
+
+
+def test_an_untouched_budget_is_not_reported_as_exhausted():
+    from airport_agent.data.http import claim_live_call, live_budget
+    with live_budget(5) as budget:
+        claim_live_call()
+        assert not budget.exhausted  # the note must not fire on a turn that stayed within the limit
+
+
+def test_budgets_nest_and_the_outer_one_survives_the_inner():
+    """Scoring runs at zero inside a turn's budget of five; the turn keeps what it had left."""
+    from airport_agent.data.http import claim_live_call, live_budget
+    with live_budget(5) as turn:
+        assert claim_live_call() is True
+        with live_budget(0):
+            assert claim_live_call() is False
+        assert claim_live_call() is True
+        assert turn.used == 2 and turn.blocked == 0  # the inner refusal is not charged to the turn
+
+
+def test_the_budget_is_shared_by_threads_that_carry_the_context():
+    """A parallel caller must go through copy_context().run — that is the supported way to fan out.
+
+    Bare `threading.Thread` starts with an EMPTY context, so it would escape the ceiling entirely.
+    Nothing in a turn spawns threads today; this test pins the boundary so a future parallel map is
+    written the right way rather than discovering the hole in production.
+    """
+    import contextvars
+
+    from airport_agent.data.http import claim_live_call, live_budget
+    granted: list[bool] = []
+    lock = threading.Lock()
+
+    def call() -> None:
+        allowed = claim_live_call()
+        with lock:
+            granted.append(allowed)
+
+    with live_budget(5) as budget:
+        contexts = [contextvars.copy_context() for _ in range(20)]
+        threads = [threading.Thread(target=ctx.run, args=(call,)) for ctx in contexts]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert sum(granted) == 5 and len(granted) == 20  # never over-grants under concurrency
+        assert budget.used == 5 and budget.blocked == 15
+
+
+def test_a_bare_thread_escapes_the_budget_which_is_a_documented_boundary():
+    from airport_agent.data.http import claim_live_call, live_budget
+    escaped: list[bool] = []
+    with live_budget(0):
+        thread = threading.Thread(target=lambda: escaped.append(claim_live_call()))
+        thread.start()
+        thread.join()
+    assert escaped == [True]  # no context, no ceiling — see live_budget's docstring

@@ -216,14 +216,17 @@ class Synthesizer:
     def synthesize(self, *, message: str, plan: Plan, plan_line: str, req: AnalysisRequest | None,
                    deterministic: DeterministicReport | None, specialist: SpecialistReport | None,
                    tool_results: list[tuple[str, dict, dict]], trace: list[ToolCallTrace],
-                   defaults: dict[str, str] | None) -> Answer:
+                   defaults: dict[str, str] | None,
+                   extra_notes: list[str] | None = None) -> Answer:
+        """`extra_notes` are uncertainty lines the orchestrator knows and the reports cannot see —
+        currently the live-call ceiling (QA task 20). They are condensed with the rest, never above it."""
         synthesis, degraded = self._prose(self._user_message(
             message=message, plan=plan, req=req, deterministic=deterministic, specialist=specialist,
             tool_results=tool_results, defaults=defaults))
 
         tables: list[Table] = []
         assumptions: list[str] = []
-        notes: list[str] = []
+        notes: list[str] = list(extra_notes or [])
         metrics: list[Metric] = []
         provenance: list[dict] = []
         covers: dict[str, list[str]] = {}
