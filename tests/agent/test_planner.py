@@ -155,12 +155,29 @@ def test_congestion_compare_defaults_to_12m(fake_data, fake_analyst, specs):
     assert "LAX, SNA" in Planner.plan_line(plan, f)
 
 
-def test_request_without_target_raises(fake_data, fake_analyst, specs):
+def test_request_without_target_falls_back_to_the_national_scope(fake_data, fake_analyst, specs):
+    # QA task 15 (human decision 2026-08-16): a themed question with no geography is answerable —
+    # rank every commercial-service airport rather than asking the user where to look.
+    from airport_agent.agent.planner import NATIONAL_SCOPE_HUBS, NATIONAL_SCOPE_LIMIT, is_national_scope
     js = _plan_json(faa_regions=[])
     p = _planner([js], fake_data, fake_analyst, specs)
-    plan, f = p.plan("rank them", SessionState(session_id="s", title="t"))
-    with pytest.raises(ValueError, match="airports or a filter"):
-        p.to_analysis_request(plan, f, None)
+    plan, f = p.plan("which airports gain most if Asian tourism grows?",
+                     SessionState(session_id="s", title="t"))
+    req = p.to_analysis_request(plan, f, None)
+    assert req.airports is None and req.filter is not None
+    assert req.filter.hub_sizes == NATIONAL_SCOPE_HUBS  # nonhub GA fields are never padded in
+    assert req.filter.limit == NATIONAL_SCOPE_LIMIT >= 140  # the whole set, never silently truncated
+    assert is_national_scope(req)
+    assert "all commercial-service airports" in Planner.plan_line(plan, f, req)
+
+
+def test_a_scope_the_user_asked_for_is_not_mistaken_for_the_national_default(fake_data, fake_analyst, specs):
+    from airport_agent.agent.planner import is_national_scope
+    js = _plan_json(faa_regions=[], hub_sizes=["large", "medium", "small"])
+    p = _planner([js], fake_data, fake_analyst, specs)
+    plan, f = p.plan("rank the commercial hubs", SessionState(session_id="s", title="t"))
+    req = p.to_analysis_request(plan, f, None)
+    assert req.filter.hub_sizes == ["large", "medium", "small"] and not is_national_scope(req)
 
 
 def test_prompt_carries_recent_turns_and_no_defaults(fake_data, fake_analyst, specs):

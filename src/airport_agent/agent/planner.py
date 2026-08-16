@@ -143,6 +143,27 @@ REPAIR_SCHEMA: dict[str, Any] = {
 }
 REPAIR_SCHEMA["required"] = list(REPAIR_SCHEMA["properties"])
 
+#: QA task 15 (human decision 2026-08-16): what "all airports" means when the user names no geography.
+#: Commercial-service hubs only — the snapshot's other ~1,805 airports are nonhub GA fields that carry
+#: no metric coverage, so ranking them would pad the list with noise rather than widen the answer.
+NATIONAL_SCOPE_HUBS: list[HubSize] = ["large", "medium", "small"]
+#: Headroom over the ~140 commercial-service airports that exist, so the default scope is never
+#: silently truncated — the assumption line claims the whole set and must not be lying.
+NATIONAL_SCOPE_LIMIT = 200
+
+
+def national_scope() -> AirportFilter:
+    """The default filter for an analytical question that named no airports, region or hub size."""
+    return AirportFilter(hub_sizes=list(NATIONAL_SCOPE_HUBS), limit=NATIONAL_SCOPE_LIMIT)
+
+
+def is_national_scope(req: AnalysisRequest | None) -> bool:
+    """Did this request fall back to the national default (rather than a filter the user asked for)?"""
+    f = req.filter if req is not None else None
+    return bool(f and not f.states and not f.faa_regions and not f.cbsa_codes and not f.iatas
+                and not f.name_contains and list(f.hub_sizes) == NATIONAL_SCOPE_HUBS
+                and f.limit == NATIONAL_SCOPE_LIMIT)
+
 
 class PlannedToolCall(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -214,6 +235,8 @@ def _targets(filters: PlanFilters) -> str:
 
 
 def _request_targets(req: AnalysisRequest) -> str:
+    if is_national_scope(req):
+        return "all commercial-service airports"  # QA task 15: the plan says so before it runs
     f = req.filter
     return _target_text(list(req.airports or []), list(f.states) if f else [],
                         list(f.faa_regions) if f else [], list(f.hub_sizes) if f else [])
@@ -326,8 +349,12 @@ class Planner:
             "specialist; the two views are synthesized (disagreements are shown, never hidden).\n"
             "- followup -> resolve against the session memory (last reports, airports, filters, preset); "
             "re-dispatch only if the answer is not already there.\n"
-            "- clarify -> the question cannot be answered without exactly one missing detail (e.g. which "
-            "airports, which horizon); ask that one question.",
+            "- clarify -> ONLY when the message carries no answerable question at all (it is empty, "
+            "unintelligible, or names nothing this product covers). A missing region, airport list, hub "
+            "size or horizon is NEVER a reason to clarify: leave those keys unset and the engine ranks "
+            "every commercial-service airport at the default horizon, which the answer states as an "
+            "assumption. A themed question with no geography ('which airports gain most if Asian tourism "
+            "grows', 'best bets for long-haul') is analytical, not clarify.",
 
             "ENGINE RULES:\n"
             "- analytical => engines = ['deterministic', 'specialist:<one name>'] (both), unless the user asks "
@@ -450,8 +477,10 @@ class Planner:
                             defaults: dict[str, str] | None) -> AnalysisRequest:
         """Map the plan onto the frozen dispatch contract.
 
-        A request with neither airports nor a filter raises ValueError (AnalysisRequest validator); the
-        Concierge turns that into a clarify answer rather than silently ranking every airport.
+        A request with neither airports nor a filter falls back to the national scope (QA task 15,
+        human decision 2026-08-16): a question with a theme but no geography is answerable, so it is
+        answered over every commercial-service airport and the answer states that as an assumption.
+        Asking the user where to look was the wrong default — it stalled real questions.
         """
         user_defaults = defaults or {}
         question_type = filters.question_type
@@ -470,6 +499,8 @@ class Planner:
         if airports is None and (filters.states or filters.faa_regions or filters.hub_sizes):
             airport_filter = AirportFilter(states=filters.states, faa_regions=filters.faa_regions,
                                            hub_sizes=filters.hub_sizes, limit=50)
+        elif airports is None:
+            airport_filter = national_scope()
         return AnalysisRequest(question_type=question_type, airports=airports, filter=airport_filter,
                                horizons=horizons,
                                peer_group=filters.peer_group or user_defaults.get("peer_group") or None,

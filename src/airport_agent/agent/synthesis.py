@@ -16,6 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from airport_agent.agent.planner import is_national_scope
 from airport_agent.agent.specialists.runner import compact_deterministic, fit_tool_result
 from airport_agent.agent.tables import (
     citations_from,
@@ -285,6 +286,10 @@ class Synthesizer:
         # QA task 13: "preset" is an internal word — the user sees the focus, as in the table titles.
         out = [f"Scored with {preset.replace('_', ' ')} focus, time period {horizon}, "
                f"as percentiles among {peer_label(peer_group)}"]
+        # QA task 15: the national fallback is a real assumption about the question, so it is stated.
+        if is_national_scope(req):
+            out.append("No airports, region or hub size were named, so every commercial-service airport "
+                       "(large, medium and small hubs) was considered")
         if rep is not None:
             out += [c for c in rep.caveats if any(m in c.lower() for m in CONVENTION_MARKERS)]
         return out

@@ -62,11 +62,17 @@ def test_clarify_makes_no_extra_calls(fake_data, fake_analyst, specs):
     assert ans.headline == "Which horizon?" and len(llm.calls) == 1 and ans.evidence_tables == []
 
 
-def test_analytical_without_targets_becomes_clarify(fake_data, fake_analyst, specs):
+def test_analytical_without_targets_ranks_the_nation_and_says_so(fake_data, fake_analyst, specs):
+    # QA task 15: this used to become a clarify ("which airports?"), stalling an answerable question.
     js = _plan_json(faa_regions=[], airports=[])
-    c, llm = _concierge([js], fake_data, fake_analyst, specs)
-    ans = c.answer("rank them", SessionState(session_id="s", title="t"))
-    assert ans.plan.intent == "clarify" and len(llm.calls) == 1
+    c, _ = _concierge([js, LLMResult(text="ok", provider="f", model="m"), FINAL, SYN],
+                      fake_data, fake_analyst, specs)
+    ans = c.answer("which airports gain most if Asian tourism grows?",
+                   SessionState(session_id="s", title="t"))
+    assert ans.plan.intent == "analytical"
+    assert "all commercial-service airports" in ans.plan_line
+    assert any("commercial-service airport" in a for a in ans.assumptions)
+    assert ans.tool_trace[0].tool == "deterministic:rank"
 
 
 def test_tool_error_is_traced_not_raised(fake_data, fake_analyst, specs):
