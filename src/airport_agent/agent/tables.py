@@ -215,6 +215,35 @@ def data_matrix(rep: DeterministicReport, specs_by_id: dict[str, MetricSpec]) ->
 comparison_table = data_matrix
 
 
+#: One-line, user-facing statement of how the deterministic score is computed (QA task 10).
+SCORE_FORMULA_CAPTION = ("Score = sum over pillars of (pillar weight × metric weight × percentile "
+                         "among peers) × 100, so 100 = the strongest case among peers under this "
+                         "preset. The pillar split is in the Scores table.")
+
+_SCORE_TITLE = re.compile(r"^(?:Ranking|Scores) — preset (\S+?),")
+
+
+def score_summary(tables: list[Table]) -> dict[str, Any] | None:
+    """Extract the headline score strip from an answer's tables (QA task 10).
+
+    Returns {label, scores: [(iata, score), ...] (≤4), shown, total, caption} from the
+    Ranking/Scores table, or None when the answer has no deterministic scores. Derived from the
+    rendered table so the strip can never disagree with it.
+    """
+    for table in tables:
+        match = _SCORE_TITLE.match(table.title)
+        if not match or "score" not in table.columns or "airport" not in table.columns:
+            continue
+        airport_i, score_i = table.columns.index("airport"), table.columns.index("score")
+        pairs = [(str(row[airport_i]), row[score_i]) for row in table.rows[:4]]
+        if not pairs:
+            return None
+        preset = match.group(1).replace("_", " ")
+        return {"label": f"{preset} score", "scores": pairs, "shown": len(pairs),
+                "total": len(table.rows), "caption": SCORE_FORMULA_CAPTION}
+    return None
+
+
 def specialist_ranking_table(rep: SpecialistReport,
                              specs_by_id: dict[str, MetricSpec] | None = None) -> Table | None:
     """The analyst's own ordering, kept separate from the formula's so the two can be compared."""

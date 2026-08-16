@@ -50,6 +50,19 @@ def test_ranking_table_row_per_report_row_with_pillar_columns(fake_analyst):
     assert ranks == sorted(ranks)
 
 
+def test_score_summary_extracts_the_strip_from_the_scores_table(fake_analyst, by_id):
+    from airport_agent.agent.tables import score_summary
+    rep = _rank_report(fake_analyst)
+    tables = [ranking_table(rep), data_matrix(rep, by_id)]
+    summary = score_summary(tables)
+    assert summary is not None and summary["label"] == "balanced score"
+    strip = dict(summary["scores"])
+    table_scores = {r.ref.iata: r.score for r in rep.rows}
+    assert all(table_scores[iata] == score for iata, score in strip.items())  # never disagrees
+    assert summary["shown"] <= 4 and summary["total"] == len(rep.rows)
+    assert score_summary([data_matrix(rep, by_id)]) is None  # no scores table -> no strip
+
+
 def test_humanize_metric_ids_rewrites_llm_prose(by_id):
     from airport_agent.agent.tables import humanize_metric_ids
     text = "High `imc_capacity_ratio` and pct_arr_delay_gt15 drive the case; enpl_cagr_5y is flat."

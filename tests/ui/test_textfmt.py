@@ -15,7 +15,8 @@ def test_text_has_sections_in_fixed_order_and_numbers_verbatim():
     assert "12.9" in t and "13.9" in t
     assert "BTS On-Time Performance (2026-04)" in t  # user-facing source names in SOURCES
     # QA task 6 layout: analyst view precedes the computed tables
-    assert t.index("ANALYST VIEW:") < t.index("AGREEMENT:") < t.index(a.evidence_tables[0].title)
+    assert (t.index("ANALYST VIEW:") < t.index("DO THE NUMBERS AND THE ANALYST AGREE?")
+            < t.index(a.evidence_tables[0].title))
     assert t.index("== ANALYST VIEW") < t.index("== COMPUTED ANALYSIS") < t.index("ASSUMPTIONS:")
 
 

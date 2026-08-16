@@ -9,7 +9,7 @@ Never re-interprets, recomputes or reformats numbers beyond display: table cells
 """
 from __future__ import annotations
 
-from airport_agent.agent.tables import source_name
+from airport_agent.agent.tables import score_summary, source_name
 from airport_agent.contracts import Answer, Table
 
 _ANALYST_TABLE_PREFIX = "Analyst ranking"
@@ -46,6 +46,16 @@ def answer_to_text(a: Answer) -> str:
     lines.append("")
     computed = [t for t in a.evidence_tables if not t.title.startswith(_ANALYST_TABLE_PREFIX)]
     analyst_tables = [t for t in a.evidence_tables if t.title.startswith(_ANALYST_TABLE_PREFIX)]
+    # QA task 10: the deterministic score leads, with a one-line formula statement.
+    summary = score_summary(computed)
+    if summary:
+        strip = " · ".join(f"{iata} {score:.0f}" if isinstance(score, int | float)
+                           else f"{iata} {score}" for iata, score in summary["scores"])
+        more = (f" (top {summary['shown']} of {summary['total']})"
+                if summary["total"] > summary["shown"] else "")
+        lines.append(f"SCORE: {strip} — {summary['label']} (0-100){more}")
+        lines.append(summary["caption"])
+        lines.append("")
     # QA task 6 layout: headline -> analyst view -> computed scores & data.
     if analyst_tables or a.analyst_view:
         lines.append("== ANALYST VIEW (AI specialist interpretation) ==")
@@ -57,7 +67,7 @@ def answer_to_text(a: Answer) -> str:
         lines.append(f"ANALYST VIEW: {a.analyst_view}")
         lines.append("")
     if a.agreement_line:
-        lines.append(f"AGREEMENT: {a.agreement_line}")
+        lines.append(f"DO THE NUMBERS AND THE ANALYST AGREE? {a.agreement_line}")
         lines.append("")
     if computed:
         lines.append("== COMPUTED ANALYSIS (every number computed from the cited data) ==")

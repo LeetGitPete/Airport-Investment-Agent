@@ -15,7 +15,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from airport_agent.agent.tables import source_name
+from airport_agent.agent.tables import score_summary, source_name
 from airport_agent.contracts import Answer, LLMError, MetricSpec, Table
 
 #: Analyst-produced tables are titled by `specialist_ranking_table`; everything else is computed.
@@ -86,6 +86,19 @@ def render_answer(
     computed = [t for t in answer.evidence_tables if not t.title.startswith(_ANALYST_TABLE_PREFIX)]
     analyst_tables = [t for t in answer.evidence_tables if t.title.startswith(_ANALYST_TABLE_PREFIX)]
 
+    # QA task 10: the deterministic score is front and center, straight under the headline,
+    # with a one-line statement of how it is computed. Values come from the Scores table so
+    # the strip can never disagree with it.
+    summary = score_summary(computed)
+    if summary:
+        chip_cols = st.columns(len(summary["scores"]))
+        for col, (iata, score) in zip(chip_cols, summary["scores"], strict=True):
+            shown = f"{score:.0f}" if isinstance(score, int | float) else str(score)
+            col.metric(iata, shown)
+        more = (f" Showing the top {summary['shown']} of {summary['total']} airports scored."
+                if summary["total"] > summary["shown"] else "")
+        st.caption(f"{summary['label'].capitalize()} (0–100). {summary['caption']}{more}")
+
     # QA task 6 layout: headline -> analyst view (+ its ranking) -> computed scores & data.
     if analyst_tables or answer.analyst_view:
         st.subheader("🧠 Analyst view (AI specialist)")
@@ -96,6 +109,7 @@ def render_answer(
     if answer.analyst_view:
         st.markdown(answer.analyst_view)
     if answer.agreement_line:
+        st.markdown("**Do the numbers and the analyst agree?**")
         st.info(answer.agreement_line)
 
     if computed:

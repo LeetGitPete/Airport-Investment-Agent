@@ -232,8 +232,9 @@ class Synthesizer:
         if specialist is not None:
             analyst_view = synthesis.analyst_summary.strip() or specialist.narrative
             disagreements = "; ".join(specialist.disagreements) or "none stated"
-            agreement_line = (f"Formula vs analyst: {specialist.agreement or 'no statement given'}. "
-                              f"Disagreements: {disagreements}")
+            # QA task 10: the line reads against the computed score shown at the top of the answer.
+            agreement_line = (f"On the computed score: {specialist.agreement or 'no statement given'}. "
+                              f"Where the analyst differs from the numbers: {disagreements}.")
         follow_ups = [f for f in synthesis.follow_ups if f.strip()][:4] or list(FALLBACK_FOLLOW_UPS)
 
         # QA task 9: LLM prose never shows internal metric ids — deterministic backstop over
