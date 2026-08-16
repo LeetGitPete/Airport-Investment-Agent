@@ -173,6 +173,7 @@ def test_a_well_written_clarify_question_is_kept_verbatim(fake_data, fake_analys
 
 def test_the_reason_is_recorded_even_though_it_left_the_headline():
     from pydantic import BaseModel, field_validator
+
     from airport_agent.agent.concierge import diagnostic
 
     class M(BaseModel):
