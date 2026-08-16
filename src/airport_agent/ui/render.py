@@ -15,7 +15,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from airport_agent.agent.tables import score_summary, source_name
+from airport_agent.agent.tables import PROVENANCE_TITLE, score_summary, tool_label
 from airport_agent.contracts import Answer, LLMError, MetricSpec, Table
 
 #: Analyst-produced tables are titled by `specialist_ranking_table`; everything else is computed.
@@ -105,6 +105,10 @@ def render_answer(
     # follow-up where prose should lead): NEW tables then sit behind a collapsed data section — still
     # in the answer, one click away, never dropped. Pointers (grids already shown earlier in the
     # chat, by content hash) always render as their one line, so nothing repeats.
+    # "Where this came from" is a per-source appendix, not evidence — collapsed by default so the
+    # data tables it cites keep the screen. It still ships in every answer, one click away.
+    provenance = [t for t in computed if t.title == PROVENANCE_TITLE]
+    computed = [t for t in computed if t.title != PROVENANCE_TITLE]
     fresh = [t for t in computed if t.shown_as == "full"]
     if answer.plan.table_display == "minimal" and fresh:
         for table in computed:
@@ -135,9 +139,12 @@ def render_answer(
                 for line in answer.uncertainty_notes:
                     st.markdown(f"- {line}")
 
-    if answer.citations:
-        sources = ", ".join(f"{source_name(c.source_id)} ({c.vintage})" for c in answer.citations)
-        st.caption(f"Sources: {sources}")
+    for table in provenance:
+        if table.shown_as == "pointer":
+            _render_table(table, specs_by_id)
+        else:
+            with st.expander(PROVENANCE_TITLE, expanded=False):
+                _render_table(table, specs_by_id)
 
     for i, text in enumerate(answer.follow_ups):
         if st.button(text, key=f"{key}-fu-{i}"):
@@ -150,6 +157,7 @@ def render_answer(
         trace_df = pd.DataFrame(
             [
                 {
+                    "step": tool_label(t.tool),
                     "tool": t.tool,
                     "args": json.dumps(t.args, default=str),
                     "rows": t.rows,

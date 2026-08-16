@@ -157,7 +157,8 @@ def test_route_stats_gives_bands_and_long_haul_tables(registry, by_id):
 def test_tool_error_becomes_a_table(registry, by_id):
     out = registry.call("get_profile", {"iata": "ZZZ"}, engine="concierge")
     tables = tool_result_tables("get_profile", out, by_id)
-    assert tables[0].title == "Tool error" and tables[0].columns == ["tool", "error"]
+    assert tables[0].title == "Tool error" and tables[0].columns == ["step", "error"]
+    assert "get_" not in tables[0].rows[0][0]  # user-facing step name, never the raw tool id
     assert "KeyError" in tables[0].rows[0][1]
 
 

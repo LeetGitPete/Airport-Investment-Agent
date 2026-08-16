@@ -10,10 +10,11 @@ from tests.ui.fake_app import make_answer
 def test_text_has_sections_in_fixed_order_and_numbers_verbatim():
     a = make_answer("compare")
     t = answer_to_text(a)
-    order = [t.index(h) for h in ("PLAN:", "HEADLINE:", "ASSUMPTIONS:", "UNCERTAINTY:", "SOURCES:", "FOLLOW-UPS:", "TOOL TRACE:")]
+    order = [t.index(h) for h in ("PLAN:", "HEADLINE:", "ASSUMPTIONS:", "UNCERTAINTY:", "FOLLOW-UPS:", "TOOL TRACE:")]
     assert order == sorted(order)
     assert "12.9" in t and "13.9" in t
-    assert "BTS On-Time Performance (2026-04)" in t  # user-facing source names in SOURCES
+    # Row 65: the SOURCES paragraph is gone — provenance lives in the "Where this came from" table.
+    assert "SOURCES:" not in t
     # Layout: analyst view precedes the computed tables
     assert (t.index("ANALYST VIEW:") < t.index("DO THE NUMBERS AND THE ANALYST AGREE?")
             < t.index(a.evidence_tables[0].title))
@@ -53,7 +54,7 @@ def test_empty_sections_are_not_printed_at_all():
                analyst_view=None, agreement_line=None, assumptions=[], uncertainty_notes=[],
                citations=[], follow_ups=[], tool_trace=[])
     t = answer_to_text(a)
-    for heading in ("ASSUMPTIONS:", "UNCERTAINTY:", "SOURCES:", "FOLLOW-UPS:", "TOOL TRACE:"):
+    for heading in ("ASSUMPTIONS:", "UNCERTAINTY:", "FOLLOW-UPS:", "TOOL TRACE:"):
         assert heading not in t
     assert "PLAN:" in t and "HEADLINE:" in t
     assert t.rstrip().endswith("airport investments.")
@@ -61,7 +62,7 @@ def test_empty_sections_are_not_printed_at_all():
 
 def test_a_section_with_content_is_still_printed():
     t = answer_to_text(make_answer("compare"))
-    for heading in ("ASSUMPTIONS:", "UNCERTAINTY:", "SOURCES:", "TOOL TRACE:"):
+    for heading in ("ASSUMPTIONS:", "UNCERTAINTY:", "TOOL TRACE:"):
         assert heading in t
 
 

@@ -23,10 +23,12 @@ from airport_agent.agent.tables import (
     citations_from,
     data_matrix,
     humanize_metric_ids,
+    humanize_tool_ids,
     peer_label,
     provenance_table,
     ranking_table,
     specialist_ranking_table,
+    tool_label,
     tool_result_tables,
 )
 from airport_agent.contracts import (
@@ -49,6 +51,12 @@ FALLBACK_NOTE = "synthesis text unavailable — showing raw report"
 FALLBACK_HEADLINE = "Results below."
 FALLBACK_FOLLOW_UPS = ["Compare with peer airports?", "Try another horizon?", "Try another preset?"]
 CONVENTION_MARKERS = ("convention", "spill model", "long-haul", "percentile")
+#: Decision 2026-08-16 (row 65): report caveats reach the ANSWER only from this allow-list — the
+#: assumptions/uncertainty blocks are a curated surface, not a drain for every methodology note the
+#: engines record. Everything else stays on the report, visible in "Show work" and the archive.
+#: Matched case-insensitively as substrings.
+ALLOWED_ASSUMPTION_MARKERS = ("long-haul =",)          # the convention actually used by the answer
+ALLOWED_NOTE_MARKERS = ("ranked against its",)         # the single-airport peer-expansion disclosure
 #: Assumptions/uncertainty are condensed DETERMINISTICALLY to a hard cap — the LLM may add lines
 #: via the specialist but can never remove one. Build-level standing tradeoffs live in the docs,
 #: not in every answer.
@@ -58,10 +66,9 @@ MAX_NOTES = 8
 #: Each entry renders one default; unknown keys fall back to "key=value".
 DEFAULT_PROSE: dict[str, Any] = {
     "horizon": lambda v: f"time period {v}",
-    "scoring_preset": lambda v: f"{str(v).replace('_', ' ')} investment focus",
+    "scoring_preset": lambda v: f"{str(v).replace('_', ' ')} weights",
     "peer_group": lambda v: f"peer comparison against {peer_label(str(v))}",
 }
-NO_DEFAULTS_ASSUMPTION = "Nothing was assumed beyond the settings and conventions stated above."
 
 SYNTHESIS_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -141,8 +148,12 @@ def _first_sentence(text: str) -> str:
     return head or FALLBACK_HEADLINE
 
 
-def _defaults_assumption(defaults: dict[str, str] | None) -> str:
-    """The closing assumption row: which settings the answer fell back on, in the user's words.
+def _defaults_assumption(defaults: dict[str, str] | None, national_scope: bool = False) -> str:
+    """The closing assumption row, built from modules — one per setting the answer fell back on,
+    " · "-joined so it scans as a list, not a paragraph (decision 2026-08-16, row 65). The national
+    scope fallback is one of the modules: it IS a default applied because the question named no
+    geography. Empty string when nothing was defaulted — a line that says "nothing assumed" says
+    nothing.
 
     Phrased as "where the question didn't specify" because the planner may legitimately override a
     default from the question itself — the answer must not claim more than it knows.
@@ -151,9 +162,11 @@ def _defaults_assumption(defaults: dict[str, str] | None) -> str:
              if value and key in DEFAULT_PROSE]
     parts += [f"{key}={value}" for key, value in (defaults or {}).items()
               if value and key not in DEFAULT_PROSE]
+    if national_scope:
+        parts.append("scope = all commercial-service airports (no geography was named)")
     if not parts:
-        return NO_DEFAULTS_ASSUMPTION
-    return "Where the question didn't specify, these defaults were used: " + ", ".join(parts) + "."
+        return ""
+    return "Where the question didn't specify: " + " · ".join(parts)
 
 
 def _compact_specialist(rep: SpecialistReport) -> dict[str, Any]:
@@ -267,9 +280,11 @@ class Synthesizer:
             if analyst_table is not None:
                 tables.append(analyst_table)
             metrics.extend(specialist.evidence)
-            assumptions.extend(specialist.assumptions)
-            notes.append(f"Specialist confidence {specialist.confidence:.2f}")
-            notes.extend(specialist.caveats)
+            # Decision 2026-08-16 (row 65): the analyst may add AT MOST one assumption and one
+            # caveat, 100 chars each — the schema says so (maxItems 1) and this clamp enforces it
+            # deterministically. Its confidence is on the report (Show work), not a note.
+            assumptions.extend(_clamp_analyst_lines(specialist.assumptions))
+            notes.extend(_clamp_analyst_lines(specialist.caveats))
             if specialist.hint_truncated:
                 notes.append("The steer sent to the specialist was truncated to its character limit")
 
@@ -280,11 +295,12 @@ class Synthesizer:
             # Remember which tool each source served, so the provenance table can say what it was
             # used for instead of listing bare source names.
             for entry in entries:
-                covers.setdefault(entry.get("source_id", ""), []).append(TOOL_PURPOSE.get(tool, tool))
+                covers.setdefault(entry.get("source_id", ""), []).append(
+                    TOOL_PURPOSE.get(tool, tool_label(tool)))
             if out.get("provenance_note"):
                 provenance_notes.append(str(out["provenance_note"]))
             assumptions.extend(self._tool_assumptions(out))
-            notes.extend(self._tool_notes(tool, out))
+        notes.extend(self._tool_failures(tool_results))
 
         if degraded:
             notes.append(FALLBACK_NOTE)
@@ -299,12 +315,13 @@ class Synthesizer:
         tables = apply_display_policy(tables, shown_tables if shown_tables is not None else {},
                                       plan.table_display, turn=turn)
         # Condense deterministically — the LLM never picks which lines survive.
-        assumptions = _condense(_unique(assumptions), MAX_ASSUMPTIONS,
-                                "further standing conventions apply (documented in docs/DESIGN.md)")
+        assumptions = _unique(assumptions)[:MAX_ASSUMPTIONS]  # tail line cut by decision, row 65
         notes = _condense(_unique(notes), MAX_NOTES, "further minor notes omitted")
-        # The block always closes with the settings actually in force, so it is never empty (product
-        # rule) and never trimmed away by the cap.
-        assumptions.append(_defaults_assumption(defaults))
+        # The closing line: every setting the answer fell back on, one module each. Omitted entirely
+        # when nothing was defaulted (row 65 — the old "nothing was assumed" filler said nothing).
+        closing = _defaults_assumption(defaults, national_scope=is_national_scope(req))
+        if closing:
+            assumptions.append(closing)
 
         headline = synthesis.headline.strip()
         if not headline:
@@ -321,11 +338,12 @@ class Synthesizer:
 
         # LLM prose never shows internal metric ids — a deterministic backstop over every text
         # surface (the tables already use display names by construction).
-        headline = humanize_metric_ids(headline, self.by_id)
-        analyst_view = humanize_metric_ids(analyst_view, self.by_id) if analyst_view else None
-        agreement_line = humanize_metric_ids(agreement_line, self.by_id) if agreement_line else None
-        assumptions = [humanize_metric_ids(a, self.by_id) for a in assumptions]
-        notes = [humanize_metric_ids(n, self.by_id) for n in notes]
+        headline = humanize_tool_ids(humanize_metric_ids(headline, self.by_id))
+        analyst_view = humanize_tool_ids(humanize_metric_ids(analyst_view, self.by_id)) if analyst_view else None
+        agreement_line = (humanize_tool_ids(humanize_metric_ids(agreement_line, self.by_id))
+                          if agreement_line else None)
+        assumptions = [humanize_tool_ids(humanize_metric_ids(a, self.by_id)) for a in assumptions]
+        notes = [humanize_tool_ids(humanize_metric_ids(n, self.by_id)) for n in notes]
 
         return Answer(plan=plan, plan_line=plan_line, headline=headline, evidence_tables=tables,
                       analyst_view=analyst_view, agreement_line=agreement_line,
@@ -344,32 +362,20 @@ class Synthesizer:
         # One line for the request-shaping choices instead of three; standing build facts (tier
         # policy etc.) live in the docs. "preset" is an internal word, so the user sees the focus
         # instead, as in the table titles.
-        out = [f"Scored with {preset.replace('_', ' ')} focus, time period {horizon}, "
-               f"as percentiles among {peer_label(peer_group)}"]
-        # The national fallback is a real assumption about the question, so it is stated.
-        if is_national_scope(req):
-            out.append("No airports, region or hub size were named, so every commercial-service airport "
-                       "(large, medium and small hubs) was considered")
+        out = [f"Scoring weights: {preset.replace('_', ' ')} · time period {horizon} · "
+               f"percentiles vs {peer_label(peer_group)}"]
+        # The national-scope fallback is stated as a module of the closing defaults line, not here.
         if rep is not None:
-            out += [c for c in rep.caveats if any(m in c.lower() for m in CONVENTION_MARKERS)]
+            out += [c for c in rep.caveats
+                    if any(m in c.lower() for m in ALLOWED_ASSUMPTION_MARKERS)]
         return out
 
     @staticmethod
     def _report_notes(rep: DeterministicReport) -> list[str]:
-        notes = [c for c in rep.caveats if not any(m in c.lower() for m in CONVENTION_MARKERS)]
-        low = sum(1 for row in rep.rows if row.low_confidence)
-        if low:
-            notes.append(f"{low} of {len(rep.rows)} airports low confidence (thin metric coverage)")
-        # Quality flags aggregated per code, not one row per metric per flag.
-        by_code: dict[str, tuple[int, str]] = {}
-        for metric in rep.evidence:
-            for flag in metric.quality:
-                count, message = by_code.get(flag.code, (0, flag.message))
-                by_code[flag.code] = (count + 1, message)
-        for code, (count, message) in by_code.items():
-            suffix = f" ({count} metrics affected)" if count > 1 else ""
-            notes.append(f"{code}: {message}{suffix}")
-        return notes
+        """The report caveats that survive into the answer: the allow-list only (row 65). The full
+        set — quality flags, tier policy, weighting mechanics, per-metric nuances — stays on the
+        report itself, one click away in "Show work"."""
+        return [c for c in rep.caveats if any(m in c.lower() for m in ALLOWED_NOTE_MARKERS)]
 
     @staticmethod
     def _tool_assumptions(out: dict[str, Any]) -> list[str]:
@@ -377,22 +383,39 @@ class Synthesizer:
         return [str(convention)] if convention else []
 
     @staticmethod
-    def _tool_notes(tool: str, out: dict[str, Any]) -> list[str]:
-        notes = []
-        # A request the tools cannot express is stated in plain English, first in the block, instead
-        # of being hidden or silently answered with a different cut.
-        if out.get("limitation"):
-            notes.append(str(out["limitation"]))
-        if out.get("error"):
-            notes.append(f"{tool} failed: {out['error']}")
-        if out.get("truncated"):
-            notes.append(f"{tool} result was truncated; more data exists")
-        coverage = out.get("coverage")
-        if isinstance(coverage, int | float):
-            notes.append(f"{tool} metric coverage {coverage:.0%}")
-        for note in out.get("data_quality_notes") or []:
-            notes.append(str(note))
+    def _tool_failures(tool_results: list[tuple[str, dict, dict]]) -> list[str]:
+        """One modular line naming every tool that errored, by its user-facing name (decision
+        2026-08-16, row 65 — the per-tool limitation/truncation/coverage notes were cut as bloat;
+        the details stay in "Show work"). Empty when everything ran."""
+        notes: list[str] = []
+        # KEPT from the old per-tool notes (the one exception to the row-65 cut): a request the
+        # tools could not express — the answer must say it shows a different cut than was asked
+        # for (product rule: no silent degradation). Rare: only fires on unsupported arguments.
+        for tool, _args, out in tool_results:
+            if out.get("limitation"):
+                notes.append(f"{tool_label(tool)}: {out['limitation']}")
+        failed = [tool_label(tool) for tool, _args, out in tool_results if out.get("error")]
+        if failed:
+            names = " and ".join([", ".join(failed[:-1]), failed[-1]]) if len(failed) > 1 else failed[0]
+            plural = "them" if len(failed) > 1 else "it"
+            notes.append(f"{names} errored — answered without {plural}")
         return notes
+
+
+ANALYST_LINE_CHARS = 100
+
+
+def _clamp_analyst_lines(items: list[str]) -> list[str]:
+    """At most ONE analyst-written line, truncated to ANALYST_LINE_CHARS with an ellipsis (decision
+    2026-08-16, row 65). The schema asks for this (maxItems 1, "100 characters MAXIMUM"); this is
+    the deterministic backstop for a model that ignores it."""
+    for line in items:
+        text = line.strip()
+        if text:
+            if len(text) > ANALYST_LINE_CHARS:
+                text = text[: ANALYST_LINE_CHARS - 1].rstrip() + "…"
+            return [text]
+    return []
 
 
 def _condense(items: list[str], cap: int, tail: str) -> list[str]:

@@ -86,7 +86,10 @@ def _check_answer(answer: Answer, state, registry) -> None:
     assert answer.plan_line.startswith("How I'm approaching this")
     assert answer.headline.strip()
     assert answer.evidence_tables
-    assert answer.assumptions
+    # Row 65: an analytical answer always states its scoring settings; an informational lookup with
+    # nothing defaulted legitimately assumes nothing, and no filler line is written to fake one.
+    if answer.plan.intent == "analytical":
+        assert answer.assumptions
     assert answer.citations and all(c.source_id and c.vintage for c in answer.citations)
     allowed = _allowed_numbers(state, answer, registry)
     unexplained = [c for c in _numeric_cells(answer) if c not in allowed]

@@ -22,8 +22,8 @@ from airport_agent.scoring.presets import Preset, load_presets
 from airport_agent.scoring.scorer import Scorer, ScoringResult
 
 UNIVERSE_LIMIT = 600
-LONGHAUL_CONVENTION = ("Long-haul convention: routes >= 1,500 statute miles (bands short<500, medium 500-1500, "
-                       "long 1500-3000, ultra>3000); passenger and freight computed separately")
+#: Compact by decision 2026-08-16 (row 65): the band cut-offs live in the table footnotes and docs.
+LONGHAUL_CONVENTION = "Long-haul = routes >= 1,500 mi"
 SPILL_CONVENTION = "Load factor is interpreted via the spill model (with spill_proxy), not an absolute cutoff"
 
 #: `get_routes` top_n for the distance calculators: high enough that no real airport's route
@@ -78,9 +78,9 @@ class Analyst:
         peers = [a.iata for a in self.data.list_airports(
             AirportFilter(hub_sizes=[ref.hub_size], limit=self.PEER_EXPANSION_LIMIT))]
         targets = list(dict.fromkeys([iata, *peers]))[: self.PEER_EXPANSION_LIMIT]
-        return targets, (f"A single airport cannot be ranked: expanded to {len(targets)} "
-                         f"{ref.hub_size}-hub peers so {iata} has context (largest by enplanements, "
-                         f"capped at {self.PEER_EXPANSION_LIMIT}).")
+        # Compact by decision 2026-08-16 (row 65): five words beat two lines; the mechanics
+        # (largest by enplanements, cap) live in the docs.
+        return targets, f"{iata} ranked against its {len(targets) - 1} {ref.hub_size}-hub peers"
 
     def _resolve_metric_ids(self, preset: Preset, focus_metrics: list[str] | None) -> tuple[list[str], list[str]]:
         """Return (scoreable metric ids, caveats about any focus_metrics dropped).

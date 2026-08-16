@@ -52,9 +52,13 @@ SPECIALIST_SCHEMA: dict[str, Any] = {
         "confidence": {"type": "number", "description": "0-1 overall confidence, given coverage and how far "
                                                         "you reasoned beyond the evidence."},
         "assumptions": {"type": "array", "items": {"type": "string"},
-                        "description": "Assumptions you made (horizon, conventions, proxies)."},
+                        "description": "AT MOST ONE assumption, 100 characters MAXIMUM, or an empty list. "
+                                       "Only if it adds something the computed settings above do not "
+                                       "already state. Anything longer is truncated."},
         "caveats": {"type": "array", "items": {"type": "string"},
-                    "description": "Data caveats that apply to your answer."},
+                    "description": "AT MOST ONE caveat, 100 characters MAXIMUM, or an empty list. Only if "
+                                   "it adds something the computed caveats do not already state. Anything "
+                                   "longer is truncated."},
         "lens": {"type": "string",
                  "description": "The analytical lens you adopted (e.g. 'capacity'). Empty string if obvious."},
     },

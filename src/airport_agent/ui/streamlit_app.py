@@ -22,10 +22,10 @@ def _set_pending(text: str) -> None:
 
 
 def _plan_caption(p: Plan) -> str:
-    return (
-        f"How I'm approaching this: {p.intent} · engines: {', '.join(p.engines) or 'none'} · "
-        f"{p.presentation_notes[:80]}"
-    )
+    notes = p.presentation_notes
+    if len(notes) > 80:
+        notes = notes[:80].rstrip() + "…"  # mark the cut — an unmarked truncation reads as a full sentence
+    return f"How I'm approaching this: {p.intent} · engines: {', '.join(p.engines) or 'none'} · {notes}"
 
 
 try:
@@ -58,9 +58,14 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
     with st.chat_message("assistant"):
-        placeholder = st.empty()
+        # Live pipeline view (design 04, 2026-08-16): every progress event appends a line inside
+        # st.status while the turn runs. Transient by design — the rerun below replaces it with the
+        # rendered answer; the permanent record is the plan line and "Show work".
+        status = st.status("Working on it…", expanded=True)
         try:
-            app.answer(prompt, state, defaults=ss.get("defaults"), on_plan=lambda p: placeholder.caption(_plan_caption(p)))
+            app.answer(prompt, state, defaults=ss.get("defaults"),
+                       on_plan=lambda p: status.update(label=_plan_caption(p)),
+                       on_progress=status.write)
         except LLMError as e:
             render_error(e)
         except Exception as e:  # noqa: BLE001 - deliberate catch-all per failure policy (design 03)

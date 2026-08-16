@@ -35,7 +35,7 @@ def test_rank_single_airport_expands_to_hub_size_peers(analyst, fake):
     sfo_hub = fake.get_airport("SFO").hub_size
     assert all(r.ref.hub_size == sfo_hub for r in rep.rows)
     assert len(iatas) <= Analyst.PEER_EXPANSION_LIMIT
-    assert any("cannot be ranked" in c and "expanded" in c for c in rep.caveats)
+    assert any("ranked against its" in c and "peers" in c for c in rep.caveats)  # row 65 compact form
     assert rep.comparison and "SFO" in next(iter(rep.comparison.values()))
 
 

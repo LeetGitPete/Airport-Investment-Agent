@@ -75,9 +75,11 @@ class App:
         self.sessions = sessions
 
     def answer(self, message: str, state: SessionState, *, defaults: dict[str, str] | None = None,
-               on_plan: Callable[[Plan], None] | None = None) -> Answer:
+               on_plan: Callable[[Plan], None] | None = None,
+               on_progress: Callable[[str], None] | None = None) -> Answer:
         """Answer one turn and persist the session. `LLMError` propagates and nothing is saved."""
-        answer = self.concierge.answer(message, state, defaults=defaults, on_plan=on_plan)
+        answer = self.concierge.answer(message, state, defaults=defaults, on_plan=on_plan,
+                                       on_progress=on_progress)
         self.sessions.save(state)
         return answer
 

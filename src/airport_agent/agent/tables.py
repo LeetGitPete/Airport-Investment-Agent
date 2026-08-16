@@ -50,6 +50,57 @@ def source_name(source_id: str | None) -> str:
     return SOURCE_DISPLAY.get(source_id or "", source_id or "")
 
 
+#: User-facing names for tools and engines — the ONLY place an internal tool id gets a user name.
+#: Raw ids (get_route_stats, specialist:expansion_analyst) are dev-facing and may appear only inside
+#: "Show work"; every other surface goes through `tool_label` / `humanize_tool_ids` (human decision
+#: 2026-08-16, same pattern as SOURCE_DISPLAY and humanize_metric_ids).
+TOOL_DISPLAY: dict[str, str] = {
+    "find_airports": "Airport search",
+    "get_profile": "Airport profile",
+    "get_route_stats": "Route statistics",
+    "get_live_status": "Live airport status",
+    "get_metric_series": "Metric history",
+    "list_sources": "Data sources",
+    "explain_metric": "Metric definition",
+    "score_airports": "Deterministic scoring",
+    "compare_airports": "Deterministic comparison",
+    "diagnose_unmet_demand": "Demand diagnosis",
+    "session_memory": "Earlier answer (memory)",
+    "deterministic": "Deterministic scoring",
+    "deterministic:rank": "Deterministic scoring (rank)",
+    "deterministic:compare": "Deterministic scoring (compare)",
+    "deterministic:diagnose": "Deterministic scoring (diagnose)",
+    "deterministic:long_haul_share": "Deterministic scoring (long-haul share)",
+    "deterministic:distance_bands": "Deterministic scoring (distance bands)",
+    "specialist:expansion_analyst": "AI analyst (expansion)",
+    "specialist:capacity_analyst": "AI analyst (capacity)",
+    "specialist:market_analyst": "AI analyst (market)",
+    "specialist:general_analyst": "AI analyst (general)",
+    "expansion_analyst": "AI analyst (expansion)",
+    "capacity_analyst": "AI analyst (capacity)",
+    "market_analyst": "AI analyst (market)",
+    "general_analyst": "AI analyst (general)",
+}
+
+
+def tool_label(tool_id: str) -> str:
+    """User-facing name for a tool/engine id. Unmapped ids fall back to a de-snaked title, never raw."""
+    if tool_id in TOOL_DISPLAY:
+        return TOOL_DISPLAY[tool_id]
+    return tool_id.replace("specialist:", "AI analyst: ").replace("_", " ").replace(":", " · ")
+
+
+def humanize_tool_ids(text: str) -> str:
+    """Replace internal tool/engine ids with their user-facing names in prose (deterministic backstop,
+    the tool-id counterpart of `humanize_metric_ids`; longest-first so `specialist:x` wins over `x`)."""
+    if not text:
+        return text
+    for tool_id in sorted(TOOL_DISPLAY, key=len, reverse=True):
+        if tool_id in text:
+            text = re.sub(rf"`?\b{re.escape(tool_id)}\b`?", TOOL_DISPLAY[tool_id], text)
+    return text
+
+
 #: What rank 1 / a high score MEANS under each preset. Percentiles are direction-adjusted per
 #: metric, so a higher score always means "stronger case for the preset's objective" — these spell
 #: that out per preset so no table needs decoding.
@@ -290,7 +341,7 @@ def specialist_ranking_table(rep: SpecialistReport,
     rows = [[item.rank, item.iata, humanize_metric_ids(item.rationale, specs_by_id or {}),
              item.confidence]
             for item in sorted(rep.ranking, key=lambda i: i.rank)]
-    return Table(title=f"Analyst ranking — {rep.specialist}",
+    return Table(title=f"Analyst ranking — {tool_label(rep.specialist)}",
                  columns=["rank", "airport", "rationale", "confidence"], rows=rows,
                  footnotes=["Rank 1 = the analyst's strongest candidate for the question asked.",
                             "The analyst's ordering and confidence, not the formula's."])
@@ -389,7 +440,7 @@ def _simple_tables(tool: str, result: dict[str, Any],
     scalars = [[k, v] for k, v in result.items()
                if k not in ("provenance", "truncated")
                and isinstance(v, str | int | float | bool | type(None))]
-    return [Table(title=f"Result — {tool}", columns=["field", "value"], rows=scalars, footnotes=[])] \
+    return [Table(title=f"Result — {tool_label(tool)}", columns=["field", "value"], rows=scalars, footnotes=[])] \
         if scalars else []
 
 
@@ -397,7 +448,7 @@ def tool_result_tables(tool: str, result: dict[str, Any],
                        specs_by_id: dict[str, MetricSpec]) -> list[Table]:
     """Render one tool result as tables. An error is shown as an error table, never dropped."""
     if result.get("error"):
-        return [Table(title="Tool error", columns=["tool", "error"], rows=[[tool, result["error"]]],
+        return [Table(title="Tool error", columns=["step", "error"], rows=[[tool_label(tool), result["error"]]],
                       footnotes=[])]
     if tool in REPORT_TOOLS:
         report = _report_from_dict(result)

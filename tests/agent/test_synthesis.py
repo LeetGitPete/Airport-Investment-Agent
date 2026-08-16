@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from airport_agent.agent.planner import PlanFilters
-from airport_agent.agent.synthesis import NO_DEFAULTS_ASSUMPTION, SYNTHESIS_SCHEMA, Synthesizer
+from airport_agent.agent.synthesis import SYNTHESIS_SCHEMA, Synthesizer
 from airport_agent.contracts import AnalysisRequest, Answer, LLMResult, Plan, RankedItem, SpecialistReport
 from tests.agent.fake_llm import ScriptedLLM
 
@@ -36,9 +36,12 @@ def test_synthesize_analytical_structure_and_no_altered_numbers(fake_analyst, sp
     assert ans.analyst_view == "Narrative." and "agrees" in ans.agreement_line and "weather" in ans.agreement_line
     # The request-shaping choices are one combined line, capped block overall
     # No internal words ("preset") in the user-facing line
-    assert any(a.startswith("Scored with") and "12m" in a and "preset" not in a for a in ans.assumptions)
+    assert any(a.startswith("Scoring weights:") and "12m" in a and "preset" not in a for a in ans.assumptions)
     assert len(ans.assumptions) <= 8 and len(ans.uncertainty_notes) <= 8
-    assert "a1" in ans.assumptions and any("confidence 0.60" in u for u in ans.uncertainty_notes)
+    # Row 65: the analyst contributes at most one assumption + one caveat; its confidence is on the
+    # report (Show work), never a note.
+    assert "a1" in ans.assumptions and "c1" in ans.uncertainty_notes
+    assert not any("confidence" in u.lower() for u in ans.uncertainty_notes)
     assert ans.citations and all(c.source_id and c.vintage for c in ans.citations)
     assert ans.follow_ups == SYN["follow_ups"]
     # Nothing is hidden, so no hidden-metrics disclosure is emitted
@@ -56,8 +59,9 @@ def test_synthesize_informational_from_tool_results(fake_analyst, fake_data, spe
     assert ans.analyst_view is None and ans.agreement_line is None
     assert any(t.title.startswith("Distance bands") for t in ans.evidence_tables)
     assert ans.citations[0].source_id == "bts_t100" and any("1,500" in a or "1500" in a for a in ans.assumptions)
-    # With no defaults in force the block still closes with an honest line, never empty
-    assert ans.assumptions[-1] == NO_DEFAULTS_ASSUMPTION
+    # Row 65: with no defaults in force there is no closing line at all — filler says nothing.
+    assert not any(a.startswith("Where the question didn't specify") for a in ans.assumptions)
+    assert not any("Nothing was assumed" in a for a in ans.assumptions)
 
 
 def test_bad_synthesis_json_falls_back_to_report_text_and_notes_it(fake_analyst, specs):
@@ -70,7 +74,9 @@ def test_bad_synthesis_json_falls_back_to_report_text_and_notes_it(fake_analyst,
 
 # beyond the brief: coverage notes, loud provider failure, hidden-metric honesty
 
-def test_tool_coverage_and_truncation_reach_uncertainty_notes(fake_analyst, fake_data, specs):
+def test_tool_chatter_is_cut_but_failures_surface_by_user_facing_name(fake_analyst, fake_data, specs):
+    """Row 65: per-tool coverage/truncation/limitation notes are gone; a tool that ERRORED is named
+    (by its user-facing label, never its id) in one modular line."""
     from airport_agent.agent.tools.data_tools import build_registry
     reg = build_registry(fake_data, fake_analyst)
     out = reg.call("score_airports", {"airports": ["BOS", "BDL"]}, engine="concierge")
@@ -79,8 +85,17 @@ def test_tool_coverage_and_truncation_reach_uncertainty_notes(fake_analyst, fake
     ans = Synthesizer(ScriptedLLM([SYN]), specs).synthesize(
         message="q", plan=plan, plan_line="pl", req=None, deterministic=None, specialist=None,
         tool_results=[("score_airports", {"airports": ["BOS", "BDL"]}, out)], trace=[], defaults=None)
-    assert any("coverage" in u for u in ans.uncertainty_notes)
+    assert not any("coverage" in u for u in ans.uncertainty_notes)
     assert any(t.title.startswith("Ranking") for t in ans.evidence_tables)
+
+    failed = [("get_live_status", {"iata": "ZZZ"}, {"error": "KeyError('ZZZ')"}),
+              ("get_route_stats", {"iata": "ZZZ"}, {"error": "KeyError('ZZZ')"})]
+    ans2 = Synthesizer(ScriptedLLM([SYN]), specs).synthesize(
+        message="q", plan=plan, plan_line="pl", req=None, deterministic=None, specialist=None,
+        tool_results=failed, trace=[], defaults=None)
+    line = next(u for u in ans2.uncertainty_notes if "errored" in u)
+    assert line == "Live airport status and Route statistics errored — answered without them"
+    assert "get_live_status" not in " ".join(ans2.uncertainty_notes)
 
 
 def test_llm_error_propagates_from_synthesis(fake_analyst, specs):

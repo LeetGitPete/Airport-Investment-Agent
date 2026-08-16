@@ -240,7 +240,8 @@ class FakeApp:
         return "rank"
 
     def answer(self, message: str, state: SessionState, *, defaults: dict[str, str] | None = None,
-               on_plan: Callable[[Plan], None] | None = None) -> Answer:
+               on_plan: Callable[[Plan], None] | None = None,
+               on_progress: Callable[[str], None] | None = None) -> Answer:
         self.last_defaults = defaults
         kind = self._kind_for(message)
         a = make_answer(kind)

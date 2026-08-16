@@ -19,6 +19,7 @@ from airport_agent.agent.compaction import Compactor
 from airport_agent.agent.planner import NEEDS_DIRECTION, OFF_TOPIC, PlanFilters, Planner, session_context
 from airport_agent.agent.sessions import NEW_CHAT_TITLE
 from airport_agent.agent.synthesis import Synthesizer
+from airport_agent.agent.tables import tool_label
 from airport_agent.agent.tools.registry import ToolRegistry
 from airport_agent.contracts import (
     AnalysisRequest,
@@ -281,7 +282,8 @@ class Concierge:
     # the turn
 
     def answer(self, message: str, state: SessionState, *, defaults: dict[str, str] | None = None,
-               on_plan: Callable[[Plan], None] | None = None) -> Answer:
+               on_plan: Callable[[Plan], None] | None = None,
+               on_progress: Callable[[str], None] | None = None) -> Answer:
         """One user turn, under one live-call ceiling.
 
         The budget binds by context rather than by signature, so every path inside this turn is
@@ -289,21 +291,35 @@ class Concierge:
         remember to ask.
         """
         with live_budget(DEFAULT_LIVE_BUDGET) as budget:
-            return self._answer(message, state, defaults=defaults, on_plan=on_plan, budget=budget)
+            return self._answer(message, state, defaults=defaults, on_plan=on_plan,
+                                 on_progress=on_progress, budget=budget)
 
     def _answer(self, message: str, state: SessionState, *, defaults: dict[str, str] | None,
-                on_plan: Callable[[Plan], None] | None, budget: LiveBudget) -> Answer:
+                on_plan: Callable[[Plan], None] | None, budget: LiveBudget,
+                on_progress: Callable[[str], None] | None = None) -> Answer:
+        # Progress events (design 04, 2026-08-16): one short line at each real boundary of the
+        # pipeline, in user-facing words only, so the UI can show what is happening while the turn
+        # runs. Transient by design — the permanent record is the plan line and "Show work".
+        def emit(text: str) -> None:
+            if on_progress is not None:
+                on_progress(text)
+
         # A compaction started at the end of the previous turn must land before this one is planned:
         # the model plans against a settled summary, never a moving one.
         if self.compactor is not None:
             self.compactor.collect(state)
         history = session_context(state)
+        emit("Reading the question and planning the approach…")
         plan, filters = self._plan(message, state, defaults)
         if on_plan is not None:
             on_plan(plan)
         if plan.intent == "clarify":
             return self._clarify_answer(state, message, filters, plan.presentation_notes)
 
+        calls = self._planned_calls(plan, filters)
+        if calls:
+            names = ", ".join(dict.fromkeys(tool_label(t) for t, _ in calls))
+            emit(f"Looking up data: {names}…")
         tool_results, trace = self._run_tools(plan, filters, message)
         req: AnalysisRequest | None = None
         deterministic: DeterministicReport | None = None
@@ -315,19 +331,25 @@ class Concierge:
             except ValueError as exc:
                 return self._clarify_answer(state, message, filters, CLARIFY_TEXT, diagnostic(exc))
             if "deterministic" in plan.engines:
+                emit("Running the deterministic scoring…")
                 try:
                     deterministic, entry = self._run_deterministic(req)
                 except ValueError as exc:  # unknown preset, empty filter, unusable metric set
                     return self._clarify_answer(state, message, filters, ANALYSIS_FAILED_TEXT,
                                                 diagnostic(exc))
                 trace.append(entry)
+                emit(f"Scores ready ({len(deterministic.rows)} airports)")
             if plan.specialist:
+                emit(f"Asking the {tool_label(plan.specialist)} to interpret the numbers…")
                 specialist, entry = self._run_specialist(req, deterministic)
                 trace.append(entry)
+                emit("Analyst view received")
         elif plan.intent == "followup" and not plan.engines and not tool_results:
+            emit("Reusing the analysis from earlier in this chat…")
             deterministic, specialist, entry = self._from_memory(state, filters.source_turn)
             trace.append(entry)
 
+        emit("Writing the answer…")
         answer = self.synthesizer.synthesize(
             message=message, plan=plan, plan_line=Planner.plan_line(plan, filters, req), req=req,
             deterministic=deterministic, specialist=specialist, tool_results=tool_results, trace=trace,

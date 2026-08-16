@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from airport_agent.agent.history import archive_index, recent_turns, turn_digest
 from airport_agent.agent.tables import PEER_GROUP_DISPLAY as PEER_GROUP_PROSE
+from airport_agent.agent.tables import tool_label
 from airport_agent.agent.tools.registry import ToolRegistry
 from airport_agent.contracts import (
     MAX_HINT_CHARS,
@@ -638,7 +639,9 @@ class Planner:
             return "How I'm approaching this: outside what I cover — no analysis run"
         if filters.conversation_kind == NEEDS_DIRECTION:
             return "How I'm approaching this: answering directly — no data lookup needed"
-        engines = ", ".join(plan.engines) or "none"
+        # User-facing engine names (decision 2026-08-16): raw ids like specialist:expansion_analyst
+        # are dev lingo and appear only in "Show work".
+        engines = ", ".join(tool_label(e) for e in plan.engines) or "none"
         if req is not None:
             focus = (req.scoring_preset or "balanced").replace("_", " ")
             return (f"How I'm approaching this: {plan.intent} · {req.question_type} · "

@@ -9,7 +9,7 @@ Never re-interprets, recomputes or reformats numbers beyond display: table cells
 """
 from __future__ import annotations
 
-from airport_agent.agent.tables import score_summary, source_name
+from airport_agent.agent.tables import score_summary
 from airport_agent.contracts import Answer, Table
 
 _ANALYST_TABLE_PREFIX = "Analyst ranking"
@@ -101,7 +101,6 @@ def answer_to_text(a: Answer) -> str:
 
     _section("ASSUMPTIONS:", list(a.assumptions))
     _section("UNCERTAINTY:", list(a.uncertainty_notes))
-    _section("SOURCES:", [f"{source_name(c.source_id)} ({c.vintage})" for c in a.citations])
     _section("FOLLOW-UPS:", list(a.follow_ups))
     _section("TOOL TRACE:", [
         f"{t.tool} {t.args} rows={_cell(t.rows)} provider={_cell(t.provider)} "
