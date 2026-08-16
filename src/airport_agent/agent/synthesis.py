@@ -314,6 +314,10 @@ class Synthesizer:
     @staticmethod
     def _tool_notes(tool: str, out: dict[str, Any]) -> list[str]:
         notes = []
+        # QA task 14 (2026-08-16): a request the tools cannot express is stated to the user in plain
+        # English, first in the block, instead of being hidden or silently answered with a different cut.
+        if out.get("limitation"):
+            notes.append(str(out["limitation"]))
         if out.get("error"):
             notes.append(f"{tool} failed: {out['error']}")
         if out.get("truncated"):

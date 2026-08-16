@@ -130,6 +130,19 @@ PLAN_SCHEMA: dict[str, Any] = {
 }
 PLAN_SCHEMA["required"] = list(PLAN_SCHEMA["properties"])
 
+#: QA task 14 (2026-08-16): the one bounded retry after a tool rejects its arguments. Same portable
+#: subset as PLAN_SCHEMA (no $ref/anyOf/additionalProperties — Gemini rejects them in response_schema).
+REPAIR_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "args_json": {"type": "string",
+                      "description": "JSON object of arguments that the tool accepts, as a string. "
+                                     "Only argument names from the schema you were given. '{}' if the "
+                                     "user's request cannot be expressed with this tool's arguments."},
+    },
+}
+REPAIR_SCHEMA["required"] = list(REPAIR_SCHEMA["properties"])
+
 
 class PlannedToolCall(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -232,9 +245,19 @@ class Planner:
     # ---------------- prompt (assembled from live objects) ----------------
 
     def _tools_block(self) -> str:
-        lines = [f"- {s.name} — {s.description}" for s in self.registry.for_engine(CONCIERGE)]
+        # QA task 14 (2026-08-16): the argument names are listed from the live tool models. Planning
+        # args_json without them is guesswork, and a guessed key (e.g. domestic_only) is rejected.
+        lines = []
+        for spec in self.registry.for_engine(CONCIERGE):
+            allowed, required = self.registry.arg_names(spec.name)
+            rendered = ", ".join(f"{a}*" if a in required else a for a in allowed) or "no arguments"
+            lines.append(f"- {spec.name} — {spec.description}\n  args: {rendered}")
         return ("TOOLS you may plan (informational intent only; at most ONE tool_calls entry per tool "
-                "name — call a tool once with all its args; the Concierge executes each entry):\n"
+                "name — call a tool once with all its args; the Concierge executes each entry).\n"
+                "args_json may use ONLY the argument names listed under each tool (* = required) — an "
+                "invented key is rejected and the question goes unanswered. When the user asks for a cut "
+                "the arguments cannot express, plan the closest call the tool does support and say so in "
+                "presentation_notes, so the answer states the limitation instead of inventing a filter:\n"
                 + "\n".join(lines))
 
     def _metrics_block(self) -> str:
@@ -355,6 +378,42 @@ class Planner:
                     {"role": "user", "content": message}]
         result = self.llm.chat(messages=messages, response_schema=PLAN_SCHEMA, temperature=0.1)
         return self._parse(parse_json_text(result.text))
+
+    def repair_tool_args(self, tool: str, args: dict[str, Any], error: str,
+                         message: str) -> dict[str, Any] | None:
+        """One bounded retry for a tool call the registry rejected (QA task 14).
+
+        The validation error and the tool's real argument list go back to the model, which either
+        re-expresses the intent with supported arguments (domestic_only -> international=false) or
+        gives up. Returns the corrected arguments, or None when it could not fix them. Never raises
+        on bad model output — the caller has a deterministic fallback.
+        """
+        try:
+            spec = self.registry.get(tool)
+        except KeyError:
+            return None
+        prompt = (f"A planned call to the tool `{tool}` was rejected by argument validation. Rewrite the "
+                  f"arguments so the call runs, keeping as much of the user's intent as the tool can "
+                  f"actually express. Drop what it cannot express — never invent an argument name.\n\n"
+                  f"TOOL: {tool} — {spec.description}\n"
+                  f"{self.registry.args_help(tool)}\n"
+                  f"JSON SCHEMA: {json.dumps(spec.params_model.model_json_schema())}\n"
+                  f"REJECTED ARGUMENTS: {json.dumps(args)}\nVALIDATION ERROR: {error}\n"
+                  f"USER QUESTION: {message}\n\n"
+                  "Return args_json = a JSON object of valid arguments as a string ({} if none can be "
+                  "salvaged). Output ONLY the JSON object.")
+        try:
+            result = self.llm.chat(messages=[{"role": "system", "content": prompt},
+                                             {"role": "user", "content": message}],
+                                   response_schema=REPAIR_SCHEMA, temperature=0.0)
+            raw = parse_json_text(result.text)
+        except (ValueError, TypeError):
+            return None
+        try:
+            fixed = json.loads(raw.get("args_json") or "{}")
+        except (TypeError, json.JSONDecodeError):
+            return None
+        return fixed if isinstance(fixed, dict) else None
 
     def _parse(self, raw: dict[str, Any]) -> tuple[Plan, PlanFilters]:
         clarify = raw.get("intent") == "clarify"  # a clarify turn executes nothing: no engines, no tools

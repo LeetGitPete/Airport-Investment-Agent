@@ -135,6 +135,57 @@ def test_unparseable_plan_becomes_a_clarify_without_further_calls(fake_data, fak
     assert state.last_reports == {} and state.last_airports == []
 
 
+# --- QA task 14: an argument the tools do not have never costs the user their answer ---------------------
+
+def _invented_arg_plan():
+    """The real QA case: 'domestic flights out of ANC' planned with a filter the tool has no key for."""
+    return _plan_json(intent="informational", engines=["tools"], question_type="none", faa_regions=[],
+                      tool_calls=[{"tool": "get_route_stats",
+                                   "args_json": '{"iata": "ANC", "domestic_only": true}'}])
+
+
+def test_invented_tool_argument_is_repaired_by_one_retry(fake_data, fake_analyst, specs):
+    # the repair call re-expresses "domestic only" with the argument the tool actually has
+    repair = '{"args_json": "{\\"iata\\": \\"ANC\\", \\"international\\": false}"}'
+    c, llm = _concierge([_invented_arg_plan(), repair, SYN], fake_data, fake_analyst, specs)
+    ans = c.answer("domestic flights out of ANC?", SessionState(session_id="s", title="t"))
+    assert ans.tool_trace[0].args == {"iata": "ANC", "international": False}
+    assert ans.tool_trace[0].note is None  # the call succeeded; nothing is reported as a failure
+    assert len(llm.calls) == 3  # plan + one bounded repair + synthesis
+    assert any("domestic_only" in note for note in ans.uncertainty_notes)  # still told, in plain English
+
+
+def test_unrepairable_argument_falls_back_to_the_nearest_data_with_a_stated_limitation(
+        fake_data, fake_analyst, specs):
+    # the repair gives up (returns the same broken args): we prune the key, run anyway, and say so
+    repair = '{"args_json": "{\\"iata\\": \\"ANC\\", \\"domestic_only\\": true}"}'
+    c, llm = _concierge([_invented_arg_plan(), repair, SYN], fake_data, fake_analyst, specs)
+    ans = c.answer("domestic flights out of ANC?", SessionState(session_id="s", title="t"))
+    assert ans.tool_trace[0].args == {"iata": "ANC"} and ans.tool_trace[0].note is None
+    assert ans.tool_trace[0].rows  # the user still gets the route data
+    limitation = next(n for n in ans.uncertainty_notes if "domestic_only" in n)
+    assert "cannot filter by 'domestic_only'" in limitation and "unfiltered" in limitation
+    assert len(llm.calls) == 3  # bounded: exactly one repair attempt, never a loop
+
+
+def test_a_type_error_the_model_cannot_fix_is_still_reported(fake_data, fake_analyst, specs):
+    js = _plan_json(intent="informational", engines=["tools"], question_type="none", faa_regions=[],
+                    tool_calls=[{"tool": "get_route_stats", "args_json": '{"iata": "SFO", "top_n": 999}'}])
+    c, _ = _concierge([js, '{"args_json": "{\\"iata\\": \\"SFO\\", \\"top_n\\": 999}"}', SYN],
+                      fake_data, fake_analyst, specs)
+    ans = c.answer("top 999 routes from SFO?", SessionState(session_id="s", title="t"))
+    # nothing to prune, so the honest outcome is the original validation error, naming what is allowed
+    assert "invalid arguments" in (ans.tool_trace[0].note or "")
+    assert "allowed arguments for get_route_stats" in ans.tool_trace[0].note
+
+
+def test_the_planner_prompt_lists_the_arguments_of_every_tool(fake_data, fake_analyst, specs):
+    c, _ = _concierge([_plan_json()], fake_data, fake_analyst, specs)
+    sysmsg = c.planner.system_prompt(None)
+    assert "args: horizon, iata*, international, threshold_mi, top_n" in sysmsg
+    assert "invented key is rejected" in sysmsg
+
+
 def test_informational_turn_keeps_previous_reports(fake_data, fake_analyst, specs):
     js = _plan_json(intent="informational", engines=["tools"], question_type="none", faa_regions=[],
                     tool_calls=[{"tool": "get_route_stats", "args_json": '{"iata": "ANC"}'}])

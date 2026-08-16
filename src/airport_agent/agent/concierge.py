@@ -37,6 +37,18 @@ TITLE_CHARS = 60
 CLARIFY_TEXT = ("I couldn't determine what to analyse. Which airports or region, and which horizon "
                 "(12m/3y/5y/10y)?")
 ROW_KEYS = ("rows", "airports", "top_routes", "series", "sources")
+#: QA task 14 (2026-08-16): the registry's prefix for an argument the tool does not accept.
+INVALID_ARGS = "invalid arguments"
+
+
+def _and(items: list[str]) -> str:
+    """'a', 'a and b', 'a, b and c' — argument names read to a user, not a Python list."""
+    if not items:
+        return ""
+    if len(items) == 1:
+        return f"'{items[0]}'"
+    quoted = [f"'{i}'" for i in items]
+    return ", ".join(quoted[:-1]) + f" and {quoted[-1]}"
 
 
 def _rows(out: dict[str, Any]) -> int | None:
@@ -104,17 +116,50 @@ class Concierge:
             return [(call.tool, call.args()) for call in filters.tool_calls]
         return [(tool, {}) for tool in plan.tools_to_call]
 
-    def _run_tools(self, plan: Plan, filters: PlanFilters) -> tuple[list[tuple[str, dict, dict]],
-                                                                    list[ToolCallTrace]]:
+    def _run_tools(self, plan: Plan, filters: PlanFilters,
+                   message: str = "") -> tuple[list[tuple[str, dict, dict]], list[ToolCallTrace]]:
         results: list[tuple[str, dict, dict]] = []
         trace: list[ToolCallTrace] = []
         for tool, args in self._planned_calls(plan, filters):
             started = time.perf_counter()
             out = self.registry.call(tool, args, engine=CONCIERGE)
+            if str(out.get("error", "")).startswith(INVALID_ARGS):
+                args, out = self._recover_tool_args(tool, args, out, message)
             trace.append(ToolCallTrace(tool=tool, args=args, rows=_rows(out), provider=None,
                                        latency_ms=_ms(started), note=out.get("error")))
             results.append((tool, args, out))
         return results, trace
+
+    def _recover_tool_args(self, tool: str, args: dict[str, Any], out: dict[str, Any],
+                           message: str) -> tuple[dict[str, Any], dict[str, Any]]:
+        """A rejected tool call gets one LLM repair, then a deterministic prune (QA task 14).
+
+        The user asked a real question; an argument the tool does not have is our problem, not theirs.
+        So we try to re-express the intent, fall back to running the call without the unsupported keys,
+        and in every case hand synthesis a plain-English `limitation` to state. Only a call that still
+        fails for another reason is reported as an error.
+        """
+        error = str(out.get("error", ""))
+        fixed = self.planner.repair_tool_args(tool, args, error, message)
+        if fixed is not None and fixed != args:
+            repaired = self.registry.call(tool, fixed, engine=CONCIERGE)
+            if not repaired.get("error"):
+                _, dropped = self.registry.prune_args(tool, args)
+                if dropped:
+                    repaired["limitation"] = (
+                        f"{tool} has no {_and(dropped)} option, so the request was re-expressed with the "
+                        f"arguments it does support ({_and(sorted(fixed)) or 'none'}).")
+                return fixed, repaired
+        pruned, dropped = self.registry.prune_args(tool, args)
+        if not dropped:
+            return args, out  # nothing to prune: a type/range error the model could not fix
+        fallback = self.registry.call(tool, pruned, engine=CONCIERGE)
+        if fallback.get("error"):
+            return args, out  # the original error is the more informative one
+        fallback["limitation"] = (
+            f"{tool} cannot filter by {_and(dropped)} — that is not something this data supports. "
+            f"The figures below are unfiltered; ask for a different cut and I will say whether it exists.")
+        return pruned, fallback
 
     def _run_deterministic(self, req: AnalysisRequest) -> tuple[DeterministicReport, ToolCallTrace]:
         name = req.question_type
@@ -158,7 +203,7 @@ class Concierge:
         if plan.intent == "clarify":
             return self._clarify_answer(state, message, filters, plan.presentation_notes or CLARIFY_TEXT)
 
-        tool_results, trace = self._run_tools(plan, filters)
+        tool_results, trace = self._run_tools(plan, filters, message)
         req: AnalysisRequest | None = None
         deterministic: DeterministicReport | None = None
         specialist: SpecialistReport | None = None

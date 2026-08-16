@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from airport_agent.agent.tools.registry import ToolRegistry
 from airport_agent.contracts import LLMError, ToolSpec
 
 
 class EchoArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")  # QA task 14: the registry requires this of every tool
     text: str
     n: int = 1
+
+
+class LooseArgs(BaseModel):
+    text: str = ""
 
 
 def _echo(p: EchoArgs) -> dict:
@@ -67,3 +72,30 @@ def test_non_dict_result_is_error_dict():
 def test_non_str_arg_keys_is_error_dict(reg):
     out = reg.call("echo", {1: "a"}, engine="concierge")
     assert "invalid arguments" in out["error"]
+
+
+# --- QA task 14: invented arguments are rejected loudly and actionably ------------------------------------
+
+def test_a_tool_that_would_ignore_unknown_arguments_cannot_be_registered():
+    r = ToolRegistry()
+    with pytest.raises(ValueError, match="extra='forbid'"):
+        r.register(ToolSpec(name="loose", description="d", params_model=LooseArgs, fn=lambda p: {},
+                            engines=["concierge"]))
+
+
+def test_every_tool_schema_forbids_extra_properties(reg):
+    for tool in reg.openai_tools("concierge"):
+        assert tool["function"]["parameters"]["additionalProperties"] is False
+
+
+def test_invented_argument_is_rejected_and_the_error_names_what_is_allowed(reg):
+    out = reg.call("echo", {"text": "a", "domestic_only": True}, engine="concierge")
+    assert "invalid arguments" in out["error"] and "domestic_only" in out["error"]
+    assert "allowed arguments for echo: n, text (required)" in out["error"]
+
+
+def test_arg_introspection_and_pruning(reg):
+    assert reg.arg_names("echo") == (["n", "text"], ["text"])
+    kept, dropped = reg.prune_args("echo", {"text": "a", "domestic_only": True, "zzz": 1})
+    assert kept == {"text": "a"} and dropped == ["domestic_only", "zzz"]
+    assert reg.prune_args("echo", {"text": "a"}) == ({"text": "a"}, [])
