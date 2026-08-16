@@ -39,11 +39,6 @@ def column_help(columns: list[str], specs_by_id: dict[str, MetricSpec]) -> dict[
     return cfg
 
 
-def assumptions_expanded(answer: Answer) -> bool:
-    """Assumptions & uncertainty expander is open by default on analytical answers, collapsed otherwise."""
-    return answer.plan.intent == "analytical"
-
-
 def render_plan_line(plan_line: str) -> None:
     st.caption(plan_line)
 
@@ -105,8 +100,12 @@ def render_answer(
     # QA task 19 (2026-08-16): a conversational turn computes nothing, so these sections would be
     # empty headings and a "none stated" caption trailing every reply. An analytical answer always
     # has assumptions (task 13 guarantees it), so hiding empties never hides a real disclosure.
+    # Always collapsed: on an analytical answer this block runs to eight assumptions plus the
+    # uncertainty notes, which pushed the tables off screen and buried the result it qualifies.
+    # Collapsed is not hidden — the heading is always present, so the disclosure is one click away
+    # and the product rule (an analytical answer always carries its assumptions) still holds.
     if answer.assumptions or answer.uncertainty_notes:
-        with st.expander("Assumptions & uncertainty", expanded=assumptions_expanded(answer)):
+        with st.expander("Assumptions & uncertainty", expanded=False):
             if answer.assumptions:
                 st.markdown("**Assumptions**")
                 for line in answer.assumptions:
