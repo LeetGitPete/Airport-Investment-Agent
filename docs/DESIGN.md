@@ -222,33 +222,31 @@ disappearing.
 
 ### 2. Design — separation of concerns, so it could be built in parallel
 
-Design was done through `/brainstorming` into `docs/design/00–06` before code. The decisions that mattered:
+Designed with `/brainstorming` into `docs/design/00–06` before any code. The decisions that shaped it:
 
-- **Layers with one composition root.** `contracts/` ← `data`/`scoring`/`llm` (mutually independent) ← `agent/`
-  ← `ui/`. Independence was the goal: each layer could be built in its own git worktree, at the same time,
-  without waiting.
-- **`contracts/` frozen at a tag** once agreed — pydantic types and `Protocol` ports only, importing nothing.
-  Frozen so parallel work could not drift the shared types out from under itself; enforced by a pre-edit hook
-  that blocks writes unless a human sets `CONTRACTS_UNFROZEN=1`.
-- **Ports and fakes.** Every layer was built against a `Protocol` with a fake implementation, so `agent/` and
-  `ui/` were testable before `data/` existed. The full `DataService` contract suite runs against **both** the
-  fake and the real DuckDB implementation, so the fake cannot drift from reality.
-- **The metric registry as single source of truth.** `config/metrics.yaml` feeds the scorer, the LLM prompts
-  and the UI tooltips. One definition, three consumers, no drift — and it is frozen with the contracts.
-- **The deterministic Analyst and the LLM specialists never call each other.** Numbers come from one, judgement
-  from the other, and the separation is enforced by the import graph rather than by discipline.
-- **Architecture as a test.** Four `import-linter` contracts run on every gate, so the layering survives
-  refactoring by an agent that never read the design doc.
-- **No free-form SQL reaches the model.** Tool arguments are pydantic-validated; the model picks tools, not
-  queries.
-- **Provenance in code, not in prose.** A specialist cites each figure as a `metric_id` + `iata` pair, and code
-  resolves the pair back to the computed value with its source and vintage. **A pair that will not resolve is
-  dropped and reported as a caveat** — a hallucinated number cannot reach the user wearing a citation.
+**Conversation is not analysis.** Three separate jobs that cannot reach into each other:
 
-Implementation ran as a roster of Claude Code subagents (`.claude/agents/`), one per layer plus a reviewer,
-under a written escalation protocol: anything ambiguous, off-design or newly discovered stops and returns a
-`DECISION NEEDED` block to the human instead of improvising. The scope cut in the tradeoffs above arrived that
-way, and so did every decision in the 60-row limitations log.
+| | Job | What it is | Can it invent a number? |
+|---|---|---|---|
+| **Concierge** | Conversation | Owns the turn: classifies intent, writes the Plan, picks the preset and airports, dispatches, holds session memory | No — it never sees raw data |
+| **Deterministic Analyst** | Computation | Plain Python. Percentiles, weights, composite score, findings, caveats | It *creates* every number — and cannot be influenced by a model |
+| **LLM specialists** | Judgement | Interpret the numbers they were handed, under a role prompt | No — enforced, see below |
+
+`scoring/` cannot import `llm/`, so that separation is the import graph, not a rule someone has to remember.
+
+- **Four specialist types, one lens each** — `expansion_analyst`, `capacity_analyst` and `market_analyst` each
+  bind to their own preset; `general_analyst` binds to none and is the fallback when no lens fits. A specialist
+  is a config file, not code.
+- **Rigid envelope, editable prose.** `config/specialists/<name>.md` is YAML front matter + markdown. The front
+  matter is a machine-enforced capability grant (`allowed_tools`, preset, `max_turns` 1–3, metric slice); the
+  body is free prose you can retune. Change how it thinks, not what it may do.
+- **The model chooses, it never composes.** Every LLM call is structured JSON against a fixed schema — Plan,
+  specialist report, synthesis. Tool args are pydantic-validated and no free-form SQL is ever exposed;
+  disallowed tools are never offered. Every schema key is required, so `disagreements` and `assumptions` cannot
+  be skipped by staying silent.
+
+Implementation ran as Claude Code subagents (`.claude/agents/`), one per layer plus a reviewer, under an
+escalation protocol: anything ambiguous stops and returns `DECISION NEEDED` rather than improvising.
 
 ### 3. QA — where most of the real improvements came from
 
