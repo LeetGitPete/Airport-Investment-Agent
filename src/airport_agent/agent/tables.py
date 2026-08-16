@@ -159,18 +159,21 @@ def _metric_row(metric: Metric) -> list[Any]:
 
 
 def ranking_table(rep: DeterministicReport) -> Table:
-    """The deterministic scores, verbatim: score, coverage and the pillar contributions behind them.
+    """The deterministic scores, verbatim: score, data completeness and the pillar contributions.
 
     A single-airport report has no meaningful rank: the rank column is dropped and the table is
     titled "Scores". Pillar columns are limited to the pillars the preset actually weights.
+    `low_confidence` stays on the report but off the table (human decision 2026-08-16): the bool
+    only says "some pillar had under half its metrics", which "data completeness" already tells
+    better — and it cannot name the pillar, so as a column it was noise.
     """
     single = len(rep.rows) == 1
     pillars = [p for p in PILLARS if rep.weights.get(p)] or PILLARS
     # User-facing pillar names in columns; "P1..P5" stay internal.
-    columns = [*([] if single else ["rank"]), "airport", "name", "airport size", "score", "coverage",
-               "low_confidence", *[PILLAR_NAMES[p] for p in pillars]]
+    columns = [*([] if single else ["rank"]), "airport", "name", "airport size", "score",
+               "data completeness", *[PILLAR_NAMES[p] for p in pillars]]
     rows = [[*([] if single else [row.rank]), row.ref.iata, row.ref.name, row.ref.hub_size, row.score,
-             row.coverage, row.low_confidence, *[row.pillar_contrib.get(p) for p in pillars]]
+             row.coverage, *[row.pillar_contrib.get(p) for p in pillars]]
             for row in sorted(rep.rows, key=lambda r: r.rank)]
     focus = (rep.preset or "balanced").replace("_", " ")
     kind = "Scores" if single else "Ranking"
