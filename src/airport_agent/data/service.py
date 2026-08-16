@@ -56,9 +56,6 @@ from airport_agent.data.paths import default_snapshot_path
 #: Horizons a metric answers at "its own" declared horizon regardless of what was requested.
 _INVARIANT_HORIZONS = {"static", "forecast"}
 
-#: NPIAS numeric capacity label -> text (matches `adapters/faa_npias.py::CAPACITY_LABELS`).
-_CAPACITY_LABEL_TEXT = {0: "none", 1: "congested", 2: "constrained_2033", 3: "constrained_2028", 4: "severe_2033"}
-
 #: `get_live_status`/`get_profile` snapshot fallback (live adapter unavailable or `live=False`).
 _SNAPSHOT_LIVE_SOURCE_IDS = ["bts_socrata"]
 

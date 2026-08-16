@@ -81,22 +81,22 @@ Total files: **182**
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `src/airport_agent/scoring/__init__.py` | 8 | pending | |
-| `src/airport_agent/scoring/analyst.py` | 309 | pending | |
-| `src/airport_agent/scoring/calculators.py` | 41 | pending | |
-| `src/airport_agent/scoring/explain.py` | 109 | pending | |
-| `src/airport_agent/scoring/percentiles.py` | 51 | pending | |
-| `src/airport_agent/scoring/presets.py` | 50 | pending | |
-| `src/airport_agent/scoring/scorer.py` | 100 | pending | |
+| `src/airport_agent/scoring/__init__.py` | 8 | done | |
+| `src/airport_agent/scoring/analyst.py` | 309 | done | |
+| `src/airport_agent/scoring/calculators.py` | 41 | done | |
+| `src/airport_agent/scoring/explain.py` | 109 | done | |
+| `src/airport_agent/scoring/percentiles.py` | 51 | done | |
+| `src/airport_agent/scoring/presets.py` | 50 | done | |
+| `src/airport_agent/scoring/scorer.py` | 100 | done | |
 
 ## 4. src/llm
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `src/airport_agent/llm/__init__.py` | 15 | pending | |
-| `src/airport_agent/llm/client.py` | 83 | pending | |
-| `src/airport_agent/llm/config.py` | 35 | pending | |
-| `src/airport_agent/llm/jsonutil.py` | 26 | pending | |
+| `src/airport_agent/llm/__init__.py` | 15 | done | |
+| `src/airport_agent/llm/client.py` | 83 | done | |
+| `src/airport_agent/llm/config.py` | 35 | done | |
+| `src/airport_agent/llm/jsonutil.py` | 26 | done | |
 
 ## 5a. src/agent/tools
 
