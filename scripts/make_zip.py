@@ -17,10 +17,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 INCLUDE_DIRS = ["src", "config", "data/snapshot", "data/curated", "tests", "docs", ".claude", "scripts"]
 INCLUDE_FILES = ["pyproject.toml", "uv.lock", ".importlinter", ".python-version", "conftest.py",
-                 ".env", ".env.example", ".contracts-frozen", ".gitignore", "CLAUDE.md",
-                 "project-description.txt"]
+                 ".env", ".env.example", ".contracts-frozen", ".gitignore", "CLAUDE.md"]
 EXCLUDE_PARTS = {"__pycache__", ".pytest_cache", ".ruff_cache", ".import_linter_cache", ".superpowers"}
 EXCLUDE_SUFFIX = {".wal", ".pyc"}
+#: Named files that live under an included directory but must never ship. `process-log.raw.jsonl`
+#: is machine output the Stop hook re-creates on any agent run, so it is not enough to delete it
+#: once -- without this it would silently reappear in the next zip (known-limitations row 61).
+EXCLUDE_NAMES = {"process-log.raw.jsonl"}
 
 
 def files() -> list[Path]:
@@ -31,7 +34,8 @@ def files() -> list[Path]:
             print(f"  !! missing directory: {d}")
             continue
         for p in base.rglob("*"):
-            if p.is_file() and not (set(p.parts) & EXCLUDE_PARTS) and p.suffix not in EXCLUDE_SUFFIX:
+            if (p.is_file() and not (set(p.parts) & EXCLUDE_PARTS)
+                    and p.suffix not in EXCLUDE_SUFFIX and p.name not in EXCLUDE_NAMES):
                 out.append(p)
     for f in INCLUDE_FILES:
         p = ROOT / f
