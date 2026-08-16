@@ -2,20 +2,9 @@
 
 `build_derived(store, years=None)` is exactly the frozen registry (`config/metrics.yaml`),
 one function per tier A/B metric id, run at every horizon the id declares, and written to
-`airport_metrics` (see plan "Store schema"). `assert_registry_covered` fails the build if a
-tier A/B id has no function at all; ids whose source was cut by the 2026-08-16 RESCOPE
-(Option A Core-6) still have a function — it returns zero rows, always, with the reason
-recorded in `MISSING_REASONS` (mirrors the frozen contract suite's `od_share` allowance,
-extended to every cut source).
-
-Branch `feature/data-extras` (2026-08-16) un-cut `aip_per_enpl_10y` once the `faa_aip`
-adapter landed (see `docs/superpowers/plans/2026-08-15-plan2a-data.md` Task 11 and the
-RESCOPE addendum); `msa_gdp_per_capita`/`msa_gdp_cagr_5y` remain documented-missing on this
-branch — BEA publishes no keyless-bulk MSA-level real-GDP table (verified 2026-08-16: the
-`MARPP` zip named in Task 10 is *Real Personal Income and Regional Price Parities by MSA*,
-not GDP; BEA's regional GDP download catalog offers only State (`SAGDP`/`SQGDP`) and County
-(`CAGDP1/2/8/9/11`) — no `MAGDP`/`MGDP` MSA family exists, and `bea.gov/data/gdp/gdp-by-
-metropolitan-area` itself redirects to `gdp-by-county`).
+`airport_metrics`. `assert_registry_covered` fails the build if a tier A/B id has no function
+at all; an id whose source never landed still has a function — it returns zero rows, always,
+with the reason recorded in `MISSING_REASONS`.
 """
 from __future__ import annotations
 
@@ -29,22 +18,21 @@ from airport_agent.data.store import Store
 
 MetricFn = Callable[..., pd.DataFrame]
 
-#: Tier A/B ids whose source was cut by the 2026-08-16 RESCOPE (human decision, Option A
-#: Core-6) — no adapter landed the data, so the function below always returns zero rows.
-#: `od_share` predates the RESCOPE (BTS DB1B timeboxed attempt, design 01 open item) but is
-#: documented the same way. See docs/design/known-limitations-and-tradeoffs.md.
+#: Tier A/B ids whose source never landed, so the function below always returns zero rows.
+#: Each reason is the durable one — why the data does not exist here, not when it was dropped.
+#: See docs/design/known-limitations-and-tradeoffs.md for the decisions behind them.
 MISSING_REASONS: dict[str, str] = {
-    "nas_delay_share": "BTS Delay Cause cut by RESCOPE 2026-08-16 (Option A Core-6): no NAS-attributed delay source.",
-    "cpe_usd": "FAA CATS Form 127 cut by RESCOPE 2026-08-16 (Option A Core-6).",
-    "nonaero_rev_per_enpl": "FAA CATS Form 127 cut by RESCOPE 2026-08-16 (Option A Core-6).",
-    "od_share": "BTS DB1B timeboxed attempt did not land (design 01 open item; predates the RESCOPE).",
+    "nas_delay_share": "No BTS Delay Cause adapter: nothing in the snapshot attributes delay minutes to the NAS.",
+    "cpe_usd": "No FAA CATS Form 127 adapter: airport financials were never ingested.",
+    "nonaero_rev_per_enpl": "No FAA CATS Form 127 adapter: airport financials were never ingested.",
+    "od_share": "The BTS DB1B adapter did not land (design 01 open item), so O&D share is unknown.",
     "msa_gdp_per_capita": (
-        "feature/data-extras (2026-08-16) confirmed BEA publishes no keyless-bulk MSA real-GDP "
-        "table (MARPP is MSA personal income/price parity, not GDP; only State/County GDP zips exist)."
+        "BEA publishes no keyless-bulk MSA real-GDP table (MARPP is MSA personal income/price parity, "
+        "not GDP; only State and County GDP zips exist)."
     ),
     "msa_gdp_cagr_5y": (
-        "feature/data-extras (2026-08-16) confirmed BEA publishes no keyless-bulk MSA real-GDP "
-        "table (MARPP is MSA personal income/price parity, not GDP; only State/County GDP zips exist)."
+        "BEA publishes no keyless-bulk MSA real-GDP table (MARPP is MSA personal income/price parity, "
+        "not GDP; only State and County GDP zips exist)."
     ),
 }
 
@@ -59,7 +47,7 @@ def _missing(reason: str) -> MetricFn:
     return _fn
 
 
-#: One function per tier A/B registry id (see plan "Derived metric definitions").
+#: One function per tier A/B registry id.
 METRIC_FUNCS: dict[str, MetricFn] = {
     # P1 Demand Pressure
     "enpl_cagr_3y": p1_demand.enpl_cagr_3y,
@@ -116,7 +104,7 @@ _AIRPORT_METRICS_COLUMNS: tuple[str, ...] = (
     "vintage",
 )
 
-#: `ref_year` sentinel meaning "the current/latest value" (see plan Store schema).
+#: `ref_year` sentinel meaning "the current/latest value".
 CURRENT_REF_YEAR = 9999
 
 #: First calendar year in the derived series (Socrata's earliest complete history).
@@ -151,7 +139,7 @@ def build_derived(store: Store, years: range | None = None) -> dict[str, int]:
     For each id, runs its function at every horizon the registry declares. Horizon-scoped
     ids (12m/3y/5y/10y) are computed for every `ref_year` in `years` (default
     `range(2016, latest_year+1)`); the latest `ref_year` that produced any rows is also
-    written again at `ref_year=9999` ("current" — see plan Store schema). Horizon-invariant
+    written again at `ref_year=9999` ("current"). Horizon-invariant
     ids (static/forecast) are computed once and written only at `ref_year=9999` (no time
     series: `get_metric_series` returns `[]` for these per the contract).
     """
@@ -219,4 +207,4 @@ def build_derived(store: Store, years: range | None = None) -> dict[str, int]:
     return row_counts
 
 
-__all__ = ["METRIC_FUNCS", "MISSING_REASONS", "assert_registry_covered", "build_derived"]
+__all__ = ["CURRENT_REF_YEAR", "METRIC_FUNCS", "MISSING_REASONS", "assert_registry_covered", "build_derived"]

@@ -22,13 +22,6 @@ def _carrier_pax(con, start: str, end: str) -> pd.DataFrame:
     ).df()
 
 
-def _with_partial_window_flag(con, horizon: str, start: str, end: str, iata: str) -> list[dict]:
-    if horizon == "12m":
-        return []
-    coverage = common.window_coverage(con, _T100_TABLE, start, end)
-    return common.partial_window_flag(coverage, iata, common.WINDOW_MONTHS[horizon])
-
-
 def carrier_hhi(con, horizon: str, ref_year: int, latest_period: str) -> pd.DataFrame:
     end = common.period_for_ref_year(ref_year, latest_period)
     start, end = common.window_months(horizon, end)
@@ -116,12 +109,12 @@ def longhaul_dep_share(con, horizon: str, ref_year: int, latest_period: str) -> 
     df = con.execute(
         """
         SELECT iata,
-               SUM(CASE WHEN distance_mi >= 1500 THEN departures ELSE 0 END) AS long_deps,
+               SUM(CASE WHEN distance_mi >= ? THEN departures ELSE 0 END) AS long_deps,
                SUM(departures) AS total_deps
         FROM routes_month WHERE period BETWEEN ? AND ? AND seats > 0
         GROUP BY iata
         """,
-        [start, end],
+        [common.LONG_HAUL_MI, start, end],
     ).df()
     coverage = common.window_coverage(con, _T100_TABLE, start, end) if horizon != "12m" else {}
     nominal = common.WINDOW_MONTHS[horizon]

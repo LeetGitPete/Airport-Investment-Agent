@@ -27,7 +27,7 @@ def _boot():
 
 
 def test_boots_with_lean_sidebar():
-    # QA task 11: no provider status, vintages or defaults widgets in the sidebar —
+    # No provider status, vintages or defaults widgets in the sidebar —
     # just conversations and sample questions.
     at = _boot()
     texts = " ".join(m.value for m in at.sidebar.markdown) + " " + " ".join(c.value for c in at.sidebar.caption)
@@ -78,7 +78,7 @@ def test_new_chat_and_switch_keeps_histories_separate():
 
 
 def test_defaults_are_forwarded_silently():
-    # QA task 11: defaults have no widgets; the built-in values are still forwarded with every
+    # Defaults have no widgets; the built-in values are still forwarded with every
     # question (overridable only by asking in the question itself).
     from tests.ui import fake_app
     at = _boot()

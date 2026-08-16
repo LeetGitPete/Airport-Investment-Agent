@@ -20,9 +20,8 @@ from airport_agent.contracts import (
 
 PILLARS = ["P1", "P2", "P3", "P4", "P5"]
 BANDS = ["short", "medium", "long", "ultra"]
-#: Presentation standard (QA 2026-08-16): user-facing labels only. "time period" = analysis
-#: window (12m/3y/5y/10y); "data as of" = the data's own date (period end / source-file date),
-#: NOT the moment we fetched it.
+#: User-facing labels only. "time period" = the analysis window (12m/3y/5y/10y); "data as of" =
+#: the data's own date (period end / source-file date), NOT the moment we fetched it.
 METRIC_PROVENANCE_COLUMNS = ["value", "unit", "time period", "period end", "source", "data as of"]
 #: Tool results that are DeterministicReport dumps.
 REPORT_TOOLS = ("score_airports", "compare_airports", "diagnose_unmet_demand")
@@ -51,9 +50,9 @@ def source_name(source_id: str | None) -> str:
     return SOURCE_DISPLAY.get(source_id or "", source_id or "")
 
 
-#: What rank 1 / a high score MEANS under each preset (QA task 2). Percentiles are
-#: direction-adjusted per metric, so a higher score is always "stronger case for the
-#: preset's objective" — these spell that out per preset so no table needs decoding.
+#: What rank 1 / a high score MEANS under each preset. Percentiles are direction-adjusted per
+#: metric, so a higher score always means "stronger case for the preset's objective" — these spell
+#: that out per preset so no table needs decoding.
 PRESET_LEGENDS: dict[str, str] = {
     "balanced": "Rank 1 = strongest overall investment candidate under balanced pillar weights.",
     "terminal_expansion": ("Rank 1 = strongest terminal-expansion candidate — the most gate/terminal "
@@ -74,7 +73,7 @@ def rank_legend(preset: str | None) -> str:
 #: Unit display: "pct" is the registry's unit for PERCENT (not percentile) — shown as "%".
 UNIT_DISPLAY: dict[str, str] = {"pct": "%"}
 
-#: Peer-group values rendered as prose (QA task 4): "hub_class" is the FAA hub-size class.
+#: Peer-group values rendered as prose ("hub_class" is the FAA hub-size class).
 PEER_GROUP_DISPLAY: dict[str, str] = {
     "hub_class": "airports of the same hub size",
     "region": "airports in the same FAA region",
@@ -96,7 +95,7 @@ def _metric_name(metric_id: str, specs_by_id: dict[str, MetricSpec]) -> str:
 
 
 def humanize_metric_ids(text: str, specs_by_id: dict[str, MetricSpec]) -> str:
-    """Replace internal metric ids with display names in LLM-written prose (QA task 9).
+    """Replace internal metric ids with display names in LLM-written prose.
 
     The specialist is prompted to use display names, but this is the deterministic backstop —
     ids are distinctive snake_case tokens, replaced longest-first on word boundaries so
@@ -107,7 +106,7 @@ def humanize_metric_ids(text: str, specs_by_id: dict[str, MetricSpec]) -> str:
     for metric_id in sorted(specs_by_id, key=len, reverse=True):
         if metric_id in text:
             text = re.sub(rf"`?\b{re.escape(metric_id)}\b`?", specs_by_id[metric_id].name, text)
-    # Pillar ids are internal too (QA task 12): P2 -> "Congestion & Physical Constraint" etc.
+    # Pillar ids are internal too: P2 -> "Congestion & Physical Constraint" etc.
     text = re.sub(r"`?\bP([1-5])\b`?", lambda m: PILLAR_NAMES[f"P{m.group(1)}"], text)
     return text
 
@@ -120,12 +119,12 @@ def _metric_row(metric: Metric) -> list[Any]:
 def ranking_table(rep: DeterministicReport) -> Table:
     """The deterministic scores, verbatim: score, coverage and the pillar contributions behind them.
 
-    A single-airport report has no meaningful rank (QA task 6): the rank column is dropped and the
-    table is titled "Scores". Pillar columns are limited to pillars the preset actually weights.
+    A single-airport report has no meaningful rank: the rank column is dropped and the table is
+    titled "Scores". Pillar columns are limited to the pillars the preset actually weights.
     """
     single = len(rep.rows) == 1
     pillars = [p for p in PILLARS if rep.weights.get(p)] or PILLARS
-    # QA task 12: user-facing pillar names in columns; "P1..P5" stay internal.
+    # User-facing pillar names in columns; "P1..P5" stay internal.
     columns = [*([] if single else ["rank"]), "airport", "name", "airport size", "score", "coverage",
                "low_confidence", *[PILLAR_NAMES[p] for p in pillars]]
     rows = [[*([] if single else [row.rank]), row.ref.iata, row.ref.name, row.ref.hub_size, row.score,
@@ -179,12 +178,12 @@ PROVENANCE_TITLE = "Where this came from"
 
 def provenance_table(entries: list[dict[str, str]], covers: dict[str, list[str]] | None = None,
                      notes: list[str] | None = None) -> Table | None:
-    """One table per answer naming every source behind it (QA task 18).
+    """One table per answer naming every source behind it.
 
     Metric-level tables carry their own `source` / `data as of` columns — one row per metric, each
     genuinely from a different place, so the column earns its width there. Everything else (airports,
     live status, distance bands, rankings) would just repeat one value down every row, so those are
-    covered here instead: the split the human chose on 2026-08-16.
+    covered here instead.
 
     `covers` maps a source id to the tools that used it, so a reader can trace a table to its origin.
     Returns None when there is nothing to cite, so an answer with no data does not grow an empty table.
@@ -213,7 +212,7 @@ def provenance_table(entries: list[dict[str, str]], covers: dict[str, list[str]]
 
 
 def data_matrix(rep: DeterministicReport, specs_by_id: dict[str, MetricSpec]) -> Table:
-    """THE canonical metrics table for every analytical answer (QA task 5) — always shown.
+    """THE canonical metrics table for every analytical answer — always shown.
 
     One row per metric (user-facing name), one value column per airport (one airport = one
     column), percentile columns when the report carries them, and provenance (source, data as
@@ -253,11 +252,8 @@ def data_matrix(rep: DeterministicReport, specs_by_id: dict[str, MetricSpec]) ->
     return Table(title=title, columns=columns, rows=rows, footnotes=footnotes)
 
 
-#: Back-compat alias: the comparison table IS the data matrix.
-comparison_table = data_matrix
 
-
-#: One-line, user-facing statement of how the deterministic score is computed (QA task 10).
+#: One-line, user-facing statement of how the deterministic score is computed.
 SCORE_FORMULA_CAPTION = ("Score = sum over pillars of (pillar weight × metric weight × percentile "
                          "among peers) × 100, so 100 = the strongest case among peers under this "
                          "preset. The pillar split is in the Scores table.")
@@ -266,7 +262,7 @@ _SCORE_TITLE = re.compile(r"^(?:Ranking|Scores) — (.+?) focus,")
 
 
 def score_summary(tables: list[Table]) -> dict[str, Any] | None:
-    """Extract the headline score strip from an answer's tables (QA task 10).
+    """Extract the headline score strip from an answer's tables.
 
     Returns {label, scores: [(iata, score), ...] (≤4), shown, total, caption} from the
     Ranking/Scores table, or None when the answer has no deterministic scores. Derived from the

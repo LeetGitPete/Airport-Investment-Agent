@@ -20,8 +20,8 @@ full history in one API call chain):**
   only that month's rows are replaced — the rest of the retained window is untouched.
 - no `--period`, `--full`: fetch the trailing `t100_months`/`otp_months` (from
   `config/sources.yaml`) months, probing backward from the current UTC month for
-  publication lag, and REPLACE the source's entire table (the RESCOPE's "trailing N months
-  only" design means old months outside the window are meant to drop off).
+  publication lag, and REPLACE the source's entire table (these sources retain a trailing
+  window only, so months outside it are meant to drop off).
 - no `--period`, not `--full`: fetch just the single latest available month (a light
   incremental default) — same replace-that-one-month semantics as `--period`.
 """
@@ -49,10 +49,6 @@ _PERIOD_COLUMN: dict[str, str] = {
     "airport_month": "period", "routes_month": "period", "otp_taxi_hist": "period", "otp_peak": "period",
     "airport_year": "year",
 }
-
-#: Sources whose `normalize()` output needs an enrichment UPDATE (`apply_*_enrichment`)
-#: instead of a plain `Store.replace_rows` for one or more of its returned tables.
-_ENRICHMENT_SOURCES = {"faa_taf", "census_cbsa"}
 
 #: Fallback trailing-months window for bts_t100 if `config/sources.yaml` doesn't set
 #: `t100_months` (design 01's original default).
@@ -91,7 +87,7 @@ class RefreshReport:
     @property
     def ok(self) -> bool:
         """True if every requested source refreshed cleanly (exit-code use only — the CLI
-        itself always exits 0 for per-source failures, per the plan)."""
+        itself always exits 0 for per-source failures)."""
         return not self.failed
 
 
@@ -234,8 +230,10 @@ def refresh(
         except Exception as exc:  # noqa: BLE001 (per-source isolation is the point)
             results.append(SourceResult(source_id, False, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}"))
 
-    derived_row_counts = build_derived(store)
-    store.close()
+    try:
+        derived_row_counts = build_derived(store)
+    finally:
+        store.close()
     finished_at = datetime.now(UTC).isoformat()
     return RefreshReport(results=results, derived_row_counts=derived_row_counts, started_at=started_at, finished_at=finished_at)
 

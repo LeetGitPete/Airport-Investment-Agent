@@ -1,7 +1,7 @@
 """The DataService contract suite must pick up implementations registered after import time.
 
 This mirrors the `pytest_generate_tests` hook in conftest.py with one extra factory appended, proving
-the mechanism a Phase 2 plugin will use (append to DATA_SERVICE_FACTORIES, then get parametrized).
+the mechanism a plugin uses: append to DATA_SERVICE_FACTORIES, then get parametrized.
 It cannot append to the real list here: conftest's hook already ran for this module's collection.
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ from tests.fakes import FakeDataService
 
 
 class Fake2(FakeDataService):
-    """Stand-in for a second implementation (Phase 2: DuckDB-backed)."""
+    """Stand-in for a second implementation (in practice, the DuckDB-backed one)."""
 
 
 EXTENDED = [*DATA_SERVICE_FACTORIES, ("fake2", Fake2)]

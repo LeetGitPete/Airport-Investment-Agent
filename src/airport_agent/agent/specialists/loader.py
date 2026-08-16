@@ -56,8 +56,8 @@ class SpecialistConfig(BaseModel):
                   .replace("{METRIC_SLICE}", self.metric_slice(specs))
                   .replace("{ALLOWED_TOOLS}", ", ".join(self.allowed_tools))
                   .replace("{OUTPUT_SCHEMA}", schema_doc()))
-        # QA task 9: prose readability — ids stay in structured refs, names go in text
-        # (code also enforces this downstream, but the model should write it right first).
+        # Prose readability: ids stay in structured refs, names go in text. Code enforces this
+        # downstream too, but the model should write it right the first time.
         return (prompt + "\n\nIn narrative, rationale and caveat TEXT, refer to metrics by their "
                 "display name (e.g. 'Weather fragility'), never by their id "
                 "(e.g. 'imc_capacity_ratio'); ids belong only in evidence_refs.")

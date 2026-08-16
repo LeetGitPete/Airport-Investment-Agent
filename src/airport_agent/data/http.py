@@ -1,4 +1,4 @@
-"""The single gate every outbound HTTP request passes through (QA task 17, 2026-08-16).
+"""The single gate every outbound HTTP request passes through.
 
 Why this exists: nothing in the data layer paced its requests. A refresh pulls dozens of files
 back-to-back (ten AIP workbooks, one T-100 and one OTP archive per month of the trailing window), and
@@ -11,7 +11,7 @@ host*. Per-host, because pacing SFO-bound calls behind BTS-bound ones would be p
 the ban risk is per-operator. The gate is a hard floor on spacing, never a budget or a queue: it
 delays, it never drops a request, and it never retries one.
 
-What this deliberately is NOT: a cache. The human decision on 2026-08-16 was "pace only, no cache",
+What this deliberately is NOT: a cache. The rule is "pace only, no cache",
 so a repeated question about the same airport still reaches the FAA — design 03's "live status is
 never cached" stays literally true, and an answer can never quote a stale operational status as
 current. Pacing changes when a request happens, never whether the answer is fresh.

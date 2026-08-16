@@ -10,16 +10,16 @@ metric's value is looked up at the *requested* horizon only if `MetricSpec.horiz
 declares it; horizon-invariant metrics (`horizons <= {"static", "forecast"}`) answer any
 request at their own single declared horizon. A metric never borrows another horizon's real
 value to answer an undeclared one — undeclared means `None`, always (see
-`_value`/`_lookup_horizon`). Multi-year semantics (from `derived/common.py`, restated here
-per the plan's Global Constraints): **CAGR-type metrics are k-year growth; level metrics at
+`_value`/`_lookup_horizon`). Multi-year semantics (from `derived/common.py`, restated
+here): **CAGR-type metrics are k-year growth; level metrics at
 horizon k are computed over the trailing k-year window** ending at the metric's own
 underlying source's latest available period (12m = trailing 12 months). Different sources
-(Socrata, OTP, T-100) publish on different, independent cadences (verified — see
+(Socrata, OTP, T-100) publish on different, independent cadences (see
 `derived/p2_congestion.py`'s `_otp_latest_period`), so "the trailing k years" ends at
 different real calendar months for different metrics; every `Metric`/row still carries its
 own `period_start`/`period_end` so this is never hidden.
 
-Memoization (plan Task 14, scoped narrowly — no report caching): the metric registry
+Memoization (scoped narrowly — no report caching): the metric registry
 (`load_registry()`) and the `list_airports` commercial-airport universe are each computed
 once per process and reused; every other method reads the snapshot fresh.
 """
@@ -55,9 +55,6 @@ from airport_agent.data.paths import default_snapshot_path
 
 #: Horizons a metric answers at "its own" declared horizon regardless of what was requested.
 _INVARIANT_HORIZONS = {"static", "forecast"}
-
-#: NPIAS numeric capacity label -> text (matches `adapters/faa_npias.py::CAPACITY_LABELS`).
-_CAPACITY_LABEL_TEXT = {0: "none", 1: "congested", 2: "constrained_2033", 3: "constrained_2028", 4: "severe_2033"}
 
 #: `get_live_status`/`get_profile` snapshot fallback (live adapter unavailable or `live=False`).
 _SNAPSHOT_LIVE_SOURCE_IDS = ["bts_socrata"]
@@ -108,13 +105,13 @@ class DuckDBDataService:
         self._universe: list[AirportRef] | None = None
         self._nasstatus = FaaNasStatusLiveAdapter()
 
-    # -- registry helpers ------------------------------------------------------
+    # registry helpers
     def _spec(self, metric_id: str) -> MetricSpec:
         if metric_id not in self._by_id:
             raise KeyError(f"unknown metric id: {metric_id!r}")
         return self._by_id[metric_id]
 
-    # -- airport lookups ---------------------------------------------------------
+    # airport lookups
     def _airport_universe(self) -> list[AirportRef]:
         """Every commercial airport (see `data/commercial.py`), ordered by latest annual
         enplanements desc then iata — computed once per process."""
@@ -165,7 +162,7 @@ class DuckDBDataService:
             raise KeyError(f"unknown airport: {iata!r}")
         return ref
 
-    # -- metric value lookups ------------------------------------------------
+    # metric value lookups
     def _value(self, iata: str, metric_id: str, horizon: str) -> float | None:
         spec = self._spec(metric_id)
         if spec.tier == "C":
@@ -207,7 +204,7 @@ class DuckDBDataService:
             quality=[QualityFlag(**f) for f in flags],
         )
 
-    # -- DataService -----------------------------------------------------------
+    # DataService
     def get_feature_matrix(
         self, airports: list[str], metric_ids: list[str], horizon: Horizon, peer_group: PeerGroup = "hub_class"
     ) -> FeatureMatrix:
@@ -269,7 +266,7 @@ class DuckDBDataService:
         total_deps = df["deps"].sum()
         intl_deps = df.loc[df["is_intl"], "deps"].sum()
         total_freight = df["freight"].sum()
-        long_freight = df.loc[df["distance"] >= 1500, "freight"].sum()
+        long_freight = df.loc[df["distance"] >= common.LONG_HAUL_MI, "freight"].sum()
         return {
             "nonstop_destinations": int(df["dest"].nunique()),
             "top_dest": top_dest,

@@ -1,9 +1,8 @@
 """Repo-root conftest: the only place pytest 8 accepts `pytest_plugins`.
 
-Phase 2: the data workstream registers its DuckDB factory here via
-`pytest_plugins = ["tests.data.conftest_plugin"]` — that plugin appends
-("duckdb", ...) to tests.contracts.conftest.DATA_SERVICE_FACTORIES before collection,
-which runs the whole DataService contract suite against the real implementation too.
+`tests.data.conftest_plugin` appends ("duckdb", ...) to
+`tests.contracts.conftest.DATA_SERVICE_FACTORIES` before collection, so the whole DataService
+contract suite runs against the real implementation as well as the fake.
 """
 from __future__ import annotations
 

@@ -9,7 +9,7 @@ from airport_agent.contracts import LLMError, ToolSpec
 
 
 class EchoArgs(BaseModel):
-    model_config = ConfigDict(extra="forbid")  # QA task 14: the registry requires this of every tool
+    model_config = ConfigDict(extra="forbid")  # the registry requires this of every tool
     text: str
     n: int = 1
 
@@ -18,7 +18,7 @@ class LooseArgs(BaseModel):
     text: str = ""
 
 
-#: QA task 18: every registration must declare provenance; these fakes read nothing real.
+#: Every registration must declare provenance; these fakes read nothing real.
 ECHO_PROV = ProvenanceSpec.none("test double, no data source")
 
 
@@ -51,7 +51,7 @@ def test_register_and_openai_shape(reg):
 
 
 def test_call_validates_and_fills_defaults(reg):
-    # QA task 18: a no-external-source tool carries its reason into the result, so the answer can
+    # A no-external-source tool carries its reason into the result, so the answer can
     # say "registry definition, not measured data" instead of showing an empty source list.
     assert reg.call("echo", {"text": "ab", "n": 2}) == {
         "out": "abab", "provenance": [], "truncated": False,
@@ -85,7 +85,7 @@ def test_non_str_arg_keys_is_error_dict(reg):
     assert "invalid arguments" in out["error"]
 
 
-# --- QA task 14: invented arguments are rejected loudly and actionably ------------------------------------
+# Invented arguments are rejected loudly and actionably.
 
 def test_a_tool_that_would_ignore_unknown_arguments_cannot_be_registered():
     r = ToolRegistry()

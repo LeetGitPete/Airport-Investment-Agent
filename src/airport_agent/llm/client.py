@@ -22,8 +22,9 @@ class LiteLLMClient:
         self._completion = completion_fn
         self.provider_name = self.config.providers[0].name
 
-    def _key(self, i: int = 0) -> str | None:
-        return self._env.get(self.config.providers[i].api_key_env) or None
+    def _primary_key(self) -> str | None:
+        """The primary provider's API key, or None when its env var is unset/empty."""
+        return self._env.get(self.config.providers[0].api_key_env) or None
 
     def status(self) -> list[dict[str, str]]:
         return [{"name": p.name, "model": p.model,
@@ -32,6 +33,8 @@ class LiteLLMClient:
                 for p in self.config.providers]
 
     def _router_completion(self) -> Callable[..., Any]:
+        # Imported lazily: litellm is slow to import and is not needed at all when a caller
+        # injects `completion_fn` (every test does).
         import litellm
         model_list = [{"model_name": p.name,
                        "litellm_params": {"model": p.model, "api_key": self._env.get(p.api_key_env),
@@ -46,7 +49,7 @@ class LiteLLMClient:
     def chat(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None,
              response_schema: dict[str, Any] | None = None, temperature: float = 0.2) -> LLMResult:
         primary = self.config.providers[0]
-        if not self._key(0):
+        if not self._primary_key():
             raise LLMError(primary.name, None, f"{primary.api_key_env} not set")
         if self._completion is None:
             self._completion = self._router_completion()

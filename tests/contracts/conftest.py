@@ -2,7 +2,7 @@
 
 Extension mechanism: DATA_SERVICE_FACTORIES is a plain module-level list read at collection time by
 `pytest_generate_tests` below, so a plugin loaded before collection may append to it and its
-implementation is then exercised by the whole suite. Phase 2's data-engineer registers
+implementation is then exercised by the whole suite. The DuckDB implementation registers itself as:
 
     # repo-root conftest.py
     pytest_plugins = ["tests.data.conftest_plugin"]

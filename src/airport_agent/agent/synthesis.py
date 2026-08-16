@@ -48,13 +48,13 @@ FALLBACK_NOTE = "synthesis text unavailable — showing raw report"
 FALLBACK_HEADLINE = "Results below."
 FALLBACK_FOLLOW_UPS = ["Compare with peer airports?", "Try another horizon?", "Try another preset?"]
 CONVENTION_MARKERS = ("convention", "spill model", "long-haul", "percentile")
-#: QA task 7 (human decision 2026-08-16): assumptions/uncertainty are condensed DETERMINISTICALLY
-#: to a hard cap — the LLM may add lines via the specialist but can never remove one. Build-level
-#: standing tradeoffs live in the docs, not in every answer.
+#: Assumptions/uncertainty are condensed DETERMINISTICALLY to a hard cap — the LLM may add lines
+#: via the specialist but can never remove one. Build-level standing tradeoffs live in the docs,
+#: not in every answer.
 MAX_ASSUMPTIONS = 7  # + the defaults line = 8 rows max
 MAX_NOTES = 8
-#: QA task 13 (2026-08-16): the settings the UI supplies are stated in plain English, not as an
-#: internal k=v dump. Each entry renders one default; unknown keys fall back to "key=value".
+#: The settings the UI supplies, stated in plain English rather than as an internal k=v dump.
+#: Each entry renders one default; unknown keys fall back to "key=value".
 DEFAULT_PROSE: dict[str, Any] = {
     "horizon": lambda v: f"time period {v}",
     "scoring_preset": lambda v: f"{str(v).replace('_', ' ')} investment focus",
@@ -108,7 +108,7 @@ class _Synthesis(BaseModel):
     follow_ups: list[str] = Field(default_factory=list)
 
 
-#: QA task 18: what each tool was doing, in the user's words, for the "used for" column.
+#: What each tool was doing, in the user's words, for the "used for" column.
 TOOL_PURPOSE: dict[str, str] = {
     "find_airports": "the airport list",
     "get_profile": "the airport profile",
@@ -127,7 +127,7 @@ def _metric_provenance(metrics: list[Metric]) -> list[dict[str, str]]:
     """Provenance entries for the scored metrics, so the table covers the deterministic side too.
 
     Only metrics that actually carry a value: a registry metric keeps its nominal source_id even when
-    the snapshot holds nothing for it, and citing those would credit sources the RESCOPE cut (QA 18).
+    the snapshot holds nothing for it, and citing those would credit sources we never read.
     """
     return [{"source_id": m.source_id, "vintage": m.vintage,
              **({"period_start": m.period_start} if m.period_start else {}),
@@ -178,7 +178,7 @@ class Synthesizer:
         self.specs = list(specs)
         self.by_id = registry_by_id(self.specs)
 
-    # ---------------- prose ----------------
+    # prose
 
     def _user_message(self, *, message: str, plan: Plan, req: AnalysisRequest | None,
                       deterministic: DeterministicReport | None, specialist: SpecialistReport | None,
@@ -211,7 +211,7 @@ class Synthesizer:
         except ValueError:
             return _Synthesis(headline="", follow_ups=list(FALLBACK_FOLLOW_UPS)), True
 
-    # ---------------- assembly (numbers never pass through the model) ----------------
+    # assembly (numbers never pass through the model)
 
     def synthesize(self, *, message: str, plan: Plan, plan_line: str, req: AnalysisRequest | None,
                    deterministic: DeterministicReport | None, specialist: SpecialistReport | None,
@@ -236,18 +236,16 @@ class Synthesizer:
             metrics.extend(deterministic.evidence)
             for metric in deterministic.evidence:
                 covers.setdefault(metric.source_id, []).append("the computed analysis")
-            # QA task 6: every analytical answer opens its computed section with the score view
-            # (pillar-level contributions); a single airport gets "Scores" without a rank column.
+            # Every analytical answer opens its computed section with the score view (pillar-level
+            # contributions); a single airport gets "Scores" without a rank column.
             if deterministic.rows:
                 tables.append(ranking_table(deterministic))
-            # QA task 5: ONE canonical data matrix, always shown — metric rows, a value column per
-            # airport, percentiles and provenance together. No separate evidence table, nothing
-            # collapsed behind an expander, and the LLM cannot choose to hide rows.
+            # ONE canonical data matrix, always shown — metric rows, a value column per airport,
+            # percentiles and provenance together. No separate evidence table, nothing collapsed behind
+            # an expander, and the LLM cannot choose to hide rows.
             matrix = data_matrix(deterministic, self.by_id)
             if matrix.rows:
                 tables.append(matrix)
-            # QA 2026-08-16: the templated explanation is no longer appended below the first table
-            # (poor placement); it still backs the fallback headline and the LLM synthesis input.
             assumptions.extend(self._report_assumptions(req, deterministic))
             notes.extend(self._report_notes(deterministic))
         elif req is not None:
@@ -268,8 +266,8 @@ class Synthesizer:
             tables.extend(tool_result_tables(tool, out, self.by_id))
             entries = out.get("provenance") or []
             provenance.extend(entries)
-            # QA task 18: remember which tool each source served, so the provenance table can say
-            # what it was used for instead of listing bare source names.
+            # Remember which tool each source served, so the provenance table can say what it was
+            # used for instead of listing bare source names.
             for entry in entries:
                 covers.setdefault(entry.get("source_id", ""), []).append(TOOL_PURPOSE.get(tool, tool))
             if out.get("provenance_note"):
@@ -279,20 +277,19 @@ class Synthesizer:
 
         if degraded:
             notes.append(FALLBACK_NOTE)
-        # QA task 18 (2026-08-16): every answer closes with where its data came from. Metric tables
-        # carry inline source columns; this covers everything that does not (airports, live status,
-        # distance bands, rankings), so no table is left unattributed.
+        # Every answer closes with where its data came from. Metric tables carry inline source
+        # columns; this covers everything that does not (airports, live status, distance bands,
+        # rankings), so no table is left unattributed.
         sources_table = provenance_table([*_metric_provenance(metrics), *provenance], covers,
                                          provenance_notes)
         if sources_table is not None:
             tables.append(sources_table)
-        # QA task 7 (human decision 2026-08-16): condense deterministically — the LLM never picks.
+        # Condense deterministically — the LLM never picks which lines survive.
         assumptions = _condense(_unique(assumptions), MAX_ASSUMPTIONS,
                                 "further standing conventions apply (documented in KEY-TRADEOFFS.md)")
         notes = _condense(_unique(notes), MAX_NOTES, "further minor notes omitted")
-        # QA task 13 (2026-08-16): the block always closes with the settings actually in force, so it
-        # is never empty (product rule) and never trimmed away by the cap. The old boilerplate line
-        # about cited sources is gone — every table already carries source and "data as of" columns.
+        # The block always closes with the settings actually in force, so it is never empty (product
+        # rule) and never trimmed away by the cap.
         assumptions.append(_defaults_assumption(defaults))
 
         headline = synthesis.headline.strip()
@@ -303,13 +300,13 @@ class Synthesizer:
         if specialist is not None:
             analyst_view = synthesis.analyst_summary.strip() or specialist.narrative
             disagreements = "; ".join(specialist.disagreements) or "none stated"
-            # QA task 10: the line reads against the computed score shown at the top of the answer.
+            # The line reads against the computed score shown at the top of the answer.
             agreement_line = (f"On the computed score: {specialist.agreement or 'no statement given'}. "
                               f"Where the analyst differs from the numbers: {disagreements}.")
         follow_ups = [f for f in synthesis.follow_ups if f.strip()][:4] or list(FALLBACK_FOLLOW_UPS)
 
-        # QA task 9: LLM prose never shows internal metric ids — deterministic backstop over
-        # every text surface (the tables already use display names by construction).
+        # LLM prose never shows internal metric ids — a deterministic backstop over every text
+        # surface (the tables already use display names by construction).
         headline = humanize_metric_ids(headline, self.by_id)
         analyst_view = humanize_metric_ids(analyst_view, self.by_id) if analyst_view else None
         agreement_line = humanize_metric_ids(agreement_line, self.by_id) if agreement_line else None
@@ -322,7 +319,7 @@ class Synthesizer:
                       citations=citations_from(metrics, provenance), follow_ups=follow_ups,
                       tool_trace=list(trace))
 
-    # ---------------- assumption / uncertainty sources ----------------
+    # assumption / uncertainty sources
 
     @staticmethod
     def _report_assumptions(req: AnalysisRequest | None,
@@ -330,12 +327,12 @@ class Synthesizer:
         preset = (rep.preset if rep else None) or (req.scoring_preset if req else None) or "engine default"
         horizon = (rep.horizon if rep else None) or (req.horizons[0] if req and req.horizons else "-")
         peer_group = (rep.peer_group if rep else None) or (req.peer_group if req else None) or "hub_class"
-        # QA task 7: one line for the request-shaping choices instead of three; standing build
-        # facts (tier policy etc.) live in the docs, not in every answer.
-        # QA task 13: "preset" is an internal word — the user sees the focus, as in the table titles.
+        # One line for the request-shaping choices instead of three; standing build facts (tier
+        # policy etc.) live in the docs. "preset" is an internal word, so the user sees the focus
+        # instead, as in the table titles.
         out = [f"Scored with {preset.replace('_', ' ')} focus, time period {horizon}, "
                f"as percentiles among {peer_label(peer_group)}"]
-        # QA task 15: the national fallback is a real assumption about the question, so it is stated.
+        # The national fallback is a real assumption about the question, so it is stated.
         if is_national_scope(req):
             out.append("No airports, region or hub size were named, so every commercial-service airport "
                        "(large, medium and small hubs) was considered")
@@ -349,7 +346,7 @@ class Synthesizer:
         low = sum(1 for row in rep.rows if row.low_confidence)
         if low:
             notes.append(f"{low} of {len(rep.rows)} airports low confidence (thin metric coverage)")
-        # QA task 7: quality flags aggregated per code (was one row per metric per flag).
+        # Quality flags aggregated per code, not one row per metric per flag.
         by_code: dict[str, tuple[int, str]] = {}
         for metric in rep.evidence:
             for flag in metric.quality:
@@ -368,8 +365,8 @@ class Synthesizer:
     @staticmethod
     def _tool_notes(tool: str, out: dict[str, Any]) -> list[str]:
         notes = []
-        # QA task 14 (2026-08-16): a request the tools cannot express is stated to the user in plain
-        # English, first in the block, instead of being hidden or silently answered with a different cut.
+        # A request the tools cannot express is stated in plain English, first in the block, instead
+        # of being hidden or silently answered with a different cut.
         if out.get("limitation"):
             notes.append(str(out["limitation"]))
         if out.get("error"):

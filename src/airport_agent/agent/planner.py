@@ -153,8 +153,8 @@ PLAN_SCHEMA: dict[str, Any] = {
 }
 PLAN_SCHEMA["required"] = list(PLAN_SCHEMA["properties"])
 
-#: QA task 14 (2026-08-16): the one bounded retry after a tool rejects its arguments. Same portable
-#: subset as PLAN_SCHEMA (no $ref/anyOf/additionalProperties — Gemini rejects them in response_schema).
+#: The one bounded retry after a tool rejects its arguments. Same portable subset as PLAN_SCHEMA
+#: (no $ref/anyOf/additionalProperties — Gemini rejects them in response_schema).
 REPAIR_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -166,9 +166,9 @@ REPAIR_SCHEMA: dict[str, Any] = {
 }
 REPAIR_SCHEMA["required"] = list(REPAIR_SCHEMA["properties"])
 
-#: QA task 15 (human decision 2026-08-16): what "all airports" means when the user names no geography.
-#: Commercial-service hubs only — the snapshot's other ~1,805 airports are nonhub GA fields that carry
-#: no metric coverage, so ranking them would pad the list with noise rather than widen the answer.
+#: What "all airports" means when the user names no geography: commercial-service hubs only. The
+#: snapshot's other ~1,805 airports are nonhub GA fields with no metric coverage, so ranking them
+#: would pad the list with noise rather than widen the answer.
 NATIONAL_SCOPE_HUBS: list[HubSize] = ["large", "medium", "small"]
 #: Headroom over the ~140 commercial-service airports that exist, so the default scope is never
 #: silently truncated — the assumption line claims the whole set and must not be lying.
@@ -279,7 +279,7 @@ def _targets(filters: PlanFilters) -> str:
 
 def _request_targets(req: AnalysisRequest) -> str:
     if is_national_scope(req):
-        return "all commercial-service airports"  # QA task 15: the plan says so before it runs
+        return "all commercial-service airports"  # said in the plan line, before anything runs
     f = req.filter
     return _target_text(list(req.airports or []), list(f.states) if f else [],
                         list(f.faa_regions) if f else [], list(f.hub_sizes) if f else [])
@@ -308,11 +308,11 @@ class Planner:
         self.presets = list(presets)
         self.specialists = list(specialists)
 
-    # ---------------- prompt (assembled from live objects) ----------------
+    # prompt (assembled from live objects)
 
     def _tools_block(self) -> str:
-        # QA task 14 (2026-08-16): the argument names are listed from the live tool models. Planning
-        # args_json without them is guesswork, and a guessed key (e.g. domestic_only) is rejected.
+        # Argument names come from the live tool models: planning args_json without them is guesswork,
+        # and a guessed key (e.g. domestic_only) is rejected.
         lines = []
         for spec in self.registry.for_engine(CONCIERGE):
             allowed, required = self.registry.arg_names(spec.name)
@@ -449,7 +449,7 @@ class Planner:
         ]
         return "\n\n".join(blocks)
 
-    # ---------------- planning ----------------
+    # planning
 
     def plan(self, message: str, state: SessionState,
              defaults: dict[str, str] | None = None) -> tuple[Plan, PlanFilters]:
@@ -461,7 +461,7 @@ class Planner:
 
     def repair_tool_args(self, tool: str, args: dict[str, Any], error: str,
                          message: str) -> dict[str, Any] | None:
-        """One bounded retry for a tool call the registry rejected (QA task 14).
+        """One bounded retry for a tool call the registry rejected.
 
         The validation error and the tool's real argument list go back to the model, which either
         re-expresses the intent with supported arguments (domestic_only -> international=false) or
@@ -528,16 +528,15 @@ class Planner:
                     presentation_notes=raw.get("presentation_notes") or "")
         return plan, filters
 
-    # ---------------- dispatch ----------------
+    # dispatch
 
     def to_analysis_request(self, plan: Plan, filters: PlanFilters,
                             defaults: dict[str, str] | None) -> AnalysisRequest:
         """Map the plan onto the frozen dispatch contract.
 
-        A request with neither airports nor a filter falls back to the national scope (QA task 15,
-        human decision 2026-08-16): a question with a theme but no geography is answerable, so it is
-        answered over every commercial-service airport and the answer states that as an assumption.
-        Asking the user where to look was the wrong default — it stalled real questions.
+        A request with neither airports nor a filter falls back to the national scope: a question with
+        a theme but no geography is answerable, so it is answered over every commercial-service airport
+        and the answer states that as an assumption. Asking the user where to look stalls real questions.
         """
         user_defaults = defaults or {}
         question_type = filters.question_type

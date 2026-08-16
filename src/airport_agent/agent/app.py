@@ -1,4 +1,4 @@
-"""Composition root: build the whole agent and hand the UI one object (design 03, plan 2d interface).
+"""Composition root: build the whole agent and hand the UI one object (design 03).
 
 `build_app` is the only place that knows how the layers are wired. The UI imports `App` and nothing else, and
 the data/scoring packages are imported lazily so this module still works in a checkout where they are not
@@ -28,7 +28,7 @@ from airport_agent.contracts import (
 )
 
 MISSING_LAYER = ("data/scoring packages not available in this checkout — pass data_service/analyst "
-                 "explicitly (Phase 3 wires the defaults)")
+                 "explicitly")
 MISSING_SNAPSHOT = ("data snapshot not found at {path} — run `uv run python -m airport_agent.data refresh` "
                     "to build it, or pass data_service explicitly")
 

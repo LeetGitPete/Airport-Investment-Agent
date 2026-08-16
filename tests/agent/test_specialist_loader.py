@@ -35,7 +35,7 @@ def test_unknown_specialist(specs):
         load_specialist("nope", specs)
 
 
-# --- beyond the brief: config/registry consistency and the shared rules block ----------------------------
+# beyond the brief: config/registry consistency and the shared rules block
 
 RULES_MARKER = "## Rules (identical for every specialist)"
 

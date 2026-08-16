@@ -1,7 +1,7 @@
 """P1 Demand Pressure derived metrics: enpl_cagr_{3y,5y,10y}, taf_cagr_10y, taf_vs_actual_gap,
 load_factor, spill_proxy, seats_per_dep_trend, pax_per_capita.
 
-See plan "Derived metric definitions" table and `derived/common.py` for the window/CAGR rules.
+See `derived/common.py` for the window/CAGR rules.
 """
 from __future__ import annotations
 
@@ -151,9 +151,11 @@ def load_factor(con, horizon: str, ref_year: int, latest_period: str) -> pd.Data
     return pd.DataFrame(rows)
 
 
-#: T-100 backfill is time/size-constrained (see known-limitations); flag 3y/5y route
-#: metrics computed from a shorter-than-nominal window.
 _T100_TABLE = "routes_month"
+
+#: Months of history a route-carrier needs before its load-factor variability is meaningful;
+#: below this a standard deviation is noise, not a spill signal.
+_MIN_MONTHS_PER_ROUTE = 6
 
 
 def spill_proxy(con, horizon: str, ref_year: int, latest_period: str) -> pd.DataFrame:
@@ -176,8 +178,10 @@ def spill_proxy(con, horizon: str, ref_year: int, latest_period: str) -> pd.Data
         .agg(n=("period", "nunique"), mean_lf=("lf", "mean"), std_lf=("lf", "std"), deps=("departures", "sum"))
         .reset_index()
     )
-    stats = stats[(stats["n"] >= 6) & (stats["mean_lf"] > 0)].copy()
+    stats = stats[(stats["n"] >= _MIN_MONTHS_PER_ROUTE) & (stats["mean_lf"] > 0)].copy()
     stats["cv"] = stats["std_lf"].fillna(0.0) / stats["mean_lf"]
+    # The T-100 backfill window is shorter than 3y/5y nominally imply (see known-limitations),
+    # so multi-year values carry a partial_window flag stating how much history they really have.
     coverage = common.window_coverage(con, _T100_TABLE, start, end) if horizon != "12m" else {}
     nominal = common.WINDOW_MONTHS[horizon]
     rows = []

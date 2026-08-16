@@ -34,18 +34,20 @@ Verified 2026-08-16 by scripting the real form:
   out — verified: ANC 2026-04 has 247 of 488 origin rows with `SEATS=0.00`,
   all-cargo carriers like Everts Air Cargo and Northern Air Cargo).
 
-**International Segment table: not landed.** A ~15-minute probe (per the
-2026-08-15 RESCOPE decision) tried `FIL`/`FIH`/`FIS`/`FIT`/`FIN`/`FIQ`/`FIP`/
+**International Segment table: not landed.** A timeboxed probe tried
+`FIL`/`FIH`/`FIS`/`FIT`/`FIN`/`FIQ`/`FIP`/
 `FIO`/`FIC`/`FIB`/`FID`/`FGH`/`FGJ`..`FGQ`/`FMG` — every one 302-redirects to
 `/Homepage.asp` (an invalid `gnoyr_VQ` code), unlike `FIM` which is a direct 200.
 The TranStats database-index pages (`Tables.asp?DB_ID=111`, `DatabaseInfo.asp`)
-did not surface the international segment table's code either. Per the RESCOPE
-decision this is `is_international=False`-only for `routes_month`; international
+did not surface the international segment table's code either, so `routes_month`
+is `is_international=False`-only; international
 totals (not route-level) remain available from `bts_socrata`
 (`intl_out_passengers`/`intl_in_passengers`). See known-limitations row 2 update.
 """
 from __future__ import annotations
 
+import calendar
+import os
 import re
 import zipfile
 from datetime import UTC, datetime
@@ -83,7 +85,7 @@ SOURCE_COLUMNS: tuple[str, ...] = (
     "MONTH",
 )
 
-#: `routes_month` columns in store order (see plan Store schema).
+#: `routes_month` columns in store order.
 ROUTES_MONTH_COLUMNS: tuple[str, ...] = (
     "iata",
     "dest",
@@ -157,9 +159,6 @@ def _extract_from_zip(zip_path: Path, dest: Path) -> None:
             part.unlink(missing_ok=True)
             raise
     # Stamp with the zip entry's own timestamp (see faa_taf._extract for the same idea).
-    import calendar
-    import os
-
     stamp = calendar.timegm((*info.date_time, 0, 0, -1))
     os.utime(dest, (stamp, stamp))
 
@@ -180,7 +179,7 @@ class BtsT100SegmentAdapter:
         self._period_start: str | None = None
         self._period_end: str | None = None
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """Submit the DL_SelectFields form for `period` (required) and cache the extracted CSV.
 
@@ -218,7 +217,7 @@ class BtsT100SegmentAdapter:
         self._set_vintage([csv_path])
         return [csv_path]
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"routes_month": df}`. Every row is `is_international=False`."""
         self._set_vintage(paths)
@@ -257,7 +256,7 @@ class BtsT100SegmentAdapter:
             drop=True
         )
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         """Derive vintage/fetched_at from the raw file's mtime (see `file_vintage`)."""
         self._vintage, self._fetched_at = file_vintage(paths)

@@ -42,10 +42,11 @@ intl_out_passengers, intl_in_passengers, load_factor`. `airport_year` rollups
 (`enplanements=Σtotal_passengers, seats=Σtotal_seats, departures=Σtotal_departures`)
 are written only for **complete** years (12 distinct months present for that
 iata/year) — partial years are left for callers to handle via TAF/trailing-12m
-fallback (see plan "Derived metric definitions", `annual_enplanements`).
+fallback (see `derived/common.py::annual_enplanements`).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -124,8 +125,6 @@ def _page_url(where: str, offset: int) -> str:
 
 
 def _page_filename(where: str, offset: int) -> str:
-    import hashlib
-
     key = hashlib.sha1(where.encode("utf-8")).hexdigest()[:10]  # noqa: S324 (cache key, not security)
     return f"bts_socrata_{key}_{offset:07d}.json"
 
@@ -159,7 +158,7 @@ class BtsSocrataAdapter:
         self._period_start: str | None = None
         self._period_end: str | None = None
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """Page through the API (cached per page) for `period`, or all of history if `None`."""
         where = _where_clause(period)
@@ -175,7 +174,7 @@ class BtsSocrataAdapter:
         self._set_vintage(paths)
         return paths
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"airport_month": df, "airport_year": df}`."""
         self._set_vintage(paths)
@@ -258,7 +257,7 @@ class BtsSocrataAdapter:
             .reset_index(drop=True)
         )
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         """Derive vintage/fetched_at from the raw pages' mtimes (see `file_vintage`)."""
         self._vintage, self._fetched_at = file_vintage(paths)

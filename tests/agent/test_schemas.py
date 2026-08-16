@@ -1,4 +1,4 @@
-"""Every structured-output schema stays a portable JSON-schema subset (limitations row 26).
+"""Every structured-output schema stays a portable JSON-schema subset.
 
 Gemini structured output (and most other providers) rejects or silently ignores anyOf / oneOf / $ref /
 additionalProperties / nullable. The three schemas therefore use enums with a "none" sentinel, empty lists and

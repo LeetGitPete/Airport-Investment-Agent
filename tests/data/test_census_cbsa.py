@@ -150,7 +150,7 @@ class TestApplyEnrichment:
             "SELECT population, gdp_real_usd FROM catchment WHERE iata = 'BOS' AND year = 2025"
         ).fetchone()
         assert bos_2025[0] > 4_000_000
-        assert bos_2025[1] is None  # no BEA source (RESCOPE)
+        assert bos_2025[1] is None  # no BEA source
 
     def test_is_idempotent(self, seeded_store: Store, normalized: dict[str, pd.DataFrame]) -> None:
         apply_cbsa_enrichment(seeded_store, normalized["cbsa_population"], normalized["cbsa_centroids"])

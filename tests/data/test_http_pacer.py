@@ -1,4 +1,4 @@
-"""The outbound-request gate (QA task 17): spacing per host, against a fake clock."""
+"""The outbound-request gate: spacing per host, verified against a fake clock."""
 from __future__ import annotations
 
 import threading

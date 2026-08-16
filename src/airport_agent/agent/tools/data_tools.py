@@ -30,11 +30,11 @@ GENERAL = "general_analyst"
 ALL_ENGINES = [CONCIERGE, EXPANSION, CAPACITY, MARKET, GENERAL]
 
 BANDS_DOC = "bands short<500, medium 500-1500, long 1500-3000, ultra>3000"
-#: QA task 18: what `find_airports` reads. OurAirports supplies identity; the FAA TAF supplies hub
-#: size and FAA region by UPDATE into the same rows (limitations row 46), so both are cited.
+#: What `find_airports` reads. OurAirports supplies identity; the FAA TAF supplies hub size and FAA
+#: region by UPDATE into the same rows, so both are cited even though the rows say 'ourairports'.
 IDENTITY_SOURCES = ("ourairports", "faa_taf")
 #: The only source a live-status call actually fetches at question time; everything else it returns
-#: is snapshot data and must keep the snapshot's own date (QA task 18).
+#: is snapshot data and must keep the snapshot's own date.
 LIVE_SOURCE = "faa_nasstatus"
 
 
@@ -107,16 +107,14 @@ def build_data_tools(data: DataService,
                      analyst: DeterministicAnalyst) -> list[tuple[ToolSpec, ProvenanceSpec]]:
     """Build the data-retrieval tools bound to a DataService (and the analyst, for route bands).
 
-    Each tool is paired with the provenance it declares (QA task 18); `ToolRegistry.register`
-    refuses a tool without one, so an unsourced result cannot reach a user by omission.
+    Each tool is paired with the provenance it declares; `ToolRegistry.register` refuses a tool
+    without one, so an unsourced result cannot reach a user by omission.
     """
 
     def find_airports(p: FindAirportsArgs) -> dict[str, Any]:
         refs = data.list_airports(AirportFilter(states=p.states, faa_regions=p.faa_regions, iatas=p.iatas,
                                                 hub_sizes=p.hub_sizes, cbsa_codes=p.cbsa_codes,
                                                 name_contains=p.name_contains, limit=p.limit))
-        # QA task 18: identity rows are OurAirports; hub size and FAA region are UPDATEd in from the
-        # FAA TAF (limitations row 46), so both are cited even though the rows say 'ourairports'.
         vintages = [v for v in data.source_vintages() if v.source_id in IDENTITY_SOURCES]
         return {"airports": [r.model_dump(mode="json") for r in refs], "count": len(refs),
                 "truncated": len(refs) == p.limit, "provenance": prov(vintages)}
@@ -143,9 +141,8 @@ def build_data_tools(data: DataService,
     def get_live_status(p: LiveStatusArgs) -> dict[str, Any]:
         live = data.get_live_status(p.iata)
         out = live.model_dump(mode="json")
-        # QA task 18: only the live feed is dated by the fetch. The latest-month traffic that rides
-        # along comes from the snapshot, and stamping it "as of now" claimed a freshness it does not
-        # have — visible the moment the provenance table put the two side by side.
+        # Only the live feed is dated by the fetch. The latest-month traffic riding along comes from
+        # the snapshot; stamping it "as of now" would claim a freshness it does not have.
         snapshot = {v.source_id: v for v in data.source_vintages()}
         entries: list[Any] = []
         for source_id in live.source_ids:
@@ -223,7 +220,7 @@ def build_registry(data: DataService, analyst: DeterministicAnalyst) -> ToolRegi
     """Compose the full tool registry (data + analysis tools) for the Concierge and the specialists.
 
     The registry is given the DataService's vintage list so a declared-but-unreturned source is cited
-    with its real date rather than a blank (QA task 18).
+    with its real date rather than a blank.
     """
     reg = ToolRegistry(source_vintages=data.source_vintages)
     for spec, provenance in [*build_data_tools(data, analyst), *build_analysis_tools(analyst)]:

@@ -57,9 +57,7 @@ ANC_ROUTES = '{"iata": "ANC"}'
 ANC_ROUTES_LONGHAUL = '{"iata": "ANC", "threshold_mi": 1500}'
 NO_ARGS = "{}"
 
-# --------------------------------------------------------------------------------------------------
 # Q1 - "Which airports in New England are strong candidates for terminal expansion?"
-# --------------------------------------------------------------------------------------------------
 Q1_PLAN = plan(intent="analytical", engines=["deterministic", "specialist:expansion_analyst"],
                question_type="rank", faa_regions=["ANE"], horizons=["5y"],
                scoring_preset="terminal_expansion", hint="terminal and gate constraints first",
@@ -78,9 +76,7 @@ Q1_SYNTHESIS = synthesis(headline="BOS leads the New England terminal-expansion 
                          hidden_reason="capacity-label rows collapsed",
                          follow_ups=["Switch to congestion_relief?", "Why is BOS first?", "Add PWM detail?"])
 
-# --------------------------------------------------------------------------------------------------
 # Q2 - "Compare LA and Santa Ana airport congestion levels."
-# --------------------------------------------------------------------------------------------------
 Q2_PLAN = plan(intent="analytical", engines=["deterministic", "specialist:capacity_analyst"],
                question_type="compare", airports=["LAX", "SNA"], horizons=["12m"],
                scoring_preset="congestion_relief", focus_metrics=P2_FOCUS,
@@ -99,9 +95,7 @@ Q2_SYNTHESIS = synthesis(headline="LAX is the more congested field; SNA is const
                          hidden_reason="scale metrics collapsed",
                          follow_ups=["Add BUR?", "Show the taxi-out trend?", "Switch horizon to 3y?"])
 
-# --------------------------------------------------------------------------------------------------
 # Q3 - "What is the percentage of long haul flights out of Anchorage airport?" (informational)
-# --------------------------------------------------------------------------------------------------
 Q3_PLAN = plan(intent="informational", engines=["tools"],
                tool_calls=[{"tool": "get_route_stats", "args_json": ANC_ROUTES}],
                presentation_notes="State the long-haul convention and separate passenger from freight.")
@@ -109,9 +103,7 @@ Q3_SYNTHESIS = synthesis(headline="About 15% of ANC passenger departures are lon
                          show_metrics=[], hidden_reason="",
                          follow_ups=["And for freight only?", "Which sources did you use?", "Compare to SEA?"])
 
-# --------------------------------------------------------------------------------------------------
 # Q4 - "What is the unmet flight demand in SFO airport and why?"
-# --------------------------------------------------------------------------------------------------
 Q4_PLAN = plan(intent="analytical", engines=["deterministic", "specialist:capacity_analyst"],
                question_type="diagnose", airports=["SFO"], horizons=["12m"],
                hint="spill model, not a load-factor cutoff",
@@ -129,9 +121,7 @@ Q4_SYNTHESIS = synthesis(headline="SFO shows two of three unmet-demand signals, 
                          hidden_reason="capacity-label rows collapsed",
                          follow_ups=["Which signal is strongest?", "Compare with OAK?", "Show the routes?"])
 
-# --------------------------------------------------------------------------------------------------
 # Follow-ups: (message, script chunk, expected extra LLM calls, answered from session memory)
-# --------------------------------------------------------------------------------------------------
 FU_Q1_PRESET = ("and with congestion_relief?",
                 [plan(intent="analytical", engines=["deterministic", "specialist:expansion_analyst"],
                       question_type="rank", faa_regions=["ANE"], horizons=["5y"],

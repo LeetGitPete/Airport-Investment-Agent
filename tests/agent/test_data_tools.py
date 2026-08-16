@@ -15,7 +15,7 @@ def test_all_tools_registered_with_engines(fake_data, fake_analyst):
     assert set(reg.names("market_analyst")) == {"find_airports", "get_profile", "get_route_stats", "explain_metric",
                                                 "get_metric_series", "compare_airports"}
     assert set(reg.names("general_analyst")) == set(reg.names())
-    # QA task 18: builders now yield (spec, provenance) pairs — every tool declares where it reads
+    # Builders yield (spec, provenance) pairs — every tool declares where it reads
     for spec, provenance in build_data_tools(fake_data, fake_analyst):
         assert spec.description and spec.json_schema()["parameters"]["type"] == "object"
         assert provenance.sources or provenance.derived_from or provenance.no_external_source

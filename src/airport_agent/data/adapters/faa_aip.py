@@ -65,7 +65,7 @@ _FY_IN_FILENAME_RE = re.compile(r"FY(\d{4})", re.IGNORECASE)
 #: `LocID` prefix marking a state/regional block grant, not a single airport (dropped).
 BLOCK_GRANT_PREFIX = "*"
 
-#: `aip_grants` columns in store order (see plan Store schema).
+#: `aip_grants` columns in store order.
 AIP_GRANTS_COLUMNS: tuple[str, ...] = ("faa_locid", "fy", "amount_usd", "source_id", "vintage")
 
 
@@ -143,7 +143,7 @@ class FaaAipAdapter:
         self._vintage: str = now.date().isoformat()
         self._fetched_at: str = now.isoformat()
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """Download all 10 fiscal years' grant workbooks (cached). `period` is ignored."""
         urls = self._resolve_urls(cache_dir)
@@ -172,7 +172,7 @@ class FaaAipAdapter:
             urls[fy] = _absolute(sub_hrefs[0])
         return urls
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"aip_grants": df}`: one row per (faa_locid, fy) with amounts summed."""
         self._set_vintage(paths)
@@ -181,7 +181,7 @@ class FaaAipAdapter:
             fy = _fy_from_filename(path)
             raw = _read_grant_table(path).copy()
             raw["faa_locid"] = raw["faa_locid"].astype(str).str.strip()
-            raw = raw[raw["faa_locid"] != "" ]
+            raw = raw[raw["faa_locid"] != ""]
             raw = raw[~raw["faa_locid"].str.startswith(BLOCK_GRANT_PREFIX)]
             raw["amount_usd"] = pd.to_numeric(raw["amount_usd"], errors="coerce")
             raw = raw.dropna(subset=["amount_usd"])
@@ -201,7 +201,7 @@ class FaaAipAdapter:
             .reset_index(drop=True)
         }
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         """Derive vintage/fetched_at from the raw files' mtimes (see `file_vintage`)."""
         xlsx_paths = [p for p in paths if p.suffix.lower() == ".xlsx"] or list(paths)

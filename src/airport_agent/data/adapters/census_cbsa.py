@@ -15,10 +15,9 @@ the keyed Census/BEA APIs):
   `https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/2024_Gaz_cbsa_national.zip`
   (`GEOID, NAME, CBSA_TYPE, INTPTLAT, INTPTLONG`).
 
-**RESCOPE (2026-08-16): population + centroids only, no BEA.** `catchment.
-gdp_real_usd` is always `None`; only the `cbsa_population`/`cbsa_pop_cagr_5y`
-metrics are computable from this source, not `msa_gdp_per_capita`/
-`msa_gdp_cagr_5y`.
+**Population + centroids only, no BEA.** `catchment.gdp_real_usd` is always
+`None`; only the `cbsa_population`/`cbsa_pop_cagr_5y` metrics are computable from
+this source, not `msa_gdp_per_capita`/`msa_gdp_cagr_5y`.
 
 Verified 2026-08-16 against the real files:
 
@@ -50,6 +49,8 @@ do this join: it has no access to `airports.lat/lon`, only the raw files.
 """
 from __future__ import annotations
 
+import calendar
+import os
 import re
 import zipfile
 from datetime import UTC, datetime
@@ -87,13 +88,12 @@ _POP_YEAR_RE = re.compile(r"^POPESTIMATE(\d{4})$")
 #: Gazetteer `CBSA_TYPE` code for a true metropolitan (as opposed to micropolitan) area.
 METRO_CBSA_TYPE = 1
 
-#: Default airport -> CBSA join radius (design 01 / plan Task 10).
+#: Default airport -> CBSA join radius (design 01).
 DEFAULT_MAX_DISTANCE_MI = 100.0
 
 CBSA_POPULATION_COLUMNS: tuple[str, ...] = ("cbsa_code", "cbsa_name", "year", "population", "source_id", "vintage")
 CBSA_CENTROID_COLUMNS: tuple[str, ...] = ("cbsa_code", "cbsa_name", "lat", "lon", "source_id", "vintage")
-#: `catchment` columns in store order (see plan Store schema). `gdp_real_usd` is always None
-#: (no BEA source in this RESCOPE).
+#: `catchment` columns in store order. `gdp_real_usd` is always None (no BEA source).
 CATCHMENT_COLUMNS: tuple[str, ...] = (
     "iata",
     "cbsa_code",
@@ -217,7 +217,7 @@ class CensusCbsaAdapter:
         self._period_start: str | None = None
         self._period_end: str | None = None
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """Download both population vintages and the gazetteer (cached). `period` is ignored."""
         pop_paths = [
@@ -244,14 +244,11 @@ class CensusCbsaAdapter:
             except BaseException:
                 part.unlink(missing_ok=True)
                 raise
-        import calendar
-        import os
-
         stamp = calendar.timegm((*info.date_time, 0, 0, -1))
         os.utime(dest, (stamp, stamp))
         return dest
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"cbsa_population": df, "cbsa_centroids": df}` (feed `apply_cbsa_enrichment`)."""
         self._set_vintage(paths)
@@ -284,7 +281,7 @@ class CensusCbsaAdapter:
             .reset_index(drop=True),
         }
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         """Derive vintage/fetched_at from the raw files' mtimes (see `file_vintage`)."""
         self._vintage, self._fetched_at = file_vintage(paths)
@@ -298,7 +295,7 @@ class CensusCbsaAdapter:
             source_id=self.id,
             description=(
                 "Census Bureau CBSA population estimates (2010-2019 + 2020-2025 vintages) and "
-                "Gazetteer CBSA centroids — population + geography only, no BEA (RESCOPE)"
+                "Gazetteer CBSA centroids — population + geography only, no BEA"
             ),
             period_start=self._period_start,
             period_end=self._period_end,

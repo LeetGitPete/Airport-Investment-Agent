@@ -26,6 +26,10 @@ LONGHAUL_CONVENTION = ("Long-haul convention: routes >= 1,500 statute miles (ban
                        "long 1500-3000, ultra>3000); passenger and freight computed separately")
 SPILL_CONVENTION = "Load factor is interpreted via the spill model (with spill_proxy), not an absolute cutoff"
 
+#: `get_routes` top_n for the distance calculators: high enough that no real airport's route
+#: list is truncated, so a band share is computed over the whole network, not a top slice.
+_ALL_ROUTES = 1000
+
 DIAGNOSE_IDS = ["load_factor", "spill_proxy", "seats_per_dep_trend", "pct_arr_delay_gt15", "avg_dep_delay_min",
                 "nas_delay_share", "taxi_out_p80_min", "npias_capacity_label", "slot_or_cap_flag",
                 "peak_hour_ops_ratio", "imc_capacity_ratio", "taf_vs_actual_gap", "taf_cagr_10y"]
@@ -33,6 +37,9 @@ LABELS = {0: "none", 1: "congested", 2: "constrained_2033", 3: "constrained_2028
 
 
 class Analyst:
+    #: Peer expansion cap for a single-airport rank: enough context to rank in, few enough to read.
+    PEER_EXPANSION_LIMIT = 30
+
     def __init__(self, data: DataService, presets_path: Path | None = None) -> None:
         self.data = data
         self.specs = data.describe_metrics()
@@ -40,7 +47,7 @@ class Analyst:
         self.presets = load_presets(presets_path)
         self.scorer = Scorer(self.specs)
 
-    # ---- helpers -------------------------------------------------------------------------------
+    # helpers
     def _preset(self, name: str | None) -> Preset:
         key = name or "balanced"
         if key not in self.presets:
@@ -63,21 +70,16 @@ class Analyst:
     def _universe(self) -> list[AirportRef]:
         return self.data.list_airports(AirportFilter(limit=UNIVERSE_LIMIT))
 
-    #: Peer expansion cap: enough context to rank in, small enough to read (QA task 8).
-    PEER_EXPANSION_LIMIT = 30
-
     def _expand_to_peers(self, iata: str) -> tuple[list[str], str]:
         """Expand a lone rank target to its hub-size class (largest first, capped, target kept)."""
         ref = self.data.get_airport(iata)
         if ref is None:
             raise KeyError(iata)  # matches get_feature_matrix's unknown-iata semantics
         peers = [a.iata for a in self.data.list_airports(
-            AirportFilter(hub_sizes=[ref.hub_size] if ref.hub_size else None,
-                          limit=self.PEER_EXPANSION_LIMIT))]
+            AirportFilter(hub_sizes=[ref.hub_size], limit=self.PEER_EXPANSION_LIMIT))]
         targets = list(dict.fromkeys([iata, *peers]))[: self.PEER_EXPANSION_LIMIT]
-        hub = ref.hub_size or "unknown"
         return targets, (f"A single airport cannot be ranked: expanded to {len(targets)} "
-                         f"{hub}-hub peers so {iata} has context (largest by enplanements, "
+                         f"{ref.hub_size}-hub peers so {iata} has context (largest by enplanements, "
                          f"capped at {self.PEER_EXPANSION_LIMIT}).")
 
     def _resolve_metric_ids(self, preset: Preset, focus_metrics: list[str] | None) -> tuple[list[str], list[str]]:
@@ -159,7 +161,7 @@ class Analyst:
                     out.append(c)
         return out
 
-    # ---- DeterministicAnalyst -------------------------------------------------------------------
+    # DeterministicAnalyst
     def rank(self, req: AnalysisRequest) -> DeterministicReport:
         if not req.horizons:
             raise ValueError("horizons must not be empty")
@@ -169,14 +171,14 @@ class Analyst:
         targets = self._resolve_airports(req)
         expansion_caveat: str | None = None
         if len(targets) == 1:
-            # QA task 8 (human decision 2026-08-16): a single airport cannot be ranked, so expand
-            # to its hub-size peers and rank it in that context ("SNA ranks 4th of 12...").
+            # A single airport cannot be ranked against nothing: expand to its hub-size peers and
+            # rank it in that context ("SNA ranks 4th of 12...").
             targets, expansion_caveat = self._expand_to_peers(targets[0])
         metric_ids, dropped_caveats = self._resolve_metric_ids(preset, req.focus_metrics)
         res, n_uni = self._score_targets(targets, metric_ids, horizon, peer_group, preset)
         evidence, ev, facts = self._evidence(targets, metric_ids, horizon)
         rows: list[ScoreRow] = res.rows
-        # Per-airport raw values for the answer's data matrix (QA task 5) — same shape compare uses.
+        # Per-airport raw values for the answer's data matrix — same shape compare uses.
         comparison = {m: {i: (ev[(i, m)].value if (i, m) in ev else None) for i in targets}
                       for m in metric_ids}
 
@@ -227,11 +229,11 @@ class Analyst:
             caveats=caveats, curated_facts=facts, percentiles=res.percentiles)
 
     def distance_bands(self, iata: str, horizon: Horizon = "12m", freight: bool = False) -> dict[str, float]:
-        return _bands(self.data.get_routes(iata, horizon=horizon, top_n=1000), freight=freight)
+        return _bands(self.data.get_routes(iata, horizon=horizon, top_n=_ALL_ROUTES), freight=freight)
 
     def long_haul_share(self, iata: str, threshold_mi: float = 1500, horizon: Horizon = "12m",
                         freight: bool = False) -> Metric:
-        return _lhs(self.data.get_routes(iata, horizon=horizon, top_n=1000), threshold_mi=threshold_mi,
+        return _lhs(self.data.get_routes(iata, horizon=horizon, top_n=_ALL_ROUTES), threshold_mi=threshold_mi,
                     freight=freight, horizon=horizon)
 
     def _signals(self, iata: str, ev: Evidence, pcts: dict[str, dict[str, float | None]]

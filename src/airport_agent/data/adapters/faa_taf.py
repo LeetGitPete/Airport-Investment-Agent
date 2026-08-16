@@ -63,7 +63,7 @@ OPERATION_COMPONENTS: tuple[str, ...] = ("itn_Ac", "itn_at", "itn_ga", "itn_mil"
 #: FAA numeric hub class → the `airports.hub_size` vocabulary.
 HUB_SIZE_MAP: dict[int, str] = {3: "large", 2: "medium", 1: "small", 0: "nonhub"}
 
-#: `taf_history` / `taf_forecast` columns in store order (see plan Store schema).
+#: `taf_history` / `taf_forecast` columns in store order.
 TAF_COLUMNS: tuple[str, ...] = (
     "faa_locid",
     "year",
@@ -135,7 +135,7 @@ class FaaTafAdapter:
         self._period_end: str | None = None
         self.base_year: int = DOCUMENTED_BASE_YEAR
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """Download the TAF zip (cached) and extract the three members into `cache_dir`.
 
@@ -175,7 +175,7 @@ class FaaTafAdapter:
         os.utime(dest, (stamp, stamp))
         return dest
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"taf_history": df, "taf_forecast": df, "airports": df}`."""
         files = _by_name(paths)
@@ -252,7 +252,7 @@ class FaaTafAdapter:
         )
         return out[list(ENRICHMENT_COLUMNS)].sort_values("faa_locid").reset_index(drop=True)
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         """Derive vintage/fetched_at from the raw files' mtimes (see `file_vintage`)."""
         self._vintage, self._fetched_at = file_vintage(paths)

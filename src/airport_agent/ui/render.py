@@ -44,23 +44,8 @@ def assumptions_expanded(answer: Answer) -> bool:
     return answer.plan.intent == "analytical"
 
 
-def metric_ids_in_table(table: Table, specs_by_id: dict[str, MetricSpec]) -> list[str]:
-    """Registered metric ids that appear as *cell values* anywhere in the table (e.g. a long-format table
-    with a metric-id column) — complements `column_help`'s column-name tooltips, in first-appearance
-    order, deduplicated."""
-    seen: list[str] = []
-    for row in table.rows:
-        for cell in row:
-            if isinstance(cell, str) and cell in specs_by_id and cell not in seen:
-                seen.append(cell)
-    return seen
-
-
 def render_plan_line(plan_line: str) -> None:
     st.caption(plan_line)
-
-
-_MAX_METRIC_DEFINITION_LINES = 12
 
 
 def _render_table(table: Table, specs_by_id: dict[str, MetricSpec]) -> None:
@@ -69,8 +54,6 @@ def _render_table(table: Table, specs_by_id: dict[str, MetricSpec]) -> None:
     st.dataframe(df, column_config=column_help(table.columns, specs_by_id), hide_index=True)
     for note in table.footnotes:
         st.caption(note)
-    # QA 2026-08-16: per-metric definition captions removed (metric definitions are available via
-    # column tooltips and the explain_metric tool; the caption block was noisy and used internal ids).
 
 
 def render_answer(
@@ -86,9 +69,9 @@ def render_answer(
     computed = [t for t in answer.evidence_tables if not t.title.startswith(_ANALYST_TABLE_PREFIX)]
     analyst_tables = [t for t in answer.evidence_tables if t.title.startswith(_ANALYST_TABLE_PREFIX)]
 
-    # QA task 10: the deterministic score is front and center, straight under the headline,
-    # with a one-line statement of how it is computed. Values come from the Scores table so
-    # the strip can never disagree with it.
+    # The deterministic score goes front and centre, straight under the headline, with a one-line
+    # statement of how it is computed. Values come from the Scores table, so the strip can never
+    # disagree with it.
     summary = score_summary(computed)
     if summary:
         chip_cols = st.columns(len(summary["scores"]))
@@ -99,7 +82,7 @@ def render_answer(
                 if summary["total"] > summary["shown"] else "")
         st.caption(f"{summary['label'].capitalize()} (0–100). {summary['caption']}{more}")
 
-    # QA task 6 layout: headline -> analyst view (+ its ranking) -> computed scores & data.
+    # Layout: headline -> analyst view (+ its ranking) -> computed scores & data.
     if analyst_tables or answer.analyst_view:
         st.subheader("🧠 Analyst view (AI specialist)")
         st.caption("The specialist's interpretation — it cites the computed evidence, "
@@ -115,7 +98,7 @@ def render_answer(
     if computed:
         st.subheader("📊 Computed analysis")
         st.caption("Every number below is computed from the cited data; the AI cannot alter it.")
-    # QA task 5: every computed table renders in place — data is never tucked behind an expander.
+    # Every computed table renders in place — data is never tucked behind an expander.
     for table in computed:
         _render_table(table, specs_by_id)
 

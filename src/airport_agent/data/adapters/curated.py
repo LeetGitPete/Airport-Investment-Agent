@@ -30,10 +30,10 @@ from airport_agent.data.paths import curated_dir
 
 FACTS_FILE = "airport_facts.yaml"
 
-#: The keys `curated_inputs` may hold (plan 2a store schema).
+#: The keys `curated_inputs` may hold.
 ALLOWED_INPUT_KEYS = {"gates", "declared_rate_vmc", "declared_rate_imc", "slot_or_cap_flag"}
 
-#: The fact categories the design allows (plan 2a Task 12).
+#: The fact categories the design allows.
 ALLOWED_CATEGORIES = {"slot_level", "constraint", "project"}
 
 FACTS_COLUMNS = ("iata", "category", "text", "value", "source_url", "as_of", "expires")
@@ -85,7 +85,7 @@ class CuratedFactsAdapter:
         self._vintage: str | None = None
         self._fetched_at: str | None = None
 
-    # -- fetch ---------------------------------------------------------------
+    # fetch
     def fetch(self, period: Period | None, cache_dir: Path) -> list[Path]:
         """A local file: nothing to download — return the curated YAML's path."""
         path = curated_dir() / FACTS_FILE
@@ -94,7 +94,7 @@ class CuratedFactsAdapter:
         self._set_vintage([path])
         return [path]
 
-    # -- normalize -----------------------------------------------------------
+    # normalize
     def normalize(self, paths: list[Path]) -> dict[str, pd.DataFrame]:
         """Return `{"curated_facts": df, "curated_inputs": df}`."""
         if len(paths) != 1:
@@ -134,7 +134,7 @@ class CuratedFactsAdapter:
         inputs = pd.DataFrame(input_rows, columns=list(INPUTS_COLUMNS))
         return {"curated_facts": facts, "curated_inputs": inputs}
 
-    # -- provenance ----------------------------------------------------------
+    # provenance
     def _set_vintage(self, paths: list[Path]) -> None:
         self._vintage, self._fetched_at = file_vintage(paths)
 

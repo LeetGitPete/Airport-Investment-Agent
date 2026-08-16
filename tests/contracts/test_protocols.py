@@ -13,7 +13,7 @@ from airport_agent.contracts import (
 )
 
 
-def test_reexports_and_protocols_are_runtime_checkable():
+def test_reexports_and_protocol_surface():
     assert hasattr(DataService, "get_feature_matrix") and hasattr(DeterministicAnalyst, "diagnose")
     assert hasattr(LLMClient, "chat") and hasattr(SpecialistRunner, "run")
     r = LLMResult(text="hi", tool_calls=[ToolCall(id="1", name="find_airports", arguments={"states": ["MA"]})],

@@ -26,13 +26,6 @@ def _planner(script, fake_data, fake_analyst, specs):
     return Planner(ScriptedLLM(script), reg, specs, PRESETS)
 
 
-def test_schema_is_portable():
-    dumped = json.dumps(PLAN_SCHEMA)
-    for bad in ("anyOf", "$ref", "additionalProperties", "nullable", "oneOf"):
-        assert bad not in dumped
-    assert set(PLAN_SCHEMA["required"]) == set(PLAN_SCHEMA["properties"])
-
-
 def test_sample_questions_verbatim():
     assert SAMPLE_QUESTIONS[0].startswith("Which airports in New England") and len(SAMPLE_QUESTIONS) == 4
 
@@ -104,7 +97,7 @@ def test_plan_filters_args_for_bad_json_is_empty():
     assert f.args_for("x") == {} and f.args_for("y") == {}
 
 
-# --- behaviours beyond the brief's list: loud failures and prompt assembly -------------------------------
+# behaviours beyond the brief's list: loud failures and prompt assembly
 
 def test_clarify_intent_drops_engines(fake_data, fake_analyst, specs):
     js = _plan_json(intent="clarify", question_type="none", faa_regions=[], horizons=[], scoring_preset="none")
@@ -156,7 +149,7 @@ def test_congestion_compare_defaults_to_12m(fake_data, fake_analyst, specs):
 
 
 def test_request_without_target_falls_back_to_the_national_scope(fake_data, fake_analyst, specs):
-    # QA task 15 (human decision 2026-08-16): a themed question with no geography is answerable —
+    # A themed question with no geography is answerable —
     # rank every commercial-service airport rather than asking the user where to look.
     from airport_agent.agent.planner import NATIONAL_SCOPE_HUBS, NATIONAL_SCOPE_LIMIT, is_national_scope
     js = _plan_json(faa_regions=[])

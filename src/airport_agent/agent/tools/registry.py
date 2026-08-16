@@ -11,7 +11,7 @@ from airport_agent.contracts import LLMError, ToolSpec
 
 
 class ToolRegistry:
-    """Named subsets of pydantic-validated tools, each with a declared provenance (QA task 18).
+    """Named subsets of pydantic-validated tools, each with a declared provenance.
 
     `source_vintages` is how a declared-but-missing source gets a real vintage rather than a blank:
     the callable is the DataService's own vintage list, injected so the registry stays free of a data
@@ -26,15 +26,15 @@ class ToolRegistry:
     def register(self, spec: ToolSpec, *, provenance: ProvenanceSpec) -> None:
         if spec.name in self._tools:
             raise ValueError(f"duplicate tool name {spec.name!r}")
-        # QA task 18 (2026-08-16): a tool must say where its data comes from before it can be called.
-        # Declared at registration so a tool added later cannot ship silently unsourced.
+        # A tool must say where its data comes from before it can be called. Declared at registration,
+        # so a tool added later cannot ship silently unsourced.
         if not isinstance(provenance, ProvenanceSpec):
             raise ValueError(f"tool {spec.name!r}: provenance must be a ProvenanceSpec — declare the "
                              "sources it reads, or ProvenanceSpec.none(reason) if it reads none")
         self._provenance[spec.name] = provenance
-        # QA task 14 (2026-08-16): every tool's argument model must forbid extras. That is what puts
-        # "additionalProperties": false into the schema the provider sees, and what turns an invented
-        # argument into a loud, repairable error instead of a silently ignored key.
+        # Every tool's argument model must forbid extras. That is what puts "additionalProperties": false
+        # into the schema the provider sees, and what turns an invented argument into a loud, repairable
+        # error instead of a silently ignored key.
         if spec.params_model.model_config.get("extra") != "forbid":
             raise ValueError(f"tool {spec.name!r}: params_model must set extra='forbid' so unknown "
                              "arguments are rejected rather than ignored")
@@ -51,8 +51,6 @@ class ToolRegistry:
 
     def openai_tools(self, engine: str) -> list[dict[str, Any]]:
         return [{"type": "function", "function": s.json_schema()} for s in self.for_engine(engine)]
-
-    # ---------------- argument introspection (QA task 14) ----------------
 
     def arg_names(self, name: str) -> tuple[list[str], list[str]]:
         """(all argument names, required ones) for a tool — the single source for prompts and errors."""
@@ -86,8 +84,8 @@ class ToolRegistry:
         try:
             params = spec.params_model(**args)
         except ValidationError as e:
-            # QA task 14: the error names what IS accepted, so the caller (LLM or human) can fix it
-            # in one step instead of guessing again.
+            # Name what IS accepted, so the caller (LLM or human) can fix it in one step
+            # instead of guessing again.
             return err(
                 "invalid arguments: "
                 + "; ".join(f"{'.'.join(map(str, x['loc']))}: {x['msg']}" for x in e.errors())
@@ -107,8 +105,6 @@ class ToolRegistry:
         out.setdefault("truncated", False)
         self._apply_provenance(name, out)
         return out
-
-    # ---------------- provenance (QA task 18) ----------------
 
     def provenance_spec(self, name: str) -> ProvenanceSpec:
         return self._provenance[name]

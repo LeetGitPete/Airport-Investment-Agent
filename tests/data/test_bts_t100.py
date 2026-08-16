@@ -132,12 +132,6 @@ class TestValues:
         assert (routes["aircraft_config"] != "").all()
 
 
-@pytest.mark.skip(reason="T-100 International Segment table not landed (15-min probe, 2026-08-16) — see module docstring")
-class TestInternational:
-    def test_jfk_has_an_international_route(self) -> None:
-        ...
-
-
 class TestVintage:
     def test_vintage_describes_the_source(self, fixture_path: Path) -> None:
         adapter = BtsT100SegmentAdapter()

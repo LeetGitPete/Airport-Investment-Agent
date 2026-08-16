@@ -46,7 +46,7 @@ class TestNpiasDevPerEnpl:
 
 
 class TestCutSourcesAlwaysEmpty:
-    """cpe_usd / nonaero_rev_per_enpl — FAA CATS cut by the RESCOPE (still missing)."""
+    """cpe_usd / nonaero_rev_per_enpl — no FAA CATS adapter, so both are always absent."""
 
     @pytest.mark.parametrize("metric_id", ["cpe_usd", "nonaero_rev_per_enpl"])
     def test_always_empty(self, tmp_store: Store, metric_id: str) -> None:
@@ -56,7 +56,7 @@ class TestCutSourcesAlwaysEmpty:
 
 
 class TestAipPerEnpl10y:
-    """`aip_per_enpl_10y` — un-cut on branch `feature/data-extras` (2026-08-16) once the
+    """`aip_per_enpl_10y` — computed for real once the
     `faa_aip` adapter landed; no longer in `MISSING_REASONS`."""
 
     def _seed_airport(self, store: Store) -> None:

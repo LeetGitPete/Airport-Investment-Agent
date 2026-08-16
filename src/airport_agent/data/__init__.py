@@ -1,7 +1,7 @@
 """Data: ingestion, loading, and caching of airport datasets.
 
-`DuckDBDataService` (Task 14) is the only supported way to read the snapshot;
-`refresh` (Task 15) is the only supported way to write it.
+`DuckDBDataService` is the only supported way to read the snapshot; `refresh` is the
+only supported way to write it.
 """
 from __future__ import annotations
 
