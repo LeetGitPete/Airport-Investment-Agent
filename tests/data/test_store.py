@@ -1,4 +1,4 @@
-"""Task 1: paths, sources config, Store schema."""
+"""Paths, the sources-config loader, and the Store schema."""
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -110,7 +110,7 @@ EXPECTED_COLUMNS: dict[str, set[str]] = {
 }
 
 
-def test_schema_columns_match_plan_exactly(tmp_store: Store) -> None:
+def test_schema_columns_are_exactly_as_declared(tmp_store: Store) -> None:
     assert set(EXPECTED_COLUMNS.keys()) == set(TABLE_NAMES)
     for table, expected_cols in EXPECTED_COLUMNS.items():
         rows = tmp_store.con.execute(

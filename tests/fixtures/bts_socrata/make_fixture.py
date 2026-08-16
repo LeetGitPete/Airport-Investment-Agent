@@ -8,7 +8,7 @@ single-page JSON response next to this file. Full history (2014+) for all 15
 airports is ~522 KB — over the fixture budget — so this subset trims to the last
 ~4.3 years (2022-2026) plus one extra complete year (2020).
 
-The 2020 year was added by the Task 13/14 dispatch (2026-08-16): the frozen
+The 2020 year is included because the frozen
 `tests/contracts/test_data_service_contract.py::test_feature_matrix_conforms_to_registry`
 requires `seats_per_dep_trend` (a genuine 5-years-ago comparison, tier A, not in
 `ATTEMPT_IDS`) to be non-None at the 5y horizon for BOS/SFO/ANC — the original

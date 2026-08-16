@@ -2,7 +2,7 @@
 
 Usage: uv run python tests/fixtures/bts_t100/make_fixture_extra_months.py
 
-Added by the Task 13/14 dispatch (2026-08-16): the frozen
+These months exist because the frozen
 `tests/contracts/test_data_service_contract.py::test_feature_matrix_12m_covers_tier_a`
 requires `spill_proxy` (tier A, 12m, not in `ATTEMPT_IDS`) to be non-None for BOS/SFO/ANC.
 `spill_proxy` needs >=6 months of data for at least one (dest, carrier) pair per airport

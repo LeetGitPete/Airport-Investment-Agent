@@ -1,7 +1,7 @@
 """Every tool declares where its data comes from, and honours the declaration.
 
-This is the sweep that found the bug, kept as a guard. On 2026-08-16 a manual pass over every tool
-found `find_airports` shipping 50 airports with no provenance at all — the key was never set and the
+This is the sweep that found the bug, kept as a guard: a manual pass over every tool once found
+`find_airports` shipping 50 airports with no provenance at all — the key was never set and the
 registry's `setdefault` filled in `[]`. A one-off audit finds that once; this finds it forever, and
 fails the moment a new tool is added without a declaration.
 """
@@ -72,8 +72,7 @@ def test_every_tool_result_honours_its_declaration(name, registry):
 def test_every_rendered_table_is_attributable(name, registry, fake_data):
     """Either the table carries its own source column, or the answer's provenance table covers it.
 
-    This is the (C) split the human chose on 2026-08-16: metric-level tables keep inline columns;
-    everything else is covered once, at the end.
+    Metric-level tables keep inline source columns; everything else is covered once, at the end.
     """
     by_id = registry_by_id(fake_data.describe_metrics())
     out = registry.call(name, CALLS[name], engine="concierge")
@@ -106,8 +105,8 @@ def test_the_provenance_table_merges_periods_and_names_its_users():
 def test_a_source_that_supplied_no_number_is_never_cited(fake_data, fake_analyst):
     """Sources that never landed keep a nominal source_id on their empty metrics — never cite them.
 
-    Found by this sweep on 2026-08-16: score_airports was citing bea_msa, bts_db1b, faa_cats and
-    bts_delay_cause, none of which have a single row in the snapshot.
+    Found by this sweep: score_airports was citing bea_msa, bts_db1b, faa_cats and bts_delay_cause,
+    none of which have a single row in the snapshot.
     """
     from airport_agent.agent.synthesis import _metric_provenance
     registry = build_registry(fake_data, fake_analyst)
@@ -128,8 +127,8 @@ def _all_metrics(fake_data):
 def test_only_the_live_feed_is_dated_by_the_fetch(registry, fake_data):
     """Snapshot traffic riding along with a live call keeps the snapshot's date, not "as of now".
 
-    Found on 2026-08-16 when the provenance table put the two side by side and the April snapshot
-    claimed the live fetch time.
+    Found when the provenance table put the two side by side and the April snapshot claimed the
+    live fetch time.
     """
     out = registry.call("get_live_status", {"iata": "SFO"}, engine="concierge")
     fetched = out["fetched_at"]

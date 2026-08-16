@@ -68,38 +68,36 @@ class FakeAnalyst:
             percentiles[iata] = (n - rank) / (n - 1) if n > 1 else 0.5
         return rows, evidence, curated_facts, {"load_factor": percentiles}, horizon, peer_group, by_metric
 
-    def rank(self, req: AnalysisRequest) -> DeterministicReport:
+    def _report(self, req: AnalysisRequest, explanation: str) -> DeterministicReport:
+        """One report shape for all three methods; only the explanation differs.
+
+        `comparison` carries the per-airport raw values for every method, mirroring the real Analyst.
+        """
         rows, evidence, curated_facts, percentiles, horizon, peer_group, by_metric = self._build(req)
-        # mirrors the real Analyst.rank: rank reports carry per-airport raw values too
-        comparison = {mid: dict(vals) for mid, vals in by_metric.items()}
         return DeterministicReport(question_type=req.question_type, preset=req.scoring_preset, weights=_WEIGHTS,
-                                    horizon=horizon, peer_group=peer_group, rows=rows, comparison=comparison,
-                                    evidence=evidence, explanation="fake rank", caveats=list(_CAVEATS),
+                                    horizon=horizon, peer_group=peer_group, rows=rows,
+                                    comparison={mid: dict(vals) for mid, vals in by_metric.items()},
+                                    evidence=evidence, explanation=explanation, caveats=list(_CAVEATS),
                                     curated_facts=curated_facts, percentiles=percentiles)
+
+    def rank(self, req: AnalysisRequest) -> DeterministicReport:
+        return self._report(req, "fake rank")
 
     def compare(self, req: AnalysisRequest) -> DeterministicReport:
-        rows, evidence, curated_facts, percentiles, horizon, peer_group, by_metric = self._build(req)
-        comparison = {mid: dict(vals) for mid, vals in by_metric.items()}
-        return DeterministicReport(question_type=req.question_type, preset=req.scoring_preset, weights=_WEIGHTS,
-                                    horizon=horizon, peer_group=peer_group, rows=rows, comparison=comparison,
-                                    evidence=evidence, explanation="fake compare", caveats=list(_CAVEATS),
-                                    curated_facts=curated_facts, percentiles=percentiles)
+        return self._report(req, "fake compare")
 
     def diagnose(self, req: AnalysisRequest) -> DeterministicReport:
-        rows, evidence, curated_facts, percentiles, horizon, peer_group, by_metric = self._build(req)
-        comparison = {mid: dict(vals) for mid, vals in by_metric.items()}
         target = self._targets(req)[0]
+        by_metric = self._build(req)[6]
+
+        def mark(ok: bool) -> str:
+            return "✔" if ok else "✘"
+
         delay = (by_metric["avg_dep_delay_min"].get(target) or 0) > 12.0
         npias = (by_metric["npias_capacity_label"].get(target) or 0) > 0
         lf = (by_metric["load_factor"].get(target) or 0) > 0.85
-        count = sum([delay, npias, lf])
-        mark = lambda ok: "✔" if ok else "✘"  # noqa: E731
-        explanation = (f"Signals of unmet demand at {target}: {count} of 3 present. "
-                       f"{mark(delay)} delay {mark(npias)} npias {mark(lf)} lf")
-        return DeterministicReport(question_type=req.question_type, preset=req.scoring_preset, weights=_WEIGHTS,
-                                    horizon=horizon, peer_group=peer_group, rows=rows, comparison=comparison,
-                                    evidence=evidence, explanation=explanation, caveats=list(_CAVEATS),
-                                    curated_facts=curated_facts, percentiles=percentiles)
+        return self._report(req, f"Signals of unmet demand at {target}: {sum([delay, npias, lf])} of 3 "
+                                 f"present. {mark(delay)} delay {mark(npias)} npias {mark(lf)} lf")
 
     def distance_bands(self, iata: str, horizon: Horizon = "12m", freight: bool = False) -> dict[str, float]:
         rows = self.data.get_routes(iata, horizon=horizon).rows

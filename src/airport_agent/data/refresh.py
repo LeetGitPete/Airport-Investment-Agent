@@ -20,8 +20,8 @@ full history in one API call chain):**
   only that month's rows are replaced — the rest of the retained window is untouched.
 - no `--period`, `--full`: fetch the trailing `t100_months`/`otp_months` (from
   `config/sources.yaml`) months, probing backward from the current UTC month for
-  publication lag, and REPLACE the source's entire table (the RESCOPE's "trailing N months
-  only" design means old months outside the window are meant to drop off).
+  publication lag, and REPLACE the source's entire table (these sources retain a trailing
+  window only, so months outside it are meant to drop off).
 - no `--period`, not `--full`: fetch just the single latest available month (a light
   incremental default) — same replace-that-one-month semantics as `--period`.
 """
