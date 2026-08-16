@@ -1,3 +1,3 @@
 Contracts (src/airport_agent/contracts/) and config/metrics.yaml frozen 2026-08-15 at tag contracts-v1;
-re-frozen 2026-08-16 at tag contracts-v2 (table display fields — known-limitations row 63).
+re-frozen 2026-08-16 at contracts-v2 (table display, row 63) and contracts-v3 (conversation memory, row 64).
 Changes need a human decision + CONTRACTS_UNFROZEN=1 + rebase of all open worktrees (see CLAUDE.md, design 05 §5.6).

@@ -430,3 +430,86 @@ def test_an_unknown_table_display_label_degrades_to_auto(fake_data, fake_analyst
                        FINAL, SYN], fake_data, fake_analyst, specs)
     ans = c.answer("rank NE", SessionState(session_id="s", title="t"))
     assert ans.plan.table_display == "auto"
+
+
+# conversation memory (contracts-v3): archive per turn, source_turn, background compaction
+
+
+def _analysis(**over):
+    return [_plan_json(**over), LLMResult(text="ok", provider="f", model="m"), FINAL, SYN]
+
+
+def test_every_computed_analysis_is_archived_under_its_turn_and_followups_are_not(fake_data, fake_analyst, specs):
+    c, _ = _concierge([*_analysis(), _followup(), SYN,
+                       *_analysis(question_type="compare", airports=["SFO", "LAX"], faa_regions=[],
+                                  engines=["deterministic", "specialist:capacity_analyst"])],
+                      fake_data, fake_analyst, specs)
+    state = SessionState(session_id="s", title="t")
+    c.answer("rank NE", state)
+    c.answer("why?", state)
+    c.answer("compare SFO and LAX", state)
+    assert sorted(state.report_archive) == [1, 3]
+    assert state.report_archive[1][0].question_type == "rank" and state.report_archive[3][0].question_type == "compare"
+    assert state.last_reports["deterministic"].question_type == "compare"
+
+
+def test_a_followup_can_name_an_earlier_analysis(fake_data, fake_analyst, specs):
+    c, llm = _concierge([*_analysis(),
+                         *_analysis(question_type="compare", airports=["SFO", "LAX"], faa_regions=[],
+                                    engines=["deterministic", "specialist:capacity_analyst"]),
+                         _followup(source_turn=1), SYN], fake_data, fake_analyst, specs)
+    state = SessionState(session_id="s", title="t")
+    c.answer("rank NE", state)
+    c.answer("compare SFO and LAX", state)
+    third = c.answer("back to the New England ranking - why was BOS first?", state)
+    entry = third.tool_trace[0]
+    assert entry.tool == "session_memory" and entry.args == {"source_turn": 1}
+    assert "turn 1" in (entry.note or "")
+    # The synthesis prompt for the follow-up carried the ranking (turn 1), not the comparison.
+    syn_user = llm.calls[-1]["messages"][-1]["content"]
+    det_view = syn_user.split("Deterministic view: ")[1].split("\n\n")[0]
+    assert '"iata": "BOS"' in det_view and '"iata": "SFO"' not in det_view
+    # And the planner was shown the archive index to choose from.
+    plan_sys = llm.calls[-2]["messages"][0]["content"]
+    assert "ANALYSES IN MEMORY" in plan_sys and "turn 1: rank" in plan_sys and "turn 2: compare" in plan_sys
+
+
+def test_an_unknown_source_turn_falls_back_to_the_last_reports(fake_data, fake_analyst, specs):
+    c, _ = _concierge([*_analysis(), _followup(source_turn=9), SYN], fake_data, fake_analyst, specs)
+    state = SessionState(session_id="s", title="t")
+    c.answer("rank NE", state)
+    ans = c.answer("why?", state)
+    assert ans.tool_trace[0].note == "answered from last reports"
+
+
+def test_history_reaches_the_synthesis_prompt(fake_data, fake_analyst, specs):
+    c, llm = _concierge([*_analysis(), _followup(), SYN], fake_data, fake_analyst, specs)
+    state = SessionState(session_id="s", title="t")
+    c.answer("rank NE", state)
+    c.answer("why?", state)
+    syn_user = llm.calls[-1]["messages"][-1]["content"]
+    assert "RECENT TURNS" in syn_user and "[turn 1] Q: rank NE" in syn_user
+
+
+def test_compaction_is_scheduled_after_the_answer_and_applied_before_the_next_plan(fake_data, fake_analyst, specs):
+    from airport_agent.agent.compaction import Compactor
+    from tests.agent.test_history import Inline
+
+    script = [*_analysis()]
+    for _ in range(6):
+        script += [_followup(), SYN]
+    # turn 6 is the first due turn (6 % 2 == 0 and turn 1 is older than the 5-turn window): the
+    # compaction call is the next script entry after turn 6's synthesis.
+    script.insert(4 + 5 * 2, "SUMMARY: turn 1 ranked New England; BOS led.")
+    c, llm = _concierge(script, fake_data, fake_analyst, specs)
+    c.compactor = Compactor(llm, executor=Inline())
+    state = SessionState(session_id="s", title="t")
+    c.answer("rank NE", state)
+    for i in range(5):
+        c.answer(f"follow-up {i}", state)
+    assert len(state.messages) == 12 and c.compactor.pending("s")
+    assert state.summary == ""  # scheduled, not applied: the turn that produced it never sees it
+    c.answer("one more", state)
+    assert state.summary == "SUMMARY: turn 1 ranked New England; BOS led." and state.summary_through_turn == 1
+    plan_sys = llm.calls[-2]["messages"][0]["content"]
+    assert "SUMMARY OF EARLIER TURNS (through turn 1)" in plan_sys and "[turn 1]" not in plan_sys

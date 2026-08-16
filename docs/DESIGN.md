@@ -26,7 +26,7 @@ So the first thing the agent does is classify the turn, and the classification d
 |---|---|---|
 | **informational** | Looking up a fact | Data tools only. No scoring, no specialist. |
 | **analytical** | Judging, ranking, comparing | Deterministic scorer **then** one LLM specialist |
-| **followup** | Pressing on the previous answer | Answers from the previous reports if they already contain it — no recompute; tables already on screen collapse to a pointer (content-hashed), never repeated |
+| **followup** | Pressing on an earlier answer | Answers from the archived reports of the turn it refers to — no recompute; tables already on screen collapse to a pointer, never repeated. Memory = a running summary (compacted in the background every 2 turns, capped) + the last 5 turns verbatim |
 | **clarify** | Hasn't given enough to act on | One targeted question back |
 
 `analytical` splits again by what the analyst actually wants — **rank** (which of these), **compare** (this vs

@@ -184,10 +184,14 @@ class Synthesizer:
     def _user_message(self, *, message: str, plan: Plan, req: AnalysisRequest | None,
                       deterministic: DeterministicReport | None, specialist: SpecialistReport | None,
                       tool_results: list[tuple[str, dict, dict]],
-                      defaults: dict[str, str] | None) -> str:
+                      defaults: dict[str, str] | None, history: str = "") -> str:
         blocks = [f"User question: {message}",
                   "Plan: " + json.dumps({"intent": plan.intent, "engines": plan.engines,
                                          "presentation_notes": plan.presentation_notes})]
+        if history:
+            # The same summary + recent digests the planner saw, so the prose can refer back to what
+            # was said ("as in turn 2, BOS still leads") instead of being written blind.
+            blocks.append(history)
         if req is not None:
             blocks.append("Resolved request: " + req.model_dump_json())
         if deterministic is not None:
@@ -219,7 +223,8 @@ class Synthesizer:
                    tool_results: list[tuple[str, dict, dict]], trace: list[ToolCallTrace],
                    defaults: dict[str, str] | None,
                    extra_notes: list[str] | None = None,
-                   shown_tables: dict[str, int] | None = None, turn: int = 1) -> Answer:
+                   shown_tables: dict[str, int] | None = None, turn: int = 1,
+                   history: str = "") -> Answer:
         """`extra_notes` are uncertainty lines the orchestrator knows and the reports cannot see —
         currently the live-call ceiling (QA task 20). They are condensed with the rest, never above it.
 
@@ -228,7 +233,7 @@ class Synthesizer:
         in full and which collapse to a pointer. Passing neither means "first turn, show everything"."""
         synthesis, degraded = self._prose(self._user_message(
             message=message, plan=plan, req=req, deterministic=deterministic, specialist=specialist,
-            tool_results=tool_results, defaults=defaults))
+            tool_results=tool_results, defaults=defaults, history=history))
 
         tables: list[Table] = []
         assumptions: list[str] = []

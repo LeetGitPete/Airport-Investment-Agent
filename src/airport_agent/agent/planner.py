@@ -15,6 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from airport_agent.agent.history import archive_index, recent_turns, turn_digest
 from airport_agent.agent.tables import PEER_GROUP_DISPLAY as PEER_GROUP_PROSE
 from airport_agent.agent.tools.registry import ToolRegistry
 from airport_agent.contracts import (
@@ -152,6 +153,10 @@ PLAN_SCHEMA: dict[str, Any] = {
                                                "questions THIS agent can answer, phrased as the user would "
                                                "ask them and aimed at what they seemed to want. Use real US "
                                                "airports, regions or hub classes. Empty otherwise."},
+        "source_turn": {"type": "integer",
+                        "description": "For intent 'followup' answered from memory: the answer turn number "
+                                       "(from ANALYSES IN MEMORY) whose analysis the user is asking about. "
+                                       "0 when it is the most recent one or when not a follow-up."},
         "table_display": {"type": "string", "enum": TABLE_DISPLAY_MODES,
                           "description": "How to show this turn's tables. 'auto' (the default for almost "
                                          "every turn) = a table identical to one already shown earlier in "
@@ -232,6 +237,19 @@ class PlanFilters(BaseModel):
     #: QA task 19: which kind of conversational turn this is, when the intent is clarify.
     conversation_kind: str = NONE_KIND
     suggested_questions: list[str] = Field(default_factory=list)
+    #: contracts-v3: for a follow-up answered from memory, WHICH earlier analysis (answer turn number
+    #: from the archive index). None = the most recent one.
+    source_turn: int | None = None
+
+    @field_validator("source_turn", mode="before")
+    @classmethod
+    def _turn_number(cls, v: Any) -> int | None:
+        """A turn number the model got wrong (text, negative, zero) means 'most recent', never an error."""
+        try:
+            n = int(v)
+        except (TypeError, ValueError):
+            return None
+        return n if n > 0 else None
 
     @property
     def is_conversational(self) -> bool:
@@ -308,6 +326,33 @@ def _default_horizon(question_type: QuestionType, preset: str | None) -> Horizon
     return "5y"
 
 
+def session_context(state: SessionState) -> str:
+    """The conversation as every LLM call sees it (planner and synthesis alike): summary + recent
+    digests + archive index. Empty string on a fresh session."""
+    blocks: list[str] = []
+    if state.summary:
+        blocks.append(f"SUMMARY OF EARLIER TURNS (through turn {state.summary_through_turn}):\n"
+                      + state.summary)
+    recent = recent_turns(state)
+    if recent:
+        blocks.append("RECENT TURNS (verbatim digests, oldest first):\n"
+                      + "\n".join(turn_digest(t) for t in recent))
+    index = archive_index(state)
+    if index:
+        blocks.append("ANALYSES IN MEMORY (name one as source_turn for a follow-up about it):\n"
+                      + "\n".join(index))
+    quick: list[str] = []
+    if state.last_airports:
+        quick.append("last airports: " + ", ".join(state.last_airports))
+    if state.last_preset:
+        quick.append(f"last preset: {state.last_preset}")
+    if quick:
+        blocks.append("LAST TURN SHORTCUTS: " + "; ".join(quick))
+    if not blocks:
+        return ""
+    return "SESSION CONTEXT:\n" + "\n\n".join(blocks)
+
+
 class Planner:
     """Turns a user message + session memory into a `Plan` with one structured-output LLM call."""
 
@@ -377,21 +422,12 @@ class Planner:
 
     @staticmethod
     def _session_block(state: SessionState | None) -> str:
-        lines: list[str] = []
-        if state is not None:
-            if state.last_airports:
-                lines.append("- last airports: " + ", ".join(state.last_airports))
-            if state.last_filters:
-                lines.append("- last filters: " + json.dumps(state.last_filters, default=str))
-            if state.last_preset:
-                lines.append(f"- last preset: {state.last_preset}")
-            if state.last_reports:
-                lines.append("- reports already in memory: " + ", ".join(sorted(state.last_reports)))
-            for message in [m for m in state.messages if m.role in ("user", "assistant")][-6:]:
-                lines.append(f"- {message.role}: {message.content[:400]}")
-        if not lines:
+        """What the planner knows of the conversation: the compacted summary of older turns, the last
+        few turns verbatim (as digests), and an index of every archived analysis so a follow-up can
+        name the turn it refers to (`source_turn`)."""
+        if state is None:
             return "SESSION CONTEXT: none (first turn)."
-        return "SESSION CONTEXT:\n" + "\n".join(lines)
+        return session_context(state) or "SESSION CONTEXT: none (first turn)."
 
     def system_prompt(self, defaults: dict[str, str] | None = None,
                       state: SessionState | None = None) -> str:
@@ -407,8 +443,9 @@ class Planner:
             "provenance and offers a follow-up analysis.\n"
             "- analytical -> a structured request goes to the deterministic scoring engine AND to one LLM "
             "specialist; the two views are synthesized (disagreements are shown, never hidden).\n"
-            "- followup -> resolve against the session memory (last reports, airports, filters, preset); "
-            "re-dispatch only if the answer is not already there.\n"
+            "- followup -> resolve against the session memory: the summary, the recent turns and the "
+            "ANALYSES IN MEMORY index. If the user refers to an earlier analysis, set source_turn to that "
+            "turn number; re-dispatch only if the answer is not already there.\n"
             "- clarify -> the message cannot be dispatched as it stands. Set conversation_kind:\n"
             "  * 'off_topic' — not about US airports as investments, and no data here can answer it "
             "(recipes, airline safety, flight booking, sports). Say nothing else; the answer is fixed.\n"
@@ -536,6 +573,7 @@ class Planner:
             # elsewhere stops a stray label from diverting a question the engines could have answered.
             conversation_kind=raw.get("conversation_kind") if clarify else NONE_KIND,
             suggested_questions=raw.get("suggested_questions") if clarify else [],
+            source_turn=raw.get("source_turn"),
         )
         engines = [] if clarify else list(raw.get("engines") or [])
         allowed = {"tools", "deterministic", *[f"specialist:{s}" for s in self.specialists]}

@@ -15,7 +15,8 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from airport_agent.agent.planner import NEEDS_DIRECTION, OFF_TOPIC, PlanFilters, Planner
+from airport_agent.agent.compaction import Compactor
+from airport_agent.agent.planner import NEEDS_DIRECTION, OFF_TOPIC, PlanFilters, Planner, session_context
 from airport_agent.agent.sessions import NEW_CHAT_TITLE
 from airport_agent.agent.synthesis import Synthesizer
 from airport_agent.agent.tools.registry import ToolRegistry
@@ -123,13 +124,16 @@ class Concierge:
     """Turns a user message into an `Answer`, mutating the session state on success."""
 
     def __init__(self, *, llm: LLMClient, registry: ToolRegistry, analyst: DeterministicAnalyst,
-                 specialists: SpecialistRunner, planner: Planner, synthesizer: Synthesizer) -> None:
+                 specialists: SpecialistRunner, planner: Planner, synthesizer: Synthesizer,
+                 compactor: Compactor | None = None) -> None:
         self.llm = llm
         self.registry = registry
         self.analyst = analyst
         self.specialists = specialists
         self.planner = planner
         self.synthesizer = synthesizer
+        #: History compaction (contracts-v3). Optional so one-shot callers (CLI, tests) pay nothing.
+        self.compactor = compactor
         self.provider_name: str = getattr(llm, "provider_name", None) or "llm"
 
     # plan
@@ -255,8 +259,18 @@ class Concierge:
         return report, trace
 
     @staticmethod
-    def _from_memory(state: SessionState) -> tuple[DeterministicReport | None, SpecialistReport | None,
-                                                   ToolCallTrace]:
+    def _from_memory(state: SessionState, source_turn: int | None = None,
+                     ) -> tuple[DeterministicReport | None, SpecialistReport | None, ToolCallTrace]:
+        """The reports a follow-up is answered from: the archived turn the planner named, if it exists
+        there; otherwise the most recent reports. The trace says which."""
+        archived = state.report_archive.get(source_turn) if source_turn else None
+        if archived:
+            det = next((r for r in archived if isinstance(r, DeterministicReport)), None)
+            spec = next((r for r in archived if isinstance(r, SpecialistReport)), None)
+            trace = ToolCallTrace(tool="session_memory", args={"source_turn": source_turn}, rows=None,
+                                  provider=None, latency_ms=0,
+                                  note=f"answered from the reports of turn {source_turn}")
+            return det, spec, trace
         stored_det = state.last_reports.get("deterministic")
         stored_spec = state.last_reports.get("specialist")
         trace = ToolCallTrace(tool="session_memory", args={}, rows=None, provider=None, latency_ms=0,
@@ -279,6 +293,11 @@ class Concierge:
 
     def _answer(self, message: str, state: SessionState, *, defaults: dict[str, str] | None,
                 on_plan: Callable[[Plan], None] | None, budget: LiveBudget) -> Answer:
+        # A compaction started at the end of the previous turn must land before this one is planned:
+        # the model plans against a settled summary, never a moving one.
+        if self.compactor is not None:
+            self.compactor.collect(state)
+        history = session_context(state)
         plan, filters = self._plan(message, state, defaults)
         if on_plan is not None:
             on_plan(plan)
@@ -306,15 +325,17 @@ class Concierge:
                 specialist, entry = self._run_specialist(req, deterministic)
                 trace.append(entry)
         elif plan.intent == "followup" and not plan.engines and not tool_results:
-            deterministic, specialist, entry = self._from_memory(state)
+            deterministic, specialist, entry = self._from_memory(state, filters.source_turn)
             trace.append(entry)
 
         answer = self.synthesizer.synthesize(
             message=message, plan=plan, plan_line=Planner.plan_line(plan, filters, req), req=req,
             deterministic=deterministic, specialist=specialist, tool_results=tool_results, trace=trace,
             defaults=defaults, extra_notes=_live_budget_note(budget),
-            shown_tables=state.shown_tables, turn=self._turn_number(state))
+            shown_tables=state.shown_tables, turn=self._turn_number(state), history=history)
         self._remember(state, message, answer, plan, req, deterministic, specialist)
+        if self.compactor is not None:
+            self.compactor.schedule(state)  # background; applied by collect() on the next turn
         return answer
 
     # memory
@@ -343,3 +364,10 @@ class Concierge:
             state.last_preset = deterministic.preset or state.last_preset
         if specialist is not None:
             state.last_reports["specialist"] = specialist
+        # Archive NEW reports under this answer's turn number (a follow-up answered from memory
+        # computed nothing, so it archives nothing — the archive holds analyses, not references).
+        fresh = [r for r in (deterministic, specialist) if r is not None]
+        computed = any(t.tool.startswith(("deterministic:", "specialist:")) for t in answer.tool_trace)
+        if fresh and computed:
+            turn = sum(1 for m in state.messages if m.role == "assistant")
+            state.report_archive[turn] = list(fresh)

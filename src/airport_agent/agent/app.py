@@ -10,6 +10,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from airport_agent.agent.compaction import Compactor
 from airport_agent.agent.concierge import Concierge
 from airport_agent.agent.planner import PRESET_NAMES, SAMPLE_QUESTIONS, Planner
 from airport_agent.agent.sessions import SessionStore
@@ -105,6 +106,6 @@ def build_app(data_service: DataService | None = None, analyst: DeterministicAna
     planner = Planner(client, registry, specs, list(PRESET_NAMES))
     concierge = Concierge(llm=client, registry=registry, analyst=deterministic,
                           specialists=SpecialistRunnerImpl(client, registry, specs), planner=planner,
-                          synthesizer=Synthesizer(client, specs))
+                          synthesizer=Synthesizer(client, specs), compactor=Compactor(client))
     return App(data=data, analyst=deterministic, llm=client, registry=registry, concierge=concierge,
                sessions=SessionStore(sessions_dir or default_sessions_dir()))

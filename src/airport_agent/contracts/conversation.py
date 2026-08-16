@@ -95,3 +95,13 @@ class SessionState(BaseModel):
     #: Read by the display policy so a rebuilt table (typically a follow-up answered from memory)
     #: becomes a pointer instead of the same grid again.
     shown_tables: dict[str, int] = Field(default_factory=dict)
+    #: Conversation memory (contracts-v3). `summary` is the compacted account of every answer turn up to
+    #: and including `summary_through_turn`, LLM-written and capped in length; the turns after it are
+    #: shown to the model verbatim (as digests). `report_archive` keeps every turn's reports by answer
+    #: turn, so a follow-up can be resolved against ANY earlier analysis, not only the most recent one
+    #: (`last_reports` remains the most-recent shortcut).
+    summary: str = ""
+    summary_through_turn: int = 0
+    report_archive: dict[
+        int, list[Annotated[DeterministicReport | SpecialistReport, Field(discriminator="report_type")]]
+    ] = Field(default_factory=dict)

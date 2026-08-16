@@ -135,6 +135,19 @@ show in full. The Concierge steers only the mode via `Plan.table_display`: `auto
 user asked to see it again — everything in full, pointer targets unchanged), `minimal` (a narrow follow-up —
 pointers as in auto, and NEW tables go behind a collapsed data section so prose leads). No mode drops a number.
 
+Conversation memory (contracts-v3, 2026-08-16). A TURN is a user message plus its reply, numbered by reply.
+Every LLM call that needs the conversation (planner, synthesis) gets the same `session_context`: the compacted
+`SessionState.summary` of older turns, the last 5 turns verbatim as fixed-form digests (`agent/history.py`:
+question, headline, analyst view, agreement, each table as title + first rows), and an index of
+`report_archive` (turn → that turn's reports) so a follow-up can name `source_turn` and be answered from ANY
+earlier analysis, not only the last. Compaction (`agent/compaction.py`) runs after every 2nd answer when a turn
+has left the verbatim window: one LLM call folds those digests into the summary, capped at 1,500 chars — one
+retry with "summary is X chars, only Y chars are allowed", then a silent truncation at a sentence boundary. It
+runs in the background between turns (only the LLM call is off-thread; digests are snapshotted on the turn and
+the result is applied by `collect()` at the start of the next turn, which blocks on it), so the session has one
+writer and a plan is never made against a moving summary. A provider error keeps the old summary; the CLI
+(one-shot) never compacts.
+
 ## Testing
 - Concierge: golden Plans for the four sample questions + 6 follow-ups (structured-output assertions).
 - Deterministic Analyst: unit + golden ordering tests (see 02).

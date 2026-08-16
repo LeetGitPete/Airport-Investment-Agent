@@ -6,7 +6,7 @@ import pytest
 
 from airport_agent.agent.planner import PLAN_SCHEMA, SAMPLE_QUESTIONS, PlanFilters, Planner
 from airport_agent.agent.tools.data_tools import build_registry
-from airport_agent.contracts import LLMError, Plan, SessionState
+from airport_agent.contracts import AnalysisRequest, LLMError, Plan, SessionState
 from tests.agent.fake_llm import ScriptedLLM
 
 PRESETS = ["balanced", "terminal_expansion", "congestion_relief", "market_entry"]
@@ -175,13 +175,35 @@ def test_a_scope_the_user_asked_for_is_not_mistaken_for_the_national_default(fak
 
 def test_prompt_carries_recent_turns_and_no_defaults(fake_data, fake_analyst, specs):
     p = _planner([_plan_json()], fake_data, fake_analyst, specs)
-    state = SessionState(session_id="s", title="t",
-                         messages=[{"role": "user", "content": f"turn {i} " + "x" * 500} for i in range(8)])
+    messages = []
+    for i in range(1, 9):
+        messages.append({"role": "user", "content": f"question {i} " + "x" * 500})
+        messages.append({"role": "assistant", "content": f"reply {i}"})
+    state = SessionState(session_id="s", title="t", messages=messages)
     p.plan("next", state)
     sysmsg = p.llm.calls[0]["messages"][0]["content"]
     assert "USER DEFAULTS: none set." in sysmsg
-    assert "turn 0" not in sysmsg and "turn 2" in sysmsg  # only the last 6 turns
-    assert "x" * 500 not in sysmsg  # content truncated to 400 chars
+    # contracts-v3: the last 5 turns verbatim (as digests), older ones only via the summary.
+    assert "[turn 3]" not in sysmsg and "[turn 4]" in sysmsg and "[turn 8]" in sysmsg
+    assert "x" * 500 not in sysmsg  # a digest clips each field
+
+
+def test_prompt_carries_summary_and_archive_index_but_not_folded_turns(fake_data, fake_analyst, specs):
+    p = _planner([_plan_json()], fake_data, fake_analyst, specs)
+    messages = []
+    for i in range(1, 8):
+        messages.append({"role": "user", "content": f"question {i}"})
+        messages.append({"role": "assistant", "content": f"reply {i}"})
+    state = SessionState(session_id="s", title="t", messages=messages, summary="BOS led turn 1.",
+                         summary_through_turn=2,
+                         report_archive={1: [fake_analyst.rank(AnalysisRequest(
+                             question_type="rank", airports=["BOS", "BDL"], horizons=["5y"],
+                             scoring_preset="balanced"))]})
+    p.plan("and BOS?", state)
+    sysmsg = p.llm.calls[0]["messages"][0]["content"]
+    assert "SUMMARY OF EARLIER TURNS (through turn 2)" in sysmsg and "BOS led turn 1." in sysmsg
+    assert "[turn 2]" not in sysmsg and "[turn 3]" in sysmsg  # folded turns are not repeated verbatim
+    assert "ANALYSES IN MEMORY" in sysmsg and "turn 1: rank · preset balanced" in sysmsg
 
 
 def test_plan_filters_round_trip_through_plan_dict(fake_data, fake_analyst, specs):
