@@ -157,14 +157,14 @@ def _render_samples(app: Any, ss: dict) -> None:
 
 
 def render_sidebar(app: Any, ss: dict) -> None:
+    # QA task 11 (2026-08-16): provider status, data vintages and the per-chat defaults widgets
+    # are gone from the sidebar. The defaults still apply — set silently here, overridable by
+    # asking (e.g. "over 10 years", "use the market entry preset"); vintages stay visible per
+    # answer ("data as of") and via the list_sources tool.
+    ss.setdefault("defaults", {"horizon": DEFAULT_HORIZON, "scoring_preset": DEFAULT_PRESET,
+                               "peer_group": DEFAULT_PEER_GROUP})
     with st.sidebar:
         _render_conversations(app, ss)
-        st.divider()
-        _render_provider(app)
-        st.divider()
-        _render_vintages(app)
-        st.divider()
-        _render_defaults(ss)
         st.divider()
         _render_samples(app, ss)
         st.divider()

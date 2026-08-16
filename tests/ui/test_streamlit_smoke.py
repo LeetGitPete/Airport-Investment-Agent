@@ -26,10 +26,13 @@ def _boot():
     return at
 
 
-def test_boots_with_sidebar_sections():
+def test_boots_with_lean_sidebar():
+    # QA task 11: no provider status, vintages or defaults widgets in the sidebar —
+    # just conversations and sample questions.
     at = _boot()
     texts = " ".join(m.value for m in at.sidebar.markdown) + " " + " ".join(c.value for c in at.sidebar.caption)
-    assert "gemini" in texts and "configured" in texts
+    assert "gemini" not in texts and "vintage" not in texts.lower()
+    assert not at.sidebar.selectbox
     assert any("New chat" in b.label for b in at.sidebar.button)
 
 
@@ -74,12 +77,14 @@ def test_new_chat_and_switch_keeps_histories_separate():
     assert len(at.main.dataframe) == n_before
 
 
-def test_defaults_are_forwarded():
+def test_defaults_are_forwarded_silently():
+    # QA task 11: defaults have no widgets; the built-in values are still forwarded with every
+    # question (overridable only by asking in the question itself).
     from tests.ui import fake_app
     at = _boot()
-    at.sidebar.selectbox[0].set_value("10y").run()
     at.chat_input[0].set_value("rank NE").run()
-    assert fake_app.LAST_APP.last_defaults["horizon"] == "10y"
+    assert fake_app.LAST_APP.last_defaults == {"horizon": "5y", "scoring_preset": "balanced",
+                                               "peer_group": "hub_class"}
 
 
 def test_boot_failure_shows_error_and_no_sidebar(monkeypatch):
