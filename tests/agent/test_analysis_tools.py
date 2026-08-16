@@ -8,7 +8,9 @@ def test_score_airports_by_region(fake_data, fake_analyst):
         "score_airports", {"faa_regions": ["ANE"], "horizon": "5y", "scoring_preset": "terminal_expansion"}, engine="concierge")
     assert out["report_type"] == "deterministic" and out["question_type"] == "rank"
     assert {r["ref"]["iata"] for r in out["rows"]} == {"BOS", "BDL", "PVD", "MHT", "PWM"}
-    assert out["provenance"] and all(set(p) == {"source_id", "vintage"} for p in out["provenance"])
+    # QA task 18: source_id and vintage are mandatory; period keys ride along when the metric has them
+    assert out["provenance"] and all({"source_id", "vintage"} <= set(p) for p in out["provenance"])
+    assert all(set(p) <= {"source_id", "vintage", "period_start", "period_end"} for p in out["provenance"])
     assert out["preset"] == "terminal_expansion" and out["horizon"] == "5y"
     assert out["coverage"] == sum(r["coverage"] for r in out["rows"]) / len(out["rows"])
 

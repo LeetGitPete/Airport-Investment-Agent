@@ -23,6 +23,7 @@ from airport_agent.agent.tables import (
     data_matrix,
     humanize_metric_ids,
     peer_label,
+    provenance_table,
     ranking_table,
     specialist_ranking_table,
     tool_result_tables,
@@ -105,6 +106,33 @@ class _Synthesis(BaseModel):
     hidden_reason: str = ""
     analyst_summary: str = ""
     follow_ups: list[str] = Field(default_factory=list)
+
+
+#: QA task 18: what each tool was doing, in the user's words, for the "used for" column.
+TOOL_PURPOSE: dict[str, str] = {
+    "find_airports": "the airport list",
+    "get_profile": "the airport profile",
+    "get_route_stats": "route mix and long-haul share",
+    "get_live_status": "live operational status",
+    "get_metric_series": "the metric series",
+    "list_sources": "the source list",
+    "explain_metric": "the metric definition",
+    "score_airports": "the computed analysis",
+    "compare_airports": "the computed analysis",
+    "diagnose_unmet_demand": "the computed analysis",
+}
+
+
+def _metric_provenance(metrics: list[Metric]) -> list[dict[str, str]]:
+    """Provenance entries for the scored metrics, so the table covers the deterministic side too.
+
+    Only metrics that actually carry a value: a registry metric keeps its nominal source_id even when
+    the snapshot holds nothing for it, and citing those would credit sources the RESCOPE cut (QA 18).
+    """
+    return [{"source_id": m.source_id, "vintage": m.vintage,
+             **({"period_start": m.period_start} if m.period_start else {}),
+             **({"period_end": m.period_end} if m.period_end else {})}
+            for m in metrics if m.source_id and m.value is not None]
 
 
 def _first_sentence(text: str) -> str:
@@ -198,9 +226,13 @@ class Synthesizer:
         notes: list[str] = []
         metrics: list[Metric] = []
         provenance: list[dict] = []
+        covers: dict[str, list[str]] = {}
+        provenance_notes: list[str] = []
 
         if deterministic is not None:
             metrics.extend(deterministic.evidence)
+            for metric in deterministic.evidence:
+                covers.setdefault(metric.source_id, []).append("the computed analysis")
             # QA task 6: every analytical answer opens its computed section with the score view
             # (pillar-level contributions); a single airport gets "Scores" without a rank column.
             if deterministic.rows:
@@ -231,12 +263,26 @@ class Synthesizer:
 
         for tool, _args, out in tool_results:
             tables.extend(tool_result_tables(tool, out, self.by_id))
-            provenance.extend(out.get("provenance") or [])
+            entries = out.get("provenance") or []
+            provenance.extend(entries)
+            # QA task 18: remember which tool each source served, so the provenance table can say
+            # what it was used for instead of listing bare source names.
+            for entry in entries:
+                covers.setdefault(entry.get("source_id", ""), []).append(TOOL_PURPOSE.get(tool, tool))
+            if out.get("provenance_note"):
+                provenance_notes.append(str(out["provenance_note"]))
             assumptions.extend(self._tool_assumptions(out))
             notes.extend(self._tool_notes(tool, out))
 
         if degraded:
             notes.append(FALLBACK_NOTE)
+        # QA task 18 (2026-08-16): every answer closes with where its data came from. Metric tables
+        # carry inline source columns; this covers everything that does not (airports, live status,
+        # distance bands, rankings), so no table is left unattributed.
+        sources_table = provenance_table([*_metric_provenance(metrics), *provenance], covers,
+                                         provenance_notes)
+        if sources_table is not None:
+            tables.append(sources_table)
         # QA task 7 (human decision 2026-08-16): condense deterministically — the LLM never picks.
         assumptions = _condense(_unique(assumptions), MAX_ASSUMPTIONS,
                                 "further standing conventions apply (documented in KEY-TRADEOFFS.md)")

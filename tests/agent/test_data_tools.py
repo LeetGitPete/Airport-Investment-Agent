@@ -15,8 +15,10 @@ def test_all_tools_registered_with_engines(fake_data, fake_analyst):
     assert set(reg.names("market_analyst")) == {"find_airports", "get_profile", "get_route_stats", "explain_metric",
                                                 "get_metric_series", "compare_airports"}
     assert set(reg.names("general_analyst")) == set(reg.names())
-    for spec in build_data_tools(fake_data, fake_analyst):
+    # QA task 18: builders now yield (spec, provenance) pairs — every tool declares where it reads
+    for spec, provenance in build_data_tools(fake_data, fake_analyst):
         assert spec.description and spec.json_schema()["parameters"]["type"] == "object"
+        assert provenance.sources or provenance.derived_from or provenance.no_external_source
 
 
 def test_find_airports_new_england(fake_data, fake_analyst):
@@ -38,7 +40,8 @@ def test_get_route_stats_anchorage(fake_data, fake_analyst):
     out = build_registry(fake_data, fake_analyst).call("get_route_stats", {"iata": "anc", "top_n": 3}, engine="concierge")
     assert out["long_haul_share"]["freight"]["value"] > out["long_haul_share"]["passenger"]["value"]
     assert set(out["distance_bands"]["passenger"]) == {"short", "medium", "long", "ultra"}
-    assert len(out["top_routes"]) == 3 and out["provenance"] == [{"source_id": "bts_t100", "vintage": "2026-04"}]
+    assert len(out["top_routes"]) == 3
+    assert [(e["source_id"], e["vintage"]) for e in out["provenance"]] == [("bts_t100", "2026-04")]
     assert "1500" in out["convention"]
 
 

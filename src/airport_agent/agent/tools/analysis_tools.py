@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from airport_agent.agent.tools.provenance import prov
+from airport_agent.agent.tools.provenance import ProvenanceSpec, prov
 from airport_agent.contracts import (
     AirportFilter,
     AnalysisRequest,
@@ -81,14 +81,22 @@ class DiagnoseArgs(_Args):
 
 def _report_dict(report: DeterministicReport) -> dict[str, Any]:
     out = report.model_dump(mode="json")
-    out["provenance"] = prov(report.evidence)
+    # QA task 18: cite only sources that actually supplied a number. Every registry metric carries a
+    # nominal source_id even when it has no value, so citing the evidence wholesale would claim BEA
+    # metro GDP and BTS DB1B — sources the RESCOPE cut and the snapshot has zero rows of. A citation
+    # for data we never had is worse than a missing one.
+    out["provenance"] = prov([m for m in report.evidence if m.value is not None])
     # design 03: every tool result carries coverage. For a report it is the mean metric coverage of its rows.
     out["coverage"] = (sum(r.coverage for r in report.rows) / len(report.rows)) if report.rows else None
     return out
 
 
-def build_analysis_tools(analyst: DeterministicAnalyst) -> list[ToolSpec]:
-    """Build the rank / compare / diagnose tools bound to a Deterministic Analyst."""
+def build_analysis_tools(analyst: DeterministicAnalyst) -> list[tuple[ToolSpec, ProvenanceSpec]]:
+    """Build the rank / compare / diagnose tools bound to a Deterministic Analyst.
+
+    Each is paired with its declared provenance (QA task 18). All three are `derived`: which sources
+    they cite depends on which metrics the query actually scored, so a static list would be a lie.
+    """
 
     def score_airports(p: ScoreAirportsArgs) -> dict[str, Any]:
         has_filter = bool(p.states or p.faa_regions or p.hub_sizes or p.cbsa_codes)
@@ -112,22 +120,25 @@ def build_analysis_tools(analyst: DeterministicAnalyst) -> list[ToolSpec]:
         return _report_dict(analyst.diagnose(req))
 
     return [
-        ToolSpec(name="score_airports", params_model=ScoreAirportsArgs, fn=score_airports,
+        (ToolSpec(name="score_airports", params_model=ScoreAirportsArgs, fn=score_airports,
                  engines=[CONCIERGE, EXPANSION, GENERAL],
                  description="Rank airports with the deterministic scoring engine. Give either explicit airports "
                              "or a filter (states / faa_regions / hub_sizes / cbsa_codes, at most `limit` "
                              "airports, default 50) - a call with neither is rejected. Returns scores, ranks, pillar and metric "
                              "contributions, coverage, percentiles, evidence and caveats. The numbers are the "
                              "formula's: report them as returned, never recompute or reweight them."),
-        ToolSpec(name="compare_airports", params_model=CompareAirportsArgs, fn=compare_airports,
+         ProvenanceSpec.derived("cites the sources of every metric that entered the score")),
+        (ToolSpec(name="compare_airports", params_model=CompareAirportsArgs, fn=compare_airports,
                  engines=[CONCIERGE, CAPACITY, MARKET, GENERAL],
                  description="Side-by-side deterministic comparison of the given airports (at least 1) on the "
                              "preset's metrics or on focus_metrics. Returns the comparison table, scores, "
                              "evidence with source and vintage, and caveats. Report the numbers as returned."),
-        ToolSpec(name="diagnose_unmet_demand", params_model=DiagnoseArgs, fn=diagnose_unmet_demand,
+         ProvenanceSpec.derived("cites the sources of every metric compared")),
+        (ToolSpec(name="diagnose_unmet_demand", params_model=DiagnoseArgs, fn=diagnose_unmet_demand,
                  engines=[CONCIERGE, CAPACITY, GENERAL],
                  description="Deterministic unmet-demand evidence bundle for the given airports (at least 1): "
                              "load factor and spill proxy, delay and taxi-out, NPIAS capacity label and curated "
                              "capacity facts, with a templated explanation. Evidence of pressure, not proof of "
                              "unmet demand - keep that distinction in the answer."),
+         ProvenanceSpec.derived("cites the sources of every metric behind the diagnosis")),
     ]

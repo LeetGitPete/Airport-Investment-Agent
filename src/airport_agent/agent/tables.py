@@ -174,6 +174,44 @@ def _matrix_values(rep: DeterministicReport, iatas: list[str]) -> dict[str, dict
     return values
 
 
+PROVENANCE_TITLE = "Where this came from"
+
+
+def provenance_table(entries: list[dict[str, str]], covers: dict[str, list[str]] | None = None,
+                     notes: list[str] | None = None) -> Table | None:
+    """One table per answer naming every source behind it (QA task 18).
+
+    Metric-level tables carry their own `source` / `data as of` columns — one row per metric, each
+    genuinely from a different place, so the column earns its width there. Everything else (airports,
+    live status, distance bands, rankings) would just repeat one value down every row, so those are
+    covered here instead: the split the human chose on 2026-08-16.
+
+    `covers` maps a source id to the tools that used it, so a reader can trace a table to its origin.
+    Returns None when there is nothing to cite, so an answer with no data does not grow an empty table.
+    """
+    by_source: dict[str, dict[str, str]] = {}
+    for entry in entries:
+        source_id = entry.get("source_id") or ""
+        if not source_id:
+            continue
+        held = by_source.setdefault(source_id, {})
+        for key in ("vintage", "period_start", "period_end"):
+            if entry.get(key) and not held.get(key):
+                held[key] = entry[key]
+    if not by_source:
+        return None
+    rows = []
+    for source_id, held in by_source.items():
+        period = " to ".join(p for p in (held.get("period_start"), held.get("period_end")) if p)
+        used_by = ", ".join(sorted(set((covers or {}).get(source_id, []))))
+        rows.append([source_name(source_id), used_by or "-", period or "-", held.get("vintage") or "-"])
+    footnotes = list(notes or [])
+    footnotes.append("'Data as of' is when we fetched the source, not when its publisher released it; "
+                     "the period is what the data itself covers.")
+    return Table(title=PROVENANCE_TITLE, columns=["source", "used for", "period", "data as of"],
+                 rows=rows, footnotes=footnotes)
+
+
 def data_matrix(rep: DeterministicReport, specs_by_id: dict[str, MetricSpec]) -> Table:
     """THE canonical metrics table for every analytical answer (QA task 5) — always shown.
 

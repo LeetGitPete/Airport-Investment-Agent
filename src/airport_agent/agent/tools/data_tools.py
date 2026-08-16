@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from airport_agent.agent.tools.analysis_tools import build_analysis_tools
-from airport_agent.agent.tools.provenance import prov
+from airport_agent.agent.tools.provenance import ProvenanceSpec, prov
 from airport_agent.agent.tools.registry import ToolRegistry
 from airport_agent.contracts import (
     PILLAR_NAMES,
@@ -30,6 +30,12 @@ GENERAL = "general_analyst"
 ALL_ENGINES = [CONCIERGE, EXPANSION, CAPACITY, MARKET, GENERAL]
 
 BANDS_DOC = "bands short<500, medium 500-1500, long 1500-3000, ultra>3000"
+#: QA task 18: what `find_airports` reads. OurAirports supplies identity; the FAA TAF supplies hub
+#: size and FAA region by UPDATE into the same rows (limitations row 46), so both are cited.
+IDENTITY_SOURCES = ("ourairports", "faa_taf")
+#: The only source a live-status call actually fetches at question time; everything else it returns
+#: is snapshot data and must keep the snapshot's own date (QA task 18).
+LIVE_SOURCE = "faa_nasstatus"
 
 
 class _Args(BaseModel):
@@ -97,15 +103,23 @@ class ListSourcesArgs(_Args):
     """No arguments."""
 
 
-def build_data_tools(data: DataService, analyst: DeterministicAnalyst) -> list[ToolSpec]:
-    """Build the data-retrieval tools bound to a DataService (and the analyst, for route bands)."""
+def build_data_tools(data: DataService,
+                     analyst: DeterministicAnalyst) -> list[tuple[ToolSpec, ProvenanceSpec]]:
+    """Build the data-retrieval tools bound to a DataService (and the analyst, for route bands).
+
+    Each tool is paired with the provenance it declares (QA task 18); `ToolRegistry.register`
+    refuses a tool without one, so an unsourced result cannot reach a user by omission.
+    """
 
     def find_airports(p: FindAirportsArgs) -> dict[str, Any]:
         refs = data.list_airports(AirportFilter(states=p.states, faa_regions=p.faa_regions, iatas=p.iatas,
                                                 hub_sizes=p.hub_sizes, cbsa_codes=p.cbsa_codes,
                                                 name_contains=p.name_contains, limit=p.limit))
+        # QA task 18: identity rows are OurAirports; hub size and FAA region are UPDATEd in from the
+        # FAA TAF (limitations row 46), so both are cited even though the rows say 'ourairports'.
+        vintages = [v for v in data.source_vintages() if v.source_id in IDENTITY_SOURCES]
         return {"airports": [r.model_dump(mode="json") for r in refs], "count": len(refs),
-                "truncated": len(refs) == p.limit}
+                "truncated": len(refs) == p.limit, "provenance": prov(vintages)}
 
     def get_profile(p: GetProfileArgs) -> dict[str, Any]:
         profile = data.get_profile(p.iata, tuple(p.horizons))
@@ -129,7 +143,16 @@ def build_data_tools(data: DataService, analyst: DeterministicAnalyst) -> list[T
     def get_live_status(p: LiveStatusArgs) -> dict[str, Any]:
         live = data.get_live_status(p.iata)
         out = live.model_dump(mode="json")
-        out["provenance"] = prov((s, live.fetched_at) for s in live.source_ids)
+        # QA task 18: only the live feed is dated by the fetch. The latest-month traffic that rides
+        # along comes from the snapshot, and stamping it "as of now" claimed a freshness it does not
+        # have — visible the moment the provenance table put the two side by side.
+        snapshot = {v.source_id: v for v in data.source_vintages()}
+        entries: list[Any] = []
+        for source_id in live.source_ids:
+            record = snapshot.get(source_id)
+            entries.append((source_id, live.fetched_at) if source_id == LIVE_SOURCE or record is None
+                           else record)
+        out["provenance"] = prov(entries)
         return out
 
     def explain_metric(p: ExplainMetricArgs) -> dict[str, Any]:
@@ -151,47 +174,58 @@ def build_data_tools(data: DataService, analyst: DeterministicAnalyst) -> list[T
         return {"sources": [v.model_dump(mode="json") for v in vintages], "provenance": prov(vintages)}
 
     return [
-        ToolSpec(name="find_airports", params_model=FindAirportsArgs, fn=find_airports,
+        (ToolSpec(name="find_airports", params_model=FindAirportsArgs, fn=find_airports,
                  engines=[CONCIERGE, EXPANSION, MARKET, GENERAL],
                  description="List airports matching a filter (states, FAA regions, CBSA codes, IATA codes, hub "
                              "sizes, name substring). Returns at most `limit` airports (1-600, default 50); the truncated "
                              "flag is set when the limit was hit. No scoring - use score_airports to rank."),
-        ToolSpec(name="get_profile", params_model=GetProfileArgs, fn=get_profile, engines=list(ALL_ENGINES),
+         ProvenanceSpec.reads(*IDENTITY_SOURCES)),
+        (ToolSpec(name="get_profile", params_model=GetProfileArgs, fn=get_profile, engines=list(ALL_ENGINES),
                  description="Structured profile of one airport: metrics per requested horizon, forecast, routes "
                              "summary, curated capacity facts, live status, data-quality notes and source "
                              "vintages. One airport per call; an unknown IATA code returns an error."),
-        ToolSpec(name="get_route_stats", params_model=RouteStatsArgs, fn=get_route_stats,
+         ProvenanceSpec.derived("cites the sources of the metrics returned for this airport")),
+        (ToolSpec(name="get_route_stats", params_model=RouteStatsArgs, fn=get_route_stats,
                  engines=[CONCIERGE, CAPACITY, MARKET, GENERAL],
                  description="Route mix for one airport: distance-band shares and long-haul share for passengers "
                              f"and freight ({BANDS_DOC}; long-haul threshold default 1500 mi - state the "
                              "convention when quoting the share), plus the top routes by departures (top_n <= 50, "
                              "default 10, optionally filtered to international or domestic). The truncated flag "
                              "is set when more routes exist."),
-        ToolSpec(name="get_live_status", params_model=LiveStatusArgs, fn=get_live_status,
+         ProvenanceSpec.reads("bts_t100")),
+        (ToolSpec(name="get_live_status", params_model=LiveStatusArgs, fn=get_live_status,
                  engines=[CONCIERGE, CAPACITY, GENERAL],
                  description="Current operational status of one airport: delay programs, ground stop, closure and "
                              "latest-month traffic, with the fetch time. Snapshot data - say so when quoting it."),
-        ToolSpec(name="explain_metric", params_model=ExplainMetricArgs, fn=explain_metric,
+         ProvenanceSpec.reads("faa_nasstatus")),
+        (ToolSpec(name="explain_metric", params_model=ExplainMetricArgs, fn=explain_metric,
                  engines=list(ALL_ENGINES),
                  description="Registry definition of one metric: definition, formula, unit, direction, pillar (and "
                              "pillar name), tier, sources, horizons and caveats. One metric per call; an unknown "
                              "metric id returns an error rather than an invented definition."),
-        ToolSpec(name="get_metric_series", params_model=MetricSeriesArgs, fn=get_metric_series,
+         ProvenanceSpec.none("Definition from the metric registry (config/metrics.yaml), not measured data")),
+        (ToolSpec(name="get_metric_series", params_model=MetricSeriesArgs, fn=get_metric_series,
                  engines=[CONCIERGE, EXPANSION, MARKET, GENERAL],
                  description="Annual series of one metric at one airport, at the metric's own declared horizon. "
                              "Returns an empty series for static and forecast metrics and for metrics unavailable "
                              "at that airport (never an invented number)."),
-        ToolSpec(name="list_sources", params_model=ListSourcesArgs, fn=list_sources,
+         ProvenanceSpec.derived("cites the source of the metric series returned")),
+        (ToolSpec(name="list_sources", params_model=ListSourcesArgs, fn=list_sources,
                  engines=[CONCIERGE, GENERAL],
                  description="List every loaded data source with its description, the period it covers and its "
                              "fetch time. Takes no arguments. Use it to answer 'where does this number come "
                              "from'."),
+         ProvenanceSpec.derived("lists the loaded sources, so it cites every one of them")),
     ]
 
 
 def build_registry(data: DataService, analyst: DeterministicAnalyst) -> ToolRegistry:
-    """Compose the full tool registry (data + analysis tools) for the Concierge and the specialists."""
-    reg = ToolRegistry()
-    for spec in [*build_data_tools(data, analyst), *build_analysis_tools(analyst)]:
-        reg.register(spec)
+    """Compose the full tool registry (data + analysis tools) for the Concierge and the specialists.
+
+    The registry is given the DataService's vintage list so a declared-but-unreturned source is cited
+    with its real date rather than a blank (QA task 18).
+    """
+    reg = ToolRegistry(source_vintages=data.source_vintages)
+    for spec, provenance in [*build_data_tools(data, analyst), *build_analysis_tools(analyst)]:
+        reg.register(spec, provenance=provenance)
     return reg
