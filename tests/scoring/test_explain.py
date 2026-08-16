@@ -54,9 +54,9 @@ def test_explain_rank_names_pillar_metric_and_source(specs, by_id):
           ("BDL", "load_factor"): _metric("load_factor", "BDL", 0.83, "ratio"),
           ("PVD", "load_factor"): _metric("load_factor", "PVD", 0.84, "ratio")}
     text = explain_rank(res, by_id, ev, "balanced", "5y", "all")
-    assert text.startswith("Ranked 2 airports with preset 'balanced' at horizon 5y; percentiles within all.")
+    assert text.startswith("Ranked 2 airports on balanced weights over 5y, as percentiles among all airports.")
     assert "ranks above" in text and "Demand Pressure" in text
-    assert "6.1%" in text and "2.3%" in text and "bts_socrata" in text and "2026-04" in text
+    assert "6.1%" in text and "2.3%" in text and "BTS T-100 airport totals" in text and "2026-04" in text
 
 
 def test_explain_rank_notes_absent_pillars(specs, by_id):

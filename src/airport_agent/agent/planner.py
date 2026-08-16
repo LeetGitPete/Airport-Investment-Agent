@@ -295,17 +295,30 @@ def _unset(value: Any) -> str | None:
     return None if value in (None, "", NONE) else str(value)
 
 
+#: FAA region codes -> user-facing names (plan line only; the codes stay in filters/plans).
+FAA_REGION_DISPLAY = {"AAL": "Alaska", "ACE": "Central", "AEA": "Eastern", "AGL": "Great Lakes",
+                      "ANE": "New England", "ANM": "Northwest Mountain", "ASO": "Southern",
+                      "ASW": "Southwest", "AWP": "Western-Pacific"}
+#: Intent / question-type enum values -> plan-line prose (decision 2026-08-16: no raw enums on a
+#: user surface).
+INTENT_DISPLAY = {"informational": "lookup", "analytical": "analysis", "followup": "follow-up",
+                  "clarify": "clarifying"}
+QUESTION_TYPE_DISPLAY = {"rank": "ranking", "compare": "comparison", "diagnose": "diagnosis",
+                         "custom": "custom analysis", "long_haul_share": "long-haul share",
+                         "distance_bands": "distance bands"}
+
+
 def _target_text(airports: list[str], states: list[str], faa_regions: list[str],
                  hub_sizes: list[str]) -> str:
     if airports:
         return ", ".join(airports)
     parts = []
     if faa_regions:
-        parts.append("region " + ",".join(faa_regions))
+        parts.append(", ".join(FAA_REGION_DISPLAY.get(r, r) for r in faa_regions) + " region")
     if states:
         parts.append("states " + ",".join(states))
     if hub_sizes:
-        parts.append("hub " + ",".join(hub_sizes))
+        parts.append(" & ".join(hub_sizes) + " hubs")
     return " ".join(parts) or "—"
 
 
@@ -644,12 +657,15 @@ class Planner:
         engines = ", ".join(tool_label(e) for e in plan.engines) or "none"
         if req is not None:
             focus = (req.scoring_preset or "balanced").replace("_", " ")
-            return (f"How I'm approaching this: {plan.intent} · {req.question_type} · "
+            return (f"How I'm approaching this: {INTENT_DISPLAY.get(plan.intent, plan.intent)} · "
+                    f"{QUESTION_TYPE_DISPLAY.get(req.question_type, req.question_type)} · "
                     f"{_request_targets(req)} · time period {', '.join(req.horizons) or '-'} · "
-                    f"{focus} focus · "
+                    f"{focus} weights · "
                     f"peers: {PEER_GROUP_PROSE.get(req.peer_group or 'hub_class', req.peer_group)} · "
                     f"engines: {engines}")
         focus = (filters.scoring_preset or "-").replace("_", " ")
-        return (f"How I'm approaching this: {plan.intent} · {filters.question_type or 'lookup'} · "
+        qt = filters.question_type
+        return (f"How I'm approaching this: {INTENT_DISPLAY.get(plan.intent, plan.intent)} · "
+                f"{QUESTION_TYPE_DISPLAY.get(qt, qt) if qt else 'lookup'} · "
                 f"{_targets(filters)} · time period {', '.join(filters.horizons) or '-'} · "
-                f"{focus} focus · engines: {engines}")
+                f"{focus} weights · engines: {engines}")

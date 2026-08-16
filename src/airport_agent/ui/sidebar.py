@@ -42,10 +42,15 @@ def _display_labels(sessions: list[Any]) -> dict[str, str]:
     id suffix. Titles that are already unique are shown unchanged."""
     titles = [s.title for s in sessions]
     counts = Counter(titles)
-    return {
-        s.session_id: (f"{s.title} · {s.session_id[:4]}" if counts[s.title] > 1 else s.title)
-        for s in sessions
-    }
+    seen: Counter[str] = Counter()
+    labels: dict[str, str] = {}
+    for s in sessions:
+        if counts[s.title] > 1:
+            seen[s.title] += 1
+            labels[s.session_id] = f"{s.title} ({seen[s.title]})"  # a counter, not an internal id
+        else:
+            labels[s.session_id] = s.title
+    return labels
 
 
 def _render_conversations(app: Any, ss: dict) -> None:
@@ -127,4 +132,3 @@ def render_sidebar(app: Any, ss: dict) -> None:
         st.divider()
         _render_samples(app, ss)
         st.divider()
-        st.caption("Design: docs/DESIGN.md")

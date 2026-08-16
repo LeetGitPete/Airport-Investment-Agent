@@ -40,7 +40,7 @@ def table_to_text(table: Table) -> str:
 
 def pointer_line(table: Table) -> str:
     """A `pointer` table (identical content shown earlier in the chat) prints as one line."""
-    return f"^ {table.title} -- unchanged since answer #{table.first_shown_turn} above (not repeated)"
+    return f"^ {table.title} -- already shown earlier in this chat (answer {table.first_shown_turn}), unchanged"
 
 
 def _table_block(table: Table) -> str:

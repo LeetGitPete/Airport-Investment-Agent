@@ -47,7 +47,7 @@ def test_pointer_table_renders_as_a_caption_not_a_grid():
     # The only grid left is the tool trace inside "Show work"; the evidence table itself is gone.
     top_level = [c for c in at.main.children.values() if c.type == "arrow_data_frame"]
     assert not top_level
-    assert any("unchanged since answer #2" in c.value for c in at.main.caption)
+    assert any("already shown earlier in this chat (answer 2)" in c.value for c in at.main.caption)
 
 
 def test_minimal_mode_keeps_new_tables_behind_a_data_expander():

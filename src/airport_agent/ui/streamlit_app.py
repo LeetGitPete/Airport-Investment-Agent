@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import streamlit as st
 
+from airport_agent.agent.planner import INTENT_DISPLAY
+from airport_agent.agent.tables import tool_label
 from airport_agent.contracts import LLMError, Plan, registry_by_id
 from airport_agent.ui.bootstrap import get_app
 from airport_agent.ui.render import render_answer, render_error
@@ -22,10 +24,14 @@ def _set_pending(text: str) -> None:
 
 
 def _plan_caption(p: Plan) -> str:
+    # `presentation_notes` stays by decision 2026-08-16: it is the planner's own short read of what
+    # the user asked for, and seeing it in flight is the point of showing the plan early.
     notes = p.presentation_notes
     if len(notes) > 80:
         notes = notes[:80].rstrip() + "…"  # mark the cut — an unmarked truncation reads as a full sentence
-    return f"How I'm approaching this: {p.intent} · engines: {', '.join(p.engines) or 'none'} · {notes}"
+    intent = INTENT_DISPLAY.get(p.intent, p.intent)
+    engines = ", ".join(tool_label(e) for e in p.engines) or "none"
+    return f"How I'm approaching this: {intent} · engines: {engines} · {notes}"
 
 
 try:

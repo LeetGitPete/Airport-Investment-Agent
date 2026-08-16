@@ -17,6 +17,12 @@ from airport_agent.contracts import (
     SpecialistReport,
     Table,
 )
+from airport_agent.contracts.display import (  # noqa: F401 — historical re-export
+    PEER_GROUP_DISPLAY,
+    SOURCE_DISPLAY,
+    peer_label,
+    source_name,
+)
 
 PILLARS = ["P1", "P2", "P3", "P4", "P5"]
 BANDS = ["short", "medium", "long", "ultra"]
@@ -26,28 +32,6 @@ METRIC_PROVENANCE_COLUMNS = ["value", "unit", "time period", "period end", "sour
 #: Tool results that are DeterministicReport dumps.
 REPORT_TOOLS = ("score_airports", "compare_airports", "diagnose_unmet_demand")
 
-#: User-facing source names. Fallback is the raw id, so an unmapped source stays visible.
-SOURCE_DISPLAY: dict[str, str] = {
-    "ourairports": "OurAirports",
-    "faa_taf": "FAA Terminal Area Forecast",
-    "faa_npias": "FAA NPIAS 2025-2029",
-    "bts_socrata": "BTS T-100 airport totals",
-    "bts_t100": "BTS T-100 route segments",
-    "bts_otp": "BTS On-Time Performance",
-    "bts_delay_cause": "BTS delay causes",
-    "census_cbsa": "Census metro population",
-    "bea_msa": "BEA metro GDP",
-    "faa_cats": "FAA airport financials (Form 127)",
-    "faa_aip": "FAA AIP grants",
-    "faa_nasstatus": "FAA NAS Status (live)",
-    "curated": "Curated airport facts",
-    "bts_db1b": "BTS DB1B O&D survey",
-}
-
-
-def source_name(source_id: str | None) -> str:
-    """User-facing name for a source id (the id itself when unmapped or empty)."""
-    return SOURCE_DISPLAY.get(source_id or "", source_id or "")
 
 
 #: User-facing names for tools and engines — the ONLY place an internal tool id gets a user name.
@@ -124,20 +108,11 @@ def rank_legend(preset: str | None) -> str:
 #: Unit display: "pct" is the registry's unit for PERCENT (not percentile) — shown as "%".
 UNIT_DISPLAY: dict[str, str] = {"pct": "%"}
 
-#: Peer-group values rendered as prose ("hub_class" is the FAA hub-size class).
-PEER_GROUP_DISPLAY: dict[str, str] = {
-    "hub_class": "airports of the same hub size",
-    "region": "airports in the same FAA region",
-    "all": "all airports",
-}
-
 
 def unit_label(unit: str | None) -> str:
     return UNIT_DISPLAY.get(unit or "", unit or "")
 
 
-def peer_label(peer_group: str | None) -> str:
-    return PEER_GROUP_DISPLAY.get(peer_group or "", peer_group or "peers")
 
 
 def _metric_name(metric_id: str, specs_by_id: dict[str, MetricSpec]) -> str:
@@ -422,12 +397,16 @@ def _simple_tables(tool: str, result: dict[str, Any],
         return [Table(title=f"Live status — {result.get('iata', '?')}", columns=["field", "value"], rows=rows,
                       footnotes=["Snapshot at the fetch time above."])]
     if tool == "explain_metric":
-        keys = ["id", "name", "definition", "formula", "unit", "direction", "pillar", "pillar_name", "tier",
-                "sources", "horizons", "caveats"]
-        rows = [[k, ", ".join(map(str, result[k])) if isinstance(result.get(k), list) else result.get(k)]
+        # Internal registry fields (id, tier, pillar code) stay off this table by decision
+        # 2026-08-16 — the user asked what a metric MEANS, not how the registry files it.
+        keys = ["name", "definition", "formula", "unit", "direction", "pillar_name", "horizons", "caveats"]
+        rows = [[k.replace("_", " "),
+                 ", ".join(map(str, result[k])) if isinstance(result.get(k), list) else result.get(k)]
                 for k in keys if k in result]
-        return [Table(title=f"Definition — {result.get('id', '?')}", columns=["field", "value"], rows=rows,
-                      footnotes=[])]
+        if result.get("sources"):
+            rows.append(["sources", ", ".join(source_name(str(x)) for x in result["sources"])])
+        return [Table(title=f"Definition — {result.get('name') or result.get('id', '?')}",
+                      columns=["field", "value"], rows=rows, footnotes=[])]
     if tool == "list_sources":
         sources = result.get("sources") or []
         rows = []

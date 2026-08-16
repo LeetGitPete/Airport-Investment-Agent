@@ -173,7 +173,11 @@ def test_other_tool_results_render(registry, by_id):
     assert sources[0].title.startswith("Sources") and sources[0].rows
     definition = tool_result_tables("explain_metric", registry.call("explain_metric", {"metric_id": "load_factor"},
                                                                     engine="concierge"), by_id)
-    assert definition[0].title.startswith("Definition") and "load_factor" in str(definition[0].rows)
+    # Decision 2026-08-16: the definition table shows the display name, never the internal id/tier.
+    rows_text = str(definition[0].rows)
+    assert definition[0].title == "Definition — Load factor"
+    assert "Load factor" in rows_text and "load_factor" not in rows_text
+    assert "tier" not in rows_text and "BTS T-100" in rows_text  # sources mapped to display names
     scored = tool_result_tables("score_airports", registry.call("score_airports", {"airports": ["BOS", "BDL"]},
                                                                 engine="concierge"), by_id)
     assert any(t.title.startswith("Ranking") for t in scored)

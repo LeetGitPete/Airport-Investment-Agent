@@ -84,7 +84,7 @@ def test_pointer_table_prints_as_one_line_and_never_the_grid():
     table = a.evidence_tables[0].model_copy(update={"shown_as": "pointer", "first_shown_turn": 1})
     a = a.model_copy(update={"evidence_tables": [table]})
     text = answer_to_text(a)
-    assert "unchanged since answer #1" in text and table.title in text
+    assert "already shown earlier in this chat (answer 1)" in text and table.title in text
     assert "12.9" not in text.split("== COMPUTED ANALYSIS")[1].split("ASSUMPTIONS:")[0]
 
 

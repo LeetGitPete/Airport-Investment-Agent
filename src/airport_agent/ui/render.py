@@ -45,7 +45,7 @@ def render_plan_line(plan_line: str) -> None:
 
 def pointer_line(table: Table) -> str:
     """The one line a `pointer` table renders as: where the identical grid already is."""
-    return f"↑ {table.title} — unchanged since answer #{table.first_shown_turn} above (not repeated)"
+    return f"↑ {table.title} — already shown earlier in this chat (answer {table.first_shown_turn}), unchanged"
 
 
 def _render_table(table: Table, specs_by_id: dict[str, MetricSpec]) -> None:
@@ -87,7 +87,7 @@ def render_answer(
 
     # Layout: headline -> analyst view (+ its ranking) -> computed scores & data.
     if analyst_tables or answer.analyst_view:
-        st.subheader("🧠 Analyst view (AI specialist)")
+        st.subheader("🧠 Analyst view (AI)")
         st.caption("The specialist's interpretation — it cites the computed evidence, "
                    "but the ordering and judgement are the model's.")
     for table in analyst_tables:

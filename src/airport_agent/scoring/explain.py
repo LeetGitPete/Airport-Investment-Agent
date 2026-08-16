@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from airport_agent.contracts import PILLAR_NAMES, Metric, MetricSpec
+from airport_agent.contracts.display import peer_label, source_name
 from airport_agent.scoring.scorer import ScoringResult
 
 Evidence = dict[tuple[str, str], Metric]  # (iata, metric_id) -> Metric
@@ -50,14 +51,15 @@ def _pair_line(a: str, b: str, res: ScoringResult, by_id: dict[str, MetricSpec],
     ma, mb = ev.get((a, m)), ev.get((b, m))
     va = fmt_value(by_id[m], ma.value if ma else None)
     vb = fmt_value(by_id[m], mb.value if mb else None)
-    src = f"{ma.source_id}, through {ma.period_end}" if ma else "source n/a"
+    src = f"{source_name(ma.source_id)}, through {ma.period_end}" if ma else "source n/a"
     return f"{a} ranks above {b} mainly on {PILLAR_NAMES[p]} (+{delta:.0f}): {by_id[m].name} {va} vs {vb} ({src})."
 
 
 def explain_rank(res: ScoringResult, by_id: dict[str, MetricSpec], evidence: Evidence, preset_name: str,
                  horizon: str, peer_group: str, absent_weight: float | None = None) -> str:
     n = len(res.rows)
-    lines = [f"Ranked {n} airports with preset '{preset_name}' at horizon {horizon}; percentiles within {peer_group}."]
+    lines = [f"Ranked {n} airports on {preset_name.replace('_', ' ')} weights over {horizon}, "
+             f"as percentiles among {peer_label(peer_group)}."]
     order = [r.ref.iata for r in res.rows]
     for a, b in zip(order, order[1:], strict=False):
         lines.append(_pair_line(a, b, res, by_id, evidence))
@@ -76,7 +78,7 @@ def explain_rank(res: ScoringResult, by_id: dict[str, MetricSpec], evidence: Evi
 
 def explain_compare(res: ScoringResult, by_id: dict[str, MetricSpec], evidence: Evidence, iatas: list[str],
                     horizon: str, peer_group: str) -> str:
-    head = f"Side-by-side at horizon {horizon} (percentiles within {peer_group})."
+    head = f"Side-by-side over {horizon}, as percentiles among {peer_label(peer_group)}."
     idx = " · ".join(f"{i} {res.pillar_scores.get(i, {}).get('P2', 0.0):.0f}" for i in iatas)
     parts = [head, f"Congestion index (P2 sub-score): {idx}."]
     gaps: list[tuple[float, str]] = []
