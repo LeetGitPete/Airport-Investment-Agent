@@ -1,4 +1,4 @@
-"""The single gate every outbound HTTP request passes through (QA task 17, 2026-08-16).
+"""The single gate every outbound HTTP request passes through.
 
 Why this exists: nothing in the data layer paced its requests. A refresh pulls dozens of files
 back-to-back (ten AIP workbooks, one T-100 and one OTP archive per month of the trailing window), and

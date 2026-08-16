@@ -115,8 +115,8 @@ def download(
     owns_client = client is None
     http_client = client or httpx.Client(follow_redirects=True, timeout=timeout)
     part = dest.with_suffix(dest.suffix + ".part")
-    # QA task 17: pace only a real request. A cache hit returned above never waits, so a re-run of
-    # a refresh over already-downloaded files is as fast as it ever was.
+    # Pace only a real request: the cache hit above returns before this gate, so a re-run of a
+    # refresh over already-downloaded files never waits.
     PACER.wait(url)
     try:
         with http_client.stream(method, url, data=data, headers=headers, follow_redirects=True) as response:

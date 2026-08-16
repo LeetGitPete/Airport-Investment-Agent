@@ -1,7 +1,7 @@
 """P2 Congestion & Physical Constraint derived metrics.
 
-`nas_delay_share` is documented-missing (BTS Delay Cause cut by the 2026-08-16 RESCOPE) —
-see `MISSING_REASONS` in `derived/__init__.py`.
+`nas_delay_share` is documented-missing (no BTS Delay Cause adapter landed) — see
+`MISSING_REASONS` in `derived/__init__.py`.
 """
 from __future__ import annotations
 
@@ -39,8 +39,8 @@ def _is_otp_current_year(con, ref_year: int, table: str = "airport_month", measu
 
 
 def pct_arr_delay_gt15(con, horizon: str, ref_year: int, latest_period: str) -> pd.DataFrame:
-    """RESCOPE 2026-08-16: OTP ingests only the trailing 12 months, so 3y is None (not
-    computed, not flagged-partial) — the horizon is dropped outright rather than mislabeled."""
+    """OTP is ingested for the trailing 12 months only, so 3y is None — not computed and not
+    flagged-partial. The horizon is dropped outright rather than mislabeled."""
     if horizon != "12m":
         return pd.DataFrame()
     otp_end = _is_otp_current_year(con, ref_year, measure="arrivals")
@@ -71,7 +71,7 @@ def pct_arr_delay_gt15(con, horizon: str, ref_year: int, latest_period: str) -> 
 
 
 def avg_dep_delay_min(con, horizon: str, ref_year: int, latest_period: str) -> pd.DataFrame:
-    """RESCOPE 2026-08-16: same 12m-only rule as `pct_arr_delay_gt15`."""
+    """Same 12m-only rule as `pct_arr_delay_gt15` (OTP holds no multi-year history)."""
     if horizon != "12m":
         return pd.DataFrame()
     otp_end = _is_otp_current_year(con, ref_year, measure="dep_count")
@@ -192,8 +192,7 @@ def npias_capacity_label(con, horizon: str, ref_year: int, latest_period: str) -
         return df
     df = df.copy()
     df["value"] = df["value"].astype(float)
-    df["period_start"] = "2025"
-    df["period_end"] = "2029"
+    df["period_start"], df["period_end"] = common.NPIAS_PLAN_PERIOD
     df["quality_json"] = common.quality_json([])
     return df[["iata", "value", "period_start", "period_end", "source_id", "vintage", "quality_json"]]
 
@@ -310,9 +309,9 @@ def imc_capacity_ratio(con, horizon: str, ref_year: int, latest_period: str) -> 
         if not r.vmc or r.vmc <= 0:
             continue
         v = r.imc / r.vmc
-        # A static curated fact has no natural trailing window; its "period" is the single
-        # point in time the FAA capacity profile was published (as_of), not None — every
-        # airport_metrics row carries a period (plan Task 13 checklist).
+        # A static curated fact has no trailing window; its "period" is the single point in
+        # time the FAA capacity profile was published (as_of). Every airport_metrics row
+        # carries a period, so None is not an option here.
         rows.append(
             dict(
                 iata=r.iata,

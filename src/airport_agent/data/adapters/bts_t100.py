@@ -46,6 +46,8 @@ totals (not route-level) remain available from `bts_socrata`
 """
 from __future__ import annotations
 
+import calendar
+import os
 import re
 import zipfile
 from datetime import UTC, datetime
@@ -157,9 +159,6 @@ def _extract_from_zip(zip_path: Path, dest: Path) -> None:
             part.unlink(missing_ok=True)
             raise
     # Stamp with the zip entry's own timestamp (see faa_taf._extract for the same idea).
-    import calendar
-    import os
-
     stamp = calendar.timegm((*info.date_time, 0, 0, -1))
     os.utime(dest, (stamp, stamp))
 

@@ -10,16 +10,16 @@ metric's value is looked up at the *requested* horizon only if `MetricSpec.horiz
 declares it; horizon-invariant metrics (`horizons <= {"static", "forecast"}`) answer any
 request at their own single declared horizon. A metric never borrows another horizon's real
 value to answer an undeclared one — undeclared means `None`, always (see
-`_value`/`_lookup_horizon`). Multi-year semantics (from `derived/common.py`, restated here
-per the plan's Global Constraints): **CAGR-type metrics are k-year growth; level metrics at
+`_value`/`_lookup_horizon`). Multi-year semantics (from `derived/common.py`, restated
+here): **CAGR-type metrics are k-year growth; level metrics at
 horizon k are computed over the trailing k-year window** ending at the metric's own
 underlying source's latest available period (12m = trailing 12 months). Different sources
-(Socrata, OTP, T-100) publish on different, independent cadences (verified — see
+(Socrata, OTP, T-100) publish on different, independent cadences (see
 `derived/p2_congestion.py`'s `_otp_latest_period`), so "the trailing k years" ends at
 different real calendar months for different metrics; every `Metric`/row still carries its
 own `period_start`/`period_end` so this is never hidden.
 
-Memoization (plan Task 14, scoped narrowly — no report caching): the metric registry
+Memoization (scoped narrowly — no report caching): the metric registry
 (`load_registry()`) and the `list_airports` commercial-airport universe are each computed
 once per process and reused; every other method reads the snapshot fresh.
 """
@@ -269,7 +269,7 @@ class DuckDBDataService:
         total_deps = df["deps"].sum()
         intl_deps = df.loc[df["is_intl"], "deps"].sum()
         total_freight = df["freight"].sum()
-        long_freight = df.loc[df["distance"] >= 1500, "freight"].sum()
+        long_freight = df.loc[df["distance"] >= common.LONG_HAUL_MI, "freight"].sum()
         return {
             "nonstop_destinations": int(df["dest"].nunique()),
             "top_dest": top_dest,

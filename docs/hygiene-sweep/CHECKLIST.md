@@ -14,17 +14,17 @@ Total files: **182**
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `src/airport_agent/contracts/__init__.py` | 119 | pending | |
-| `src/airport_agent/contracts/conversation.py` | 82 | pending | |
-| `src/airport_agent/contracts/data_service.py` | 86 | pending | |
-| `src/airport_agent/contracts/llm.py` | 42 | pending | |
-| `src/airport_agent/contracts/models.py` | 190 | pending | |
-| `src/airport_agent/contracts/registry.py` | 34 | pending | |
-| `src/airport_agent/contracts/reports.py` | 64 | pending | |
-| `src/airport_agent/contracts/requests.py` | 66 | pending | |
-| `src/airport_agent/contracts/scoring.py` | 34 | pending | |
-| `src/airport_agent/contracts/specialists.py` | 16 | pending | |
-| `src/airport_agent/contracts/tools.py` | 20 | pending | |
+| `src/airport_agent/contracts/__init__.py` | 119 | done | read-only, logged only |
+| `src/airport_agent/contracts/conversation.py` | 82 | done | read-only, logged only |
+| `src/airport_agent/contracts/data_service.py` | 86 | done | read-only, logged only |
+| `src/airport_agent/contracts/llm.py` | 42 | done | read-only, logged only |
+| `src/airport_agent/contracts/models.py` | 190 | done | read-only, logged only |
+| `src/airport_agent/contracts/registry.py` | 34 | done | read-only, logged only |
+| `src/airport_agent/contracts/reports.py` | 64 | done | read-only, logged only |
+| `src/airport_agent/contracts/requests.py` | 66 | done | read-only, logged only |
+| `src/airport_agent/contracts/scoring.py` | 34 | done | read-only, logged only |
+| `src/airport_agent/contracts/specialists.py` | 16 | done | read-only, logged only |
+| `src/airport_agent/contracts/tools.py` | 20 | done | read-only, logged only |
 
 ## 10. repo root
 
@@ -36,46 +36,46 @@ Total files: **182**
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `src/airport_agent/data/adapters/__init__.py` | 30 | pending | |
-| `src/airport_agent/data/adapters/base.py` | 134 | pending | |
-| `src/airport_agent/data/adapters/bts_otp.py` | 341 | pending | |
-| `src/airport_agent/data/adapters/bts_socrata.py` | 281 | pending | |
-| `src/airport_agent/data/adapters/bts_t100.py` | 281 | pending | |
-| `src/airport_agent/data/adapters/census_cbsa.py` | 307 | pending | |
-| `src/airport_agent/data/adapters/curated.py` | 158 | pending | |
-| `src/airport_agent/data/adapters/faa_aip.py` | 226 | pending | |
-| `src/airport_agent/data/adapters/faa_nasstatus.py` | 173 | pending | |
-| `src/airport_agent/data/adapters/faa_npias.py` | 250 | pending | |
-| `src/airport_agent/data/adapters/faa_taf.py` | 275 | pending | |
-| `src/airport_agent/data/adapters/ourairports.py` | 192 | pending | |
+| `src/airport_agent/data/adapters/__init__.py` | 30 | done |  |
+| `src/airport_agent/data/adapters/base.py` | 134 | done |  |
+| `src/airport_agent/data/adapters/bts_otp.py` | 341 | done |  |
+| `src/airport_agent/data/adapters/bts_socrata.py` | 281 | done |  |
+| `src/airport_agent/data/adapters/bts_t100.py` | 281 | done |  |
+| `src/airport_agent/data/adapters/census_cbsa.py` | 307 | done |  |
+| `src/airport_agent/data/adapters/curated.py` | 158 | done |  |
+| `src/airport_agent/data/adapters/faa_aip.py` | 226 | done |  |
+| `src/airport_agent/data/adapters/faa_nasstatus.py` | 173 | done |  |
+| `src/airport_agent/data/adapters/faa_npias.py` | 250 | done |  |
+| `src/airport_agent/data/adapters/faa_taf.py` | 275 | done |  |
+| `src/airport_agent/data/adapters/ourairports.py` | 192 | done |  |
 
 ## 2b. src/data/derived
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `src/airport_agent/data/derived/__init__.py` | 222 | pending | |
-| `src/airport_agent/data/derived/common.py` | 153 | pending | |
-| `src/airport_agent/data/derived/p1_demand.py` | 275 | pending | |
-| `src/airport_agent/data/derived/p2_congestion.py` | 340 | pending | |
-| `src/airport_agent/data/derived/p3_market.py` | 209 | pending | |
-| `src/airport_agent/data/derived/p4_economy.py` | 64 | pending | |
-| `src/airport_agent/data/derived/p5_finance.py` | 64 | pending | |
+| `src/airport_agent/data/derived/__init__.py` | 222 | done |  |
+| `src/airport_agent/data/derived/common.py` | 153 | done |  |
+| `src/airport_agent/data/derived/p1_demand.py` | 275 | done |  |
+| `src/airport_agent/data/derived/p2_congestion.py` | 340 | done |  |
+| `src/airport_agent/data/derived/p3_market.py` | 209 | done |  |
+| `src/airport_agent/data/derived/p4_economy.py` | 64 | done |  |
+| `src/airport_agent/data/derived/p5_finance.py` | 64 | done |  |
 
 ## 2c. src/data (core)
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `src/airport_agent/data/__init__.py` | 12 | pending | |
-| `src/airport_agent/data/__main__.py` | 101 | pending | |
-| `src/airport_agent/data/commercial.py` | 23 | pending | |
-| `src/airport_agent/data/geo.py` | 16 | pending | |
-| `src/airport_agent/data/http.py` | 97 | pending | |
-| `src/airport_agent/data/paths.py` | 28 | pending | |
-| `src/airport_agent/data/quality.py` | 98 | pending | |
-| `src/airport_agent/data/refresh.py` | 276 | pending | |
-| `src/airport_agent/data/service.py` | 396 | pending | |
-| `src/airport_agent/data/sources_config.py` | 39 | pending | |
-| `src/airport_agent/data/store.py` | 342 | pending | |
+| `src/airport_agent/data/__init__.py` | 12 | done |  |
+| `src/airport_agent/data/__main__.py` | 101 | done |  |
+| `src/airport_agent/data/commercial.py` | 23 | done |  |
+| `src/airport_agent/data/geo.py` | 16 | done |  |
+| `src/airport_agent/data/http.py` | 97 | done |  |
+| `src/airport_agent/data/paths.py` | 28 | done |  |
+| `src/airport_agent/data/quality.py` | 98 | done |  |
+| `src/airport_agent/data/refresh.py` | 276 | done |  |
+| `src/airport_agent/data/service.py` | 396 | done |  |
+| `src/airport_agent/data/sources_config.py` | 39 | done |  |
+| `src/airport_agent/data/store.py` | 342 | done |  |
 
 ## 3. src/scoring
 

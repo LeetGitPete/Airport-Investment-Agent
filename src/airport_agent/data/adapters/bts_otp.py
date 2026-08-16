@@ -57,6 +57,8 @@ months, so the `3y`/`5y` delay horizons (`pct_arr_delay_gt15`,
 """
 from __future__ import annotations
 
+import calendar
+import os
 import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -144,9 +146,6 @@ def _extract_data_csv(zip_path: Path, dest: Path) -> Path:
         except BaseException:
             part.unlink(missing_ok=True)
             raise
-    import calendar
-    import os
-
     stamp = calendar.timegm((*info.date_time, 0, 0, -1))
     os.utime(dest, (stamp, stamp))
     return dest

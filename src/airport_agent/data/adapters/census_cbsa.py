@@ -50,6 +50,8 @@ do this join: it has no access to `airports.lat/lon`, only the raw files.
 """
 from __future__ import annotations
 
+import calendar
+import os
 import re
 import zipfile
 from datetime import UTC, datetime
@@ -244,9 +246,6 @@ class CensusCbsaAdapter:
             except BaseException:
                 part.unlink(missing_ok=True)
                 raise
-        import calendar
-        import os
-
         stamp = calendar.timegm((*info.date_time, 0, 0, -1))
         os.utime(dest, (stamp, stamp))
         return dest

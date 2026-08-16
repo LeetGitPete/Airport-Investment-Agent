@@ -13,7 +13,7 @@ from pathlib import Path
 
 from airport_agent.data.adapters.base import Period
 from airport_agent.data.paths import default_snapshot_path, raw_cache_dir
-from airport_agent.data.refresh import refresh, staleness
+from airport_agent.data.refresh import RefreshReport, refresh, staleness
 from airport_agent.data.sources_config import load_sources
 
 
@@ -42,7 +42,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _print_staleness_table(snapshot: Path | None) -> None:
     rows = staleness(snapshot)
-    width = max(len(r["source_id"]) for r in rows)
+    width = max((len(r["source_id"]) for r in rows), default=9)
     print(f"{'source_id'.ljust(width)}  status   age_days  cadence_days  fetched_at")
     for r in rows:
         age = "n/a" if r["age_days"] is None else str(r["age_days"])
@@ -50,7 +50,7 @@ def _print_staleness_table(snapshot: Path | None) -> None:
         print(f"{r['source_id'].ljust(width)}  {r['status']:<7}  {age:>8}  {r['cadence_days']:>12}  {fetched}")
 
 
-def _print_refresh_report(report) -> None:
+def _print_refresh_report(report: RefreshReport) -> None:
     width = max((len(r.source_id) for r in report.results), default=8)
     print(f"{'source_id'.ljust(width)}  status  rows     seconds")
     for r in report.results:
@@ -70,10 +70,6 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    if args.command != "refresh":
-        parser.error(f"unknown command: {args.command}")
-        return 2
-
     if args.check:
         _print_staleness_table(args.snapshot)
         return 0
@@ -84,7 +80,6 @@ def main(argv: list[str] | None = None) -> int:
         unknown = [s for s in sources if s not in known]
         if unknown:
             parser.error(f"unknown source id(s): {', '.join(unknown)} (known: {', '.join(sorted(known))})")
-            return 2
 
     report = refresh(
         sources=sources,

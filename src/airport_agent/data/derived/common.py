@@ -20,6 +20,15 @@ import pandas as pd
 #: metrics don't use a window).
 WINDOW_MONTHS: dict[str, int] = {"12m": 12, "3y": 36, "5y": 60, "10y": 120}
 
+#: Long-haul threshold in statute miles (design 02 convention: no ICAO/IATA standard exists,
+#: so ">= 1,500 mi" is our stated default and every answer using it says so).
+LONG_HAUL_MI = 1500.0
+
+#: Plan period of the NPIAS edition currently ingested. NPIAS rows carry no per-row period,
+#: so the edition's own span is the honest thing to stamp. Must track
+#: `adapters/faa_npias.py::NPIAS_PLAN_YEARS` — bump both when the FAA publishes a new edition.
+NPIAS_PLAN_PERIOD = ("2025", "2029")
+
 
 def _add_months(period: str, delta: int) -> str:
     """`period` ("YYYY-MM") shifted by `delta` months (may be negative)."""

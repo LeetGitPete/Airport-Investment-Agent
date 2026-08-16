@@ -42,10 +42,11 @@ intl_out_passengers, intl_in_passengers, load_factor`. `airport_year` rollups
 (`enplanements=Σtotal_passengers, seats=Σtotal_seats, departures=Σtotal_departures`)
 are written only for **complete** years (12 distinct months present for that
 iata/year) — partial years are left for callers to handle via TAF/trailing-12m
-fallback (see plan "Derived metric definitions", `annual_enplanements`).
+fallback (see `derived/common.py::annual_enplanements`).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -124,8 +125,6 @@ def _page_url(where: str, offset: int) -> str:
 
 
 def _page_filename(where: str, offset: int) -> str:
-    import hashlib
-
     key = hashlib.sha1(where.encode("utf-8")).hexdigest()[:10]  # noqa: S324 (cache key, not security)
     return f"bts_socrata_{key}_{offset:07d}.json"
 

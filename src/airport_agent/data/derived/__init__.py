@@ -2,20 +2,9 @@
 
 `build_derived(store, years=None)` is exactly the frozen registry (`config/metrics.yaml`),
 one function per tier A/B metric id, run at every horizon the id declares, and written to
-`airport_metrics` (see plan "Store schema"). `assert_registry_covered` fails the build if a
-tier A/B id has no function at all; ids whose source was cut by the 2026-08-16 RESCOPE
-(Option A Core-6) still have a function — it returns zero rows, always, with the reason
-recorded in `MISSING_REASONS` (mirrors the frozen contract suite's `od_share` allowance,
-extended to every cut source).
-
-Branch `feature/data-extras` (2026-08-16) un-cut `aip_per_enpl_10y` once the `faa_aip`
-adapter landed (see `docs/superpowers/plans/2026-08-15-plan2a-data.md` Task 11 and the
-RESCOPE addendum); `msa_gdp_per_capita`/`msa_gdp_cagr_5y` remain documented-missing on this
-branch — BEA publishes no keyless-bulk MSA-level real-GDP table (verified 2026-08-16: the
-`MARPP` zip named in Task 10 is *Real Personal Income and Regional Price Parities by MSA*,
-not GDP; BEA's regional GDP download catalog offers only State (`SAGDP`/`SQGDP`) and County
-(`CAGDP1/2/8/9/11`) — no `MAGDP`/`MGDP` MSA family exists, and `bea.gov/data/gdp/gdp-by-
-metropolitan-area` itself redirects to `gdp-by-county`).
+`airport_metrics`. `assert_registry_covered` fails the build if a tier A/B id has no function
+at all; an id whose source never landed still has a function — it returns zero rows, always,
+with the reason recorded in `MISSING_REASONS`.
 """
 from __future__ import annotations
 
@@ -219,4 +208,4 @@ def build_derived(store: Store, years: range | None = None) -> dict[str, int]:
     return row_counts
 
 
-__all__ = ["METRIC_FUNCS", "MISSING_REASONS", "assert_registry_covered", "build_derived"]
+__all__ = ["CURRENT_REF_YEAR", "METRIC_FUNCS", "MISSING_REASONS", "assert_registry_covered", "build_derived"]

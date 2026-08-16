@@ -234,8 +234,10 @@ def refresh(
         except Exception as exc:  # noqa: BLE001 (per-source isolation is the point)
             results.append(SourceResult(source_id, False, 0, time.monotonic() - t0, f"{type(exc).__name__}: {exc}"))
 
-    derived_row_counts = build_derived(store)
-    store.close()
+    try:
+        derived_row_counts = build_derived(store)
+    finally:
+        store.close()
     finished_at = datetime.now(UTC).isoformat()
     return RefreshReport(results=results, derived_row_counts=derived_row_counts, started_at=started_at, finished_at=finished_at)
 

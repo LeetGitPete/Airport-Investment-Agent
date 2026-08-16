@@ -181,7 +181,7 @@ class FaaAipAdapter:
             fy = _fy_from_filename(path)
             raw = _read_grant_table(path).copy()
             raw["faa_locid"] = raw["faa_locid"].astype(str).str.strip()
-            raw = raw[raw["faa_locid"] != "" ]
+            raw = raw[raw["faa_locid"] != ""]
             raw = raw[~raw["faa_locid"].str.startswith(BLOCK_GRANT_PREFIX)]
             raw["amount_usd"] = pd.to_numeric(raw["amount_usd"], errors="coerce")
             raw = raw.dropna(subset=["amount_usd"])

@@ -45,6 +45,8 @@ from airport_agent.data.adapters.base import Period, download, file_vintage
 from airport_agent.data.paths import curated_dir
 
 NPIAS_EDITION = "2025-2029"
+#: The edition's plan years, split out for the `SourceVintage` period.
+NPIAS_PLAN_YEARS: tuple[str, str] = ("2025", "2029")
 NPIAS_URL = (
     "https://www.faa.gov/sites/faa.gov/files/airports/planning_capacity/npias/current/"
     "ARP-NPIAS-2025-2029-AppendixA.xlsx"
@@ -243,8 +245,8 @@ class FaaNpiasAdapter:
                 "5-year development estimate, with capacity-constraint labels from the NPIAS "
                 f"national capacity outlook ({lists.source_url}, as of {lists.as_of})"
             ),
-            period_start="2025",
-            period_end="2029",
+            period_start=NPIAS_PLAN_YEARS[0],
+            period_end=NPIAS_PLAN_YEARS[1],
             fetched_at=self._fetched_at,
             url=NPIAS_URL,
         )

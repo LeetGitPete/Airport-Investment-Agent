@@ -1,8 +1,7 @@
 """P5 Financeability & Pipeline derived metrics.
 
-`cpe_usd`/`nonaero_rev_per_enpl` (FAA CATS Form 127) are documented-missing — cut by the
-2026-08-16 RESCOPE — see `MISSING_REASONS` in `derived/__init__.py`. `aip_per_enpl_10y`
-was un-cut on branch `feature/data-extras` (2026-08-16) once the `faa_aip` adapter landed.
+`cpe_usd`/`nonaero_rev_per_enpl` (FAA CATS Form 127) are documented-missing — no adapter
+landed for that source. See `MISSING_REASONS` in `derived/__init__.py`.
 """
 from __future__ import annotations
 
@@ -23,8 +22,7 @@ def npias_dev_per_enpl(con, horizon: str, ref_year: int, latest_period: str) -> 
         return df
     df = df.copy()
     df["value"] = df["dev_estimate_usd"] / df["enplanements"]
-    df["period_start"] = "2025"
-    df["period_end"] = "2029"
+    df["period_start"], df["period_end"] = common.NPIAS_PLAN_PERIOD
     df["quality_json"] = common.quality_json([])
     return df[["iata", "value", "period_start", "period_end", "source_id", "vintage", "quality_json"]]
 

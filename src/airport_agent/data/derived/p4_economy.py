@@ -1,13 +1,11 @@
 """P4 Economic Base derived metrics.
 
-`msa_gdp_per_capita`/`msa_gdp_cagr_5y` are documented-missing: no BEA source. The
-2026-08-16 RESCOPE kept `census_cbsa` for population/centroids only; branch
-`feature/data-extras` (2026-08-16) then attempted to un-cut BEA and confirmed there is
-nothing to un-cut — BEA's keyless bulk zip catalog (`apps.bea.gov/regional/zip/`) has no
-MSA-level real-GDP table at all (`MARPP` is MSA personal income/regional price parities,
-not GDP; only State `SAGDP`/`SQGDP` and County `CAGDP1/2/8/9/11` GDP zips exist; BEA's own
-`gdp-by-metropolitan-area` page redirects to `gdp-by-county`). See `MISSING_REASONS` in
-`derived/__init__.py`.
+`msa_gdp_per_capita`/`msa_gdp_cagr_5y` are documented-missing: BEA's keyless bulk zip
+catalog (`apps.bea.gov/regional/zip/`) has no MSA-level real-GDP table at all (`MARPP` is
+MSA personal income/regional price parities, not GDP; only State `SAGDP`/`SQGDP` and County
+`CAGDP1/2/8/9/11` GDP zips exist, and BEA's own `gdp-by-metropolitan-area` page redirects to
+`gdp-by-county`). `census_cbsa` supplies population and centroids only. See `MISSING_REASONS`
+in `derived/__init__.py`.
 """
 from __future__ import annotations
 
