@@ -45,14 +45,20 @@ MAX_SYNTHESIS_TOOL_CHARS = 2000
 FALLBACK_NOTE = "synthesis text unavailable — showing raw report"
 FALLBACK_HEADLINE = "Results below."
 FALLBACK_FOLLOW_UPS = ["Compare with peer airports?", "Try another horizon?", "Try another preset?"]
-BASELINE_ASSUMPTION = ("Every number shown comes from a cited source at the vintage listed; nothing "
-                       "is estimated or adjusted by the model")
 CONVENTION_MARKERS = ("convention", "spill model", "long-haul", "percentile")
 #: QA task 7 (human decision 2026-08-16): assumptions/uncertainty are condensed DETERMINISTICALLY
 #: to a hard cap — the LLM may add lines via the specialist but can never remove one. Build-level
 #: standing tradeoffs live in the docs, not in every answer.
-MAX_ASSUMPTIONS = 7  # + the baseline line = 8 rows max
+MAX_ASSUMPTIONS = 7  # + the defaults line = 8 rows max
 MAX_NOTES = 8
+#: QA task 13 (2026-08-16): the settings the UI supplies are stated in plain English, not as an
+#: internal k=v dump. Each entry renders one default; unknown keys fall back to "key=value".
+DEFAULT_PROSE: dict[str, Any] = {
+    "horizon": lambda v: f"time period {v}",
+    "scoring_preset": lambda v: f"{str(v).replace('_', ' ')} investment focus",
+    "peer_group": lambda v: f"peer comparison against {peer_label(str(v))}",
+}
+NO_DEFAULTS_ASSUMPTION = "Nothing was assumed beyond the settings and conventions stated above."
 
 SYNTHESIS_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -103,6 +109,21 @@ class _Synthesis(BaseModel):
 def _first_sentence(text: str) -> str:
     head = text.strip().split(". ")[0].strip()
     return head or FALLBACK_HEADLINE
+
+
+def _defaults_assumption(defaults: dict[str, str] | None) -> str:
+    """The closing assumption row: which settings the answer fell back on, in the user's words.
+
+    Phrased as "where the question didn't specify" because the planner may legitimately override a
+    default from the question itself — the answer must not claim more than it knows.
+    """
+    parts = [DEFAULT_PROSE[key](value) for key, value in (defaults or {}).items()
+             if value and key in DEFAULT_PROSE]
+    parts += [f"{key}={value}" for key, value in (defaults or {}).items()
+              if value and key not in DEFAULT_PROSE]
+    if not parts:
+        return NO_DEFAULTS_ASSUMPTION
+    return "Where the question didn't specify, these defaults were used: " + ", ".join(parts) + "."
 
 
 def _compact_specialist(rep: SpecialistReport) -> dict[str, Any]:
@@ -213,16 +234,16 @@ class Synthesizer:
             assumptions.extend(self._tool_assumptions(out))
             notes.extend(self._tool_notes(tool, out))
 
-        if defaults:
-            assumptions.append("UI defaults applied: "
-                               + ", ".join(f"{k}={v}" for k, v in defaults.items() if v))
         if degraded:
             notes.append(FALLBACK_NOTE)
         # QA task 7 (human decision 2026-08-16): condense deterministically — the LLM never picks.
         assumptions = _condense(_unique(assumptions), MAX_ASSUMPTIONS,
                                 "further standing conventions apply (documented in KEY-TRADEOFFS.md)")
         notes = _condense(_unique(notes), MAX_NOTES, "further minor notes omitted")
-        assumptions.append(BASELINE_ASSUMPTION)  # the assumptions block is never empty (product rule)
+        # QA task 13 (2026-08-16): the block always closes with the settings actually in force, so it
+        # is never empty (product rule) and never trimmed away by the cap. The old boilerplate line
+        # about cited sources is gone — every table already carries source and "data as of" columns.
+        assumptions.append(_defaults_assumption(defaults))
 
         headline = synthesis.headline.strip()
         if not headline:
@@ -261,8 +282,9 @@ class Synthesizer:
         peer_group = (rep.peer_group if rep else None) or (req.peer_group if req else None) or "hub_class"
         # QA task 7: one line for the request-shaping choices instead of three; standing build
         # facts (tier policy etc.) live in the docs, not in every answer.
-        out = [f"Scored with preset {preset}, time period {horizon}, "
-               f"percentiles among {peer_label(peer_group)}"]
+        # QA task 13: "preset" is an internal word — the user sees the focus, as in the table titles.
+        out = [f"Scored with {preset.replace('_', ' ')} focus, time period {horizon}, "
+               f"as percentiles among {peer_label(peer_group)}"]
         if rep is not None:
             out += [c for c in rep.caveats if any(m in c.lower() for m in CONVENTION_MARKERS)]
         return out

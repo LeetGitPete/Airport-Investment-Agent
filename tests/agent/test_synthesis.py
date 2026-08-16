@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from airport_agent.agent.planner import PlanFilters
-from airport_agent.agent.synthesis import SYNTHESIS_SCHEMA, Synthesizer
+from airport_agent.agent.synthesis import NO_DEFAULTS_ASSUMPTION, SYNTHESIS_SCHEMA, Synthesizer
 from airport_agent.contracts import AnalysisRequest, Answer, LLMResult, Plan, RankedItem, SpecialistReport
 from tests.agent.fake_llm import ScriptedLLM
 
@@ -35,7 +35,8 @@ def test_synthesize_analytical_structure_and_no_altered_numbers(fake_analyst, sp
     assert scores == {r.ref.iata: r.score for r in det.rows}  # numbers verbatim from the report
     assert ans.analyst_view == "Narrative." and "agrees" in ans.agreement_line and "weather" in ans.agreement_line
     # QA task 7: the request-shaping choices are one combined line, capped block overall
-    assert any(a.startswith("Scored with preset") and "12m" in a for a in ans.assumptions)
+    # QA task 13: no internal words ("preset") in the user-facing line
+    assert any(a.startswith("Scored with") and "12m" in a and "preset" not in a for a in ans.assumptions)
     assert len(ans.assumptions) <= 8 and len(ans.uncertainty_notes) <= 8
     assert "a1" in ans.assumptions and any("confidence 0.60" in u for u in ans.uncertainty_notes)
     assert ans.citations and all(c.source_id and c.vintage for c in ans.citations)
@@ -55,6 +56,8 @@ def test_synthesize_informational_from_tool_results(fake_analyst, fake_data, spe
     assert ans.analyst_view is None and ans.agreement_line is None
     assert any(t.title.startswith("Distance bands") for t in ans.evidence_tables)
     assert ans.citations[0].source_id == "bts_t100" and any("1,500" in a or "1500" in a for a in ans.assumptions)
+    # QA task 13: with no defaults in force the block still closes with an honest line, never empty
+    assert ans.assumptions[-1] == NO_DEFAULTS_ASSUMPTION
 
 
 def test_bad_synthesis_json_falls_back_to_report_text_and_notes_it(fake_analyst, specs):
@@ -95,7 +98,13 @@ def test_defaults_are_disclosed_and_nothing_is_hidden(fake_analyst, specs):
     ans = Synthesizer(ScriptedLLM([SYN]), specs).synthesize(
         message="q", plan=_plan(), plan_line="pl", req=req, deterministic=det, specialist=None,
         tool_results=[], trace=[], defaults={"horizon": "12m", "peer_group": "all"})
-    assert any(a.startswith("UI defaults applied") for a in ans.assumptions)
+    # QA task 13: the defaults are disclosed in plain English, never as an internal k=v dump, and
+    # they always close the block (never trimmed by the cap, so the block is never empty).
+    closing = ans.assumptions[-1]
+    assert closing.startswith("Where the question didn't specify")
+    assert "time period 12m" in closing and "all airports" in closing
+    assert not any("horizon=" in a or "peer_group=" in a for a in ans.assumptions)
+    assert not any("comes from a cited source" in a for a in ans.assumptions)  # boilerplate row is gone
     # QA task 5: the data matrix always shows every metric with a value — the LLM cannot hide
     # rows, so there is no hidden-metrics disclosure to make.
     assert not any("not shown" in u for u in ans.uncertainty_notes)
