@@ -1,11 +1,3 @@
-# Airport Investment Intelligence Agent — Design
-
-An agent that ranks and compares US airports as capacity-expansion investment candidates. A **deterministic
-scorer** does the arithmetic over public aviation data; an **LLM** routes the question and interprets the
-result. The model chooses *what to compute* and explains *what it means* — it never produces a number.
-
----
-
 ## Run it
 
 ```
@@ -138,54 +130,17 @@ The weights are not fixed — that is the point of classifying the interaction. 
 Asking about terminal expansion and asking about congestion relief should not return the same ranking, and they
 don't.
 
-### Conventions are declared, not assumed
-
-Long-haul is **≥1,500 statute miles** — no ICAO or IATA standard exists, so the threshold is stated in every
-answer that uses it. Capacity absorption uses a **spill model** rather than a load-factor cutoff, for the same
-reason. Percentiles are **within hub class** for P5.
-
-*Full detail: [`SCORING-METHODOLOGY.md`](SCORING-METHODOLOGY.md).*
-
 ---
 
 ## Key tradeoffs
 
-> **Pete — this section is my draft from the limitations log; edit or replace it.**
+**Important note first:** The design, research and QA process took the majority of the time, and scope creep made it so this codebase is surely lacking a deep manual overview - this is the number one thing I’d dedicate more time to in this project.
+Going over each file manually and understanding it more deeply is something I always do in my work with AI agents - it's the only way to truly maintain a codebase throughout time and scale it - but with this project's scope and time it wasn’t something I was able to achieve here.
 
-**One day, so the data layer was cut rather than the reasoning.** Mid-build the projected work overran the
-timebox. Rather than quietly thin everything, the options were written up and decided explicitly: keep six data
-sources, cut five. The cost is visible and stated — **27 of the 40 registry metrics carry data** in the shipped
-snapshot. Of the 13 that don't: 5 are tier C (documented gaps, never scored), 6 are tier A whose sources were
-cut, and 2 are gate metrics no public source supports at all.
-
-**Registry metrics are tiered by how honestly they can be computed**, and the gaps stay visible:
-
-| Tier | Count | Meaning |
-|---|---:|---|
-| A | 30 | Computable for every airport from bulk public data |
-| B | 5 | Needs hand-curated input — realistically majors only |
-| C | 5 | **Defined but never scored.** A named gap, not a silent omission |
-
-Tier C is deliberate. `asv_utilization`, `dscr`, `days_cash` all matter to this question and none is published
-per airport. Naming them beats a registry that quietly contains only what was easy to get.
-
-**A missing number is reported, never estimated.** On-time data is a trailing 12 months, so the 3-year and
-5-year delay horizons return `None` rather than a number computed from too little data and labelled as though
-it weren't. A specialist that receives no value for a metric must say it is unavailable and reason without it.
-
-**No public gate-count source exists**, which bites hardest exactly where it matters: `terminal_expansion`
-up-weights `pax_per_gate` and `deps_per_gate_day` at 3.0 and both are empty for every airport. Renormalizing
-silently would have handed that weight to the very metrics the preset means to damp — so the scorer now detects
-the case and says so in the answer.
-
-**One free-tier LLM provider, failing loudly.** If Gemini fails the app raises an actionable error rather than
-degrading to a worse answer, because a silently worse answer is the failure mode that actually costs you.
-
-**Offline by default.** The snapshot is committed and queried locally; only FAA NAS Status is live, capped at 5
-calls per turn behind a 3-second per-host pacer.
-
-*Full detail: [`KEY-TRADEOFFS.md`](KEY-TRADEOFFS.md) · the running log, 60 entries:
-[`design/known-limitations-and-tradeoffs.md`](design/known-limitations-and-tradeoffs.md).*
+- More data adapters - of course there's a lot more data that could be gathered and this will be a pure improvement to the project.
+- More specialists - currently there are only 3 specialists, and one generalist, this structure is a POC but of course a more complete build would have to include a wider variety of specialists
+- Scoring methodology - the scoring system is simple and intuitive, but it lacks more nuance, providing LLMS more freedom here through a wider variety of data sources, that arent cleanly mapped onto metrics could prove very useful - researching what investors actually do to get their data, and some of the more common heauristics would be something I'd look in to.
+- Polish - of course there are still many visual ui bugs/ missing features that couldnt be addressed in the amount of time for this project.
 
 ---
 
@@ -212,73 +167,25 @@ number regardless of cast). Dead ends were logged too, not quietly dropped.
 what produced the A/B/C tiering: a question with no computable metric became a documented tier-C gap instead of
 disappearing. No metric was chosen because the data happened to exist.
 
-### 2. Design — separation of concerns, so it could be built in parallel
+### 2. Designing and implementing
 
-Designed with `/brainstorming` into `docs/design/00–06` before any code. The decisions that shaped it:
+Designed with `/brainstorming` into `docs/design/00–06` before any code. 
 
-**Conversation is not analysis.** Three separate jobs that cannot reach into each other:
+The most important design lens that led the entire session was separating and boxing LLMS into strict rules and tool capabilities,
+this will hopefully prevent hallucinations and allow the data and deterministic logic to shine through. I'm trying to utilize the llm's superpower which is understanding
+human language and dispatching the relevant tools per request, streamlining the data analyst's routing role while providing all the data it needs for judgement.
 
-| | Job | What it is | Can it invent a number? |
-|---|---|---|---|
-| **Concierge** | Conversation | Owns the turn: classifies intent, writes the Plan, picks the preset and airports, dispatches, holds session memory | No — it never sees raw data |
-| **Deterministic Analyst** | Computation | Plain Python. Percentiles, weights, composite score, findings, caveats | It *creates* every number — and cannot be influenced by a model |
-| **LLM specialists** | Judgement | Interpret the numbers they were handed, under a role prompt | No — enforced, see below |
+This comes into play nicely these design decisions:
+- Conversation agent — the Concierge owns language, intent and dispatch; it never touches raw data.
+- Deterministic Analyst — plain Python, and the only thing in the system that creates a number.
+- LLM specialists — interpret numbers handed to them, one lens each, never compute their own.
+- Frozen contracts — pydantic types and Protocol ports, agreed once and locked at a tag.
+- Structured JSON everywhere — every LLM call answers a fixed schema; nothing is parsed out of prose.
+- Required fields — disagreements and assumptions are mandatory, so silence can't hide either.
+- Tools, not queries — validated arguments from a fixed set; no free-form SQL ever reaches the model.
+- Capability grant per specialist — allowed tools, preset, turn limit and metric slice fixed in front matter. 
 
-`scoring/` cannot import `llm/`, so that separation is the import graph, not a rule someone has to remember.
+### 3. QA 
 
-- **Four specialist types, one lens each** — `expansion_analyst`, `capacity_analyst` and `market_analyst` each
-  bind to their own preset; `general_analyst` binds to none and is the fallback when no lens fits. A specialist
-  is a config file, not code.
-- **Rigid envelope, editable prose.** `config/specialists/<name>.md` is YAML front matter + markdown. The front
-  matter is a machine-enforced capability grant (`allowed_tools`, preset, `max_turns` 1–3, metric slice); the
-  body is free prose you can retune. Change how it thinks, not what it may do.
-- **The model chooses, it never composes.** Every LLM call is structured JSON against a fixed schema — Plan,
-  specialist report, synthesis. Tool args are pydantic-validated and no free-form SQL is ever exposed;
-  disallowed tools are never offered. Every schema key is required, so `disagreements` and `assumptions` cannot
-  be skipped by staying silent.
+Testing the product with real questions -> noting issues -> using claude to fix trivial issues directly, and /brainstorming for larger stuff. For example off-topic handling was added here, and many ui-issues like empty rows or missing sources.
 
-Implementation ran as Claude Code subagents (`.claude/agents/`), one per layer plus a reviewer, under an
-escalation protocol: anything ambiguous stops and returns `DECISION NEEDED` rather than improvising.
-
-### 3. QA — where most of the real improvements came from
-
-Running the app against real questions found what the tests could not. The changes that mattered:
-
-- **A ranking made one live FAA request per airport.** The national default is 140 airports, so a single
-  question fired 140 downloads of the *same* national document — a ~7-minute stall and, under timeout, a fatal
-  crash. Fixed in two parts: scoring now runs inside a zero live-call budget, and a per-turn ceiling of 5 is
-  enforced by `contextvar` so every caller inherits it at any depth. A 3-second per-host pacer sits underneath.
-- **Conversational turns had no path.** Both *"what's the most interesting airport fact?"* and *"what's a good
-  carbonara recipe?"* fell through to `clarify` and got whatever the planner improvised. Now `off_topic`
-  declines with a constant, and `needs_direction` returns three answerable questions as clickable follow-ups.
-- **A preset's headline emphasis could silently evaporate.** `terminal_expansion` up-weights two metrics that
-  have no data anywhere, and renormalization quietly redistributed that weight to the metrics the preset
-  deliberately damps — a result close to the opposite of the stated intent, with every individual number still
-  correct. The scorer now names those metrics and the answer says the emphasis did not apply.
-- **"Top routes" was not reproducible.** `get_routes` ordered by departures with no tie-break and then
-  truncated, so ordering decided *membership*, not just position — 252 airports have a tie straddling the
-  default top-10. Adding `dest ASC` makes the order total.
-- **Empty sections rendered as dead headings**, and the assumptions block — up to eight items plus uncertainty
-  notes — pushed the actual tables off screen. Empty sections are now skipped; the assumptions block is
-  collapsed by default but always present.
-- **A hygiene sweep** across all 182 files removed dead code and rewrote comments that explained *what* rather
-  than *why*. Its unfixed findings were carried into the limitations log rather than deleted with the report —
-  including one wrong scored number (a 28-day February zero-filled across 31 days of hour slots) that needs a
-  snapshot rebuild to fix and is logged rather than hidden.
-
-`WHERE-HOW-AI-IS-USED.md` carries the full runtime and dev-time account, ending with an honest list of what AI
-got wrong during the build and what was done about it.
-
----
-
-## Where to read more
-
-| | |
-|---|---|
-| `docs/SCORING-METHODOLOGY.md` | Derivation, full registry, normalization, presets, worked examples |
-| `docs/KEY-TRADEOFFS.md` | Every constraint and decision, ending with "out of scope / with more time" |
-| `docs/WHERE-HOW-AI-IS-USED.md` | Runtime and dev-time AI in full, plus what AI got wrong |
-| `docs/research/` | The three research notes — investment metrics, data sources, LLM providers |
-| `docs/design/00–06` | The design docs the build followed |
-| `docs/design/known-limitations-and-tradeoffs.md` | The living log — 60 entries, including what is still broken |
-| `CLAUDE.md` | The operating rules the build agents worked under |

@@ -286,7 +286,7 @@ class Synthesizer:
             tables.append(sources_table)
         # Condense deterministically — the LLM never picks which lines survive.
         assumptions = _condense(_unique(assumptions), MAX_ASSUMPTIONS,
-                                "further standing conventions apply (documented in KEY-TRADEOFFS.md)")
+                                "further standing conventions apply (documented in docs/DESIGN.md)")
         notes = _condense(_unique(notes), MAX_NOTES, "further minor notes omitted")
         # The block always closes with the settings actually in force, so it is never empty (product
         # rule) and never trimmed away by the cap.

@@ -62,8 +62,6 @@ def main() -> int:
         ".claude/ included (hidden dir)": any(n.startswith(".claude/") for n in names),
         "snapshot present": "data/snapshot/airports.duckdb" in names,
         "DESIGN.md present": "docs/DESIGN.md" in names,
-        "three standalone docs present": all(f"docs/{n}" in names for n in
-                                            ("SCORING-METHODOLOGY.md", "KEY-TRADEOFFS.md", "WHERE-HOW-AI-IS-USED.md")),
         "no .venv / .git / raw cache / sessions": not any(
             n.startswith((".venv/", ".git/", "data/raw/", "data/sessions/")) for n in names),
         "no .wal": not any(n.endswith(".wal") for n in names),
