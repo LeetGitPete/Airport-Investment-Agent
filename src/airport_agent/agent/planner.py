@@ -125,7 +125,11 @@ PLAN_SCHEMA: dict[str, Any] = {
             "description": "Data tools to run for informational intent. Empty otherwise."},
         "presentation_notes": {"type": "string",
                                "description": "How to present the answer (what to surface first, what to omit "
-                                              "and why). Empty string when you have no preference."},
+                                              "and why). Empty string when you have no preference. For intent "
+                                              "'clarify' this field IS the question shown to the user, so write "
+                                              "it as a question addressed to them ('Which airports did you "
+                                              "mean?'), never as an instruction about them ('Ask the user "
+                                              "to...')."},
     },
 }
 PLAN_SCHEMA["required"] = list(PLAN_SCHEMA["properties"])

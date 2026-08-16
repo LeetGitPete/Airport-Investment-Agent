@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from airport_agent.agent.concierge import Concierge
+from airport_agent.agent.concierge import CLARIFY_TEXT, Concierge
 from airport_agent.agent.planner import Planner
 from airport_agent.agent.specialists.runner import SpecialistRunnerImpl
 from airport_agent.agent.synthesis import Synthesizer
@@ -139,6 +139,55 @@ def test_unparseable_plan_becomes_a_clarify_without_further_calls(fake_data, fak
     assert [m.role for m in state.messages] == ["user", "assistant"]
     assert state.messages[0].content == "???" and state.messages[1].answer is ans
     assert state.last_reports == {} and state.last_airports == []
+
+
+# --- QA task 16: a clarify answer never leaks internals ---------------------------------------------------
+
+def test_clarify_headline_is_never_a_raw_validation_dump(fake_data, fake_analyst, specs):
+    # the plan asks to rank with a preset the analyst rejects -> ValueError deep in the engine
+    js = _plan_json(faa_regions=[], airports=[], scoring_preset="balanced", question_type="compare")
+    c, _ = _concierge([js, LLMResult(text="ok", provider="f", model="m"), FINAL, SYN],
+                      fake_data, fake_analyst, specs)
+    ans = c.answer("compare nothing in particular", SessionState(session_id="s", title="t"))
+    for banned in ("pydantic", "validation error", "[type=", "input_value="):
+        assert banned not in ans.headline.lower()
+
+
+def test_instruction_voice_clarify_note_is_replaced_with_a_real_question(fake_data, fake_analyst, specs):
+    js = _plan_json(intent="clarify", engines=[], question_type="none", faa_regions=[],
+                    presentation_notes="Ask the user to specify which airports, region, or hub size "
+                                       "they wish to analyze regarding long-distance hauls.")
+    c, _ = _concierge([js], fake_data, fake_analyst, specs)
+    ans = c.answer("maybe long distance hauls?", SessionState(session_id="s", title="t"))
+    assert not ans.headline.lower().startswith("ask the user")
+    assert ans.headline == CLARIFY_TEXT and ans.headline.endswith("?")
+
+
+def test_a_well_written_clarify_question_is_kept_verbatim(fake_data, fake_analyst, specs):
+    js = _plan_json(intent="clarify", engines=[], question_type="none", faa_regions=[],
+                    presentation_notes="Which horizon did you mean, 12m or 5y?")
+    c, _ = _concierge([js], fake_data, fake_analyst, specs)
+    ans = c.answer("rank them", SessionState(session_id="s", title="t"))
+    assert ans.headline == "Which horizon did you mean, 12m or 5y?"
+
+
+def test_the_reason_is_recorded_even_though_it_left_the_headline():
+    from pydantic import BaseModel, field_validator
+    from airport_agent.agent.concierge import diagnostic
+
+    class M(BaseModel):
+        x: int
+        @field_validator("x")
+        @classmethod
+        def _check(cls, v):
+            raise ValueError("AnalysisRequest needs airports or a filter")
+
+    try:
+        M(x=1)
+    except Exception as exc:  # noqa: BLE001 - exactly the shape the Concierge catches
+        note = diagnostic(exc)
+    assert note == "AnalysisRequest needs airports or a filter"
+    assert "pydantic.dev" not in note and "\n" not in note
 
 
 # --- QA task 14: an argument the tools do not have never costs the user their answer ---------------------

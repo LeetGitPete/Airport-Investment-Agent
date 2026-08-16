@@ -10,6 +10,7 @@ provider error instead of a half-answer. Tool errors are traced and shown, never
 """
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Callable
 from typing import Any
@@ -39,6 +40,41 @@ CLARIFY_TEXT = ("I couldn't determine what to analyse. Which airports or region,
 ROW_KEYS = ("rows", "airports", "top_routes", "series", "sources")
 #: QA task 14 (2026-08-16): the registry's prefix for an argument the tool does not accept.
 INVALID_ARGS = "invalid arguments"
+#: QA task 16 (2026-08-16): a clarify headline is a question addressed to the user. The planner
+#: sometimes writes it in instruction voice ("Ask the user to specify which airports..."), which read
+#: as stage directions when shown verbatim. Such a note is dropped for the well-formed default.
+_INSTRUCTION_VOICE = re.compile(r"^\s*(?:please\s+)?(?:ask|tell|prompt|request|instruct|clarify\s+with)\b"
+                                r".*?\b(?:user|them|they)\b", re.IGNORECASE | re.DOTALL)
+#: Pydantic decorates every validation error with a docs URL and a `[type=..., input_value=...]`
+#: machine suffix. Neither belongs in anything a person reads.
+_PYDANTIC_TAIL = re.compile(r"\s*For further information visit https?://\S+", re.IGNORECASE)
+_PYDANTIC_META = re.compile(r"\s*\[type=[^\]]*\]\s*$")
+ANALYSIS_FAILED_TEXT = ("I couldn't run that analysis on the data I have. Try naming the airports or "
+                        "region directly, or a different time period.")
+
+
+def clarify_text(note: str | None) -> str:
+    """The question actually shown when the agent asks something back (QA task 16)."""
+    text = (note or "").strip()
+    if not text or _INSTRUCTION_VOICE.match(text):
+        return CLARIFY_TEXT
+    return text
+
+
+def diagnostic(exc: Exception, limit: int = 160) -> str:
+    """A short human-readable trace of an internal failure — never the raw validation dump.
+
+    Pydantic renders a multi-line report with a docs URL; showing that to a user (as the clarify
+    headline once did) is noise. The useful sentence is the validator's own message.
+    """
+    lines = [_PYDANTIC_META.sub("", ln.strip())
+             for ln in _PYDANTIC_TAIL.sub("", str(exc)).splitlines() if ln.strip()]
+    chosen = next((ln for ln in lines if ln.lower().startswith("value error")), None)
+    if chosen is not None:
+        chosen = chosen.split(",", 1)[1].strip() if "," in chosen else chosen
+    else:
+        chosen = lines[0] if lines else type(exc).__name__
+    return chosen[:limit].rstrip(" ,;")
 
 
 def _and(items: list[str]) -> str:
@@ -93,16 +129,22 @@ class Concierge:
         return Plan(intent="clarify", engines=[], filters=filters.model_dump(), tools_to_call=[],
                     specialist=None, presentation_notes=text)
 
-    def _clarify_answer(self, state: SessionState, message: str, filters: PlanFilters, text: str) -> Answer:
+    def _clarify_answer(self, state: SessionState, message: str, filters: PlanFilters, text: str,
+                        detail: str | None = None) -> Answer:
         """A clarifying question is a real turn: it is recorded so the next message has its antecedent.
 
         Only the transcript is touched — `last_reports`, `last_airports` and `last_preset` keep the previous
         turn's analysis, because nothing new was computed.
+
+        `detail` is why the turn could not run. It goes to the uncertainty notes, condensed (QA task 16):
+        the headline stays a plain question, and the reason is still recorded rather than swallowed.
         """
+        text = clarify_text(text)
         plan = self._clarify_plan(filters, text)
         answer = Answer(plan=plan, plan_line=Planner.plan_line(plan, filters), headline=text,
                         evidence_tables=[], analyst_view=None, agreement_line=None, assumptions=[],
-                        uncertainty_notes=[], citations=[], follow_ups=[], tool_trace=[])
+                        uncertainty_notes=[f"Why I stopped: {detail}"] if detail else [],
+                        citations=[], follow_ups=[], tool_trace=[])
         state.messages.append(ChatMessage(role="user", content=message))
         state.messages.append(ChatMessage(role="assistant", content=text, answer=answer))
         return answer
@@ -201,7 +243,7 @@ class Concierge:
         if on_plan is not None:
             on_plan(plan)
         if plan.intent == "clarify":
-            return self._clarify_answer(state, message, filters, plan.presentation_notes or CLARIFY_TEXT)
+            return self._clarify_answer(state, message, filters, plan.presentation_notes)
 
         tool_results, trace = self._run_tools(plan, filters, message)
         req: AnalysisRequest | None = None
@@ -212,13 +254,14 @@ class Concierge:
             try:
                 req = self.planner.to_analysis_request(plan, filters, defaults)
             except ValueError as exc:
-                return self._clarify_answer(state, message, filters, f"{CLARIFY_TEXT} ({exc})")
+                # QA task 16: the raw pydantic dump used to be pasted into the headline.
+                return self._clarify_answer(state, message, filters, CLARIFY_TEXT, diagnostic(exc))
             if "deterministic" in plan.engines:
                 try:
                     deterministic, entry = self._run_deterministic(req)
                 except ValueError as exc:  # unknown preset, empty filter, unusable metric set
-                    return self._clarify_answer(state, message, filters,
-                                                f"I could not run that analysis: {exc}")
+                    return self._clarify_answer(state, message, filters, ANALYSIS_FAILED_TEXT,
+                                                diagnostic(exc))
                 trace.append(entry)
             if plan.specialist:
                 specialist, entry = self._run_specialist(req, deterministic)
