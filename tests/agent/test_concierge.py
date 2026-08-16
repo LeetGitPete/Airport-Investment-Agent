@@ -191,6 +191,32 @@ def test_the_reason_is_recorded_even_though_it_left_the_headline():
     assert "pydantic.dev" not in note and "\n" not in note
 
 
+def test_stop_reason_maps_every_known_diagnostic_to_a_plain_sentence():
+    from airport_agent.agent.concierge import stop_reason
+
+    assert (stop_reason("AnalysisRequest needs airports or a filter")
+            == "I couldn't work out which airports to analyze.")
+    assert (stop_reason("unknown scoring preset 'speed'; choose one of ['balanced']")
+            == "The requested focus isn't one of the built-in ones.")
+    assert stop_reason("plan names unknown engines {'x'}") == "The plan wasn't executable as drawn up."
+    assert (stop_reason("plan names more than one specialist: ['a', 'b']")
+            == "The plan wasn't executable as drawn up.")
+    assert (stop_reason("something the mapping has never seen")
+            == "The request couldn't be turned into a runnable analysis.")
+
+
+def test_why_i_stopped_shows_a_plain_sentence_never_the_raw_diagnostic(fake_data, fake_analyst, specs):
+    """Rows 65-66: the pydantic-ish detail goes to the debug log; the user reads a plain sentence."""
+    from airport_agent.agent.planner import PlanFilters
+
+    c, _ = _concierge([], fake_data, fake_analyst, specs)
+    state = SessionState(session_id="s", title="t")
+    detail = "1 validation error for AnalysisRequest, Value error, AnalysisRequest needs airports or a filter"
+    ans = c._clarify_answer(state, "rank them", PlanFilters(), CLARIFY_TEXT, detail)
+    assert ans.uncertainty_notes == ["Why I stopped: I couldn't work out which airports to analyze."]
+    assert all("AnalysisRequest" not in n and "validation error" not in n for n in ans.uncertainty_notes)
+
+
 # An argument the tools do not have never costs the user their answer.
 
 def _invented_arg_plan():

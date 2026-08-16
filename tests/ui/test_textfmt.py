@@ -88,6 +88,19 @@ def test_pointer_table_prints_as_one_line_and_never_the_grid():
     assert "12.9" not in text.split("== COMPUTED ANALYSIS")[1].split("ASSUMPTIONS:")[0]
 
 
+def test_tool_trace_prints_user_facing_steps_never_raw_ids_or_args():
+    """Rows 65-66: the trace shows step + rows + source + time + note; raw tool id and args
+    stay on ToolCallTrace for the debug log, off the printed surface."""
+    a = make_answer("compare")  # fake trace uses the unmapped id get_feature_matrix
+    t = answer_to_text(a)
+    assert "get_feature_matrix" not in t
+    trace = t.split("TOOL TRACE:")[1]
+    assert "get feature matrix" in trace  # tool_label's de-snaked fallback
+    assert "rows=2" in trace and "source=fake" in trace and "time_ms=12" in trace and "note=-" in trace
+    assert "horizon" not in trace  # the args dump is gone
+    assert "provider=" not in trace and "latency_ms=" not in trace
+
+
 def test_minimal_mode_puts_new_tables_under_a_data_heading():
     a = make_answer("compare")
     a = a.model_copy(update={"plan": a.plan.model_copy(update={"table_display": "minimal"})})

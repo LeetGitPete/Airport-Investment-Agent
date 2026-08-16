@@ -19,6 +19,7 @@ import logging
 from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from dataclasses import dataclass
 
+from airport_agent.agent.debuglog import DebugLog, NullDebugLog
 from airport_agent.agent.history import turn_digest, turns, turns_to_fold
 from airport_agent.contracts import LLMClient, LLMError, SessionState
 
@@ -63,10 +64,13 @@ class Compactor:
     """Owns the LLM call, the retry rule and the per-session pending futures."""
 
     def __init__(self, llm: LLMClient, *, max_chars: int = MAX_CHARS, every: int = EVERY_TURNS,
-                 executor: Executor | None = None) -> None:
+                 executor: Executor | None = None,
+                 debug: DebugLog | NullDebugLog | None = None) -> None:
         self.llm = llm
         self.max_chars = max_chars
         self.every = every
+        #: Dev-time JSONL mirror of the silent retry/truncation mechanics (debuglog design).
+        self.debug = debug if debug is not None else NullDebugLog()
         self._executor = executor or ThreadPoolExecutor(max_workers=1, thread_name_prefix="compaction")
         self._pending: dict[str, Future[CompactionResult]] = {}
 
@@ -79,22 +83,29 @@ class Compactor:
 
     # the call (synchronous; runs on the worker)
 
-    def compact(self, summary: str, digests: list[str], through_turn: int) -> CompactionResult:
+    def compact(self, summary: str, digests: list[str], through_turn: int,
+                session_id: str = "") -> CompactionResult:
         """One call, one bounded retry, then a silent truncation. Raises LLMError only if the provider fails."""
         user = ("CURRENT SUMMARY:\n" + (summary or "(none yet)") + "\n\nTURNS TO FOLD IN:\n"
                 + "\n".join(digests))
         messages = [{"role": "system", "content": SYSTEM_PROMPT.format(max_chars=self.max_chars)},
                     {"role": "user", "content": user}]
         text = self.llm.chat(messages=messages, temperature=0.1).text.strip()
-        if len(text) > self.max_chars:
+        chars_before = len(text)
+        retry_fired = chars_before > self.max_chars
+        if retry_fired:
             messages.append({"role": "assistant", "content": text})
             messages.append({"role": "user", "content": RETRY_TEMPLATE.format(actual=len(text),
                                                                                allowed=self.max_chars)})
             text = self.llm.chat(messages=messages, temperature=0.1).text.strip()
-        if len(text) > self.max_chars:
+        truncated = len(text) > self.max_chars
+        if truncated:
             log.warning("compaction summary still %d chars after retry; truncated to %d",
                         len(text), self.max_chars)
             text = truncate_at_sentence(text, self.max_chars)
+        self.debug.log(session_id, through_turn, "compaction", through_turn=through_turn,
+                       retry_fired=retry_fired, truncated=truncated, chars_before=chars_before,
+                       chars_after=len(text))
         return CompactionResult(summary=text, through_turn=through_turn)
 
     # background plumbing
@@ -108,7 +119,8 @@ class Compactor:
         digests = [turn_digest(t) for t in folds]
         through = folds[-1].number
         summary = state.summary
-        self._pending[state.session_id] = self._executor.submit(self.compact, summary, digests, through)
+        self._pending[state.session_id] = self._executor.submit(self.compact, summary, digests,
+                                                                through, state.session_id)
         return True
 
     def collect(self, state: SessionState) -> bool:
@@ -121,6 +133,7 @@ class Compactor:
             result = future.result()
         except LLMError as exc:
             log.warning("compaction skipped for %s: %s", state.session_id, exc)
+            self.debug.log(state.session_id, len(turns(state)), "compaction", error=str(exc))
             return False
         if result.through_turn <= state.summary_through_turn:
             return False

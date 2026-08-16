@@ -16,6 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from airport_agent.agent.debuglog import DebugLog, NullDebugLog
 from airport_agent.agent.planner import is_national_scope
 from airport_agent.agent.specialists.runner import compact_deterministic, fit_tool_result
 from airport_agent.agent.table_display import apply_display_policy
@@ -187,10 +188,13 @@ def _metric_ids(deterministic: DeterministicReport | None) -> list[str]:
 class Synthesizer:
     """Turns the engines' outputs into the fixed `Answer` structure with one LLM call for the prose."""
 
-    def __init__(self, llm: LLMClient, specs: list[MetricSpec]) -> None:
+    def __init__(self, llm: LLMClient, specs: list[MetricSpec], *,
+                 debug: DebugLog | NullDebugLog | None = None) -> None:
         self.llm = llm
         self.specs = list(specs)
         self.by_id = registry_by_id(self.specs)
+        #: Dev-time JSONL mirror of what the curation dropped (debuglog design, 2026-08-16).
+        self.debug = debug if debug is not None else NullDebugLog()
 
     # prose
 
@@ -237,7 +241,7 @@ class Synthesizer:
                    defaults: dict[str, str] | None,
                    extra_notes: list[str] | None = None,
                    shown_tables: dict[str, int] | None = None, turn: int = 1,
-                   history: str = "") -> Answer:
+                   history: str = "", session_id: str = "") -> Answer:
         """`extra_notes` are uncertainty lines the orchestrator knows and the reports cannot see —
         currently the live-call ceiling (QA task 20). They are condensed with the rest, never above it.
 
@@ -316,7 +320,9 @@ class Synthesizer:
                                       plan.table_display, turn=turn)
         # Condense deterministically — the LLM never picks which lines survive.
         assumptions = _unique(assumptions)[:MAX_ASSUMPTIONS]  # tail line cut by decision, row 65
-        notes = _condense(_unique(notes), MAX_NOTES, "further minor notes omitted")
+        unique_notes = _unique(notes)
+        notes_before_cap = len(unique_notes)
+        notes = _condense(unique_notes, MAX_NOTES, "further minor notes omitted")
         # The closing line: every setting the answer fell back on, one module each. Omitted entirely
         # when nothing was defaulted (row 65 — the old "nothing was assumed" filler said nothing).
         closing = _defaults_assumption(defaults, national_scope=is_national_scope(req))
@@ -344,6 +350,18 @@ class Synthesizer:
                           if agreement_line else None)
         assumptions = [humanize_tool_ids(humanize_metric_ids(a, self.by_id)) for a in assumptions]
         notes = [humanize_tool_ids(humanize_metric_ids(n, self.by_id)) for n in notes]
+
+        # Dev-time mirror of what the row-65 curation dropped from this answer's surface.
+        allowed = ALLOWED_ASSUMPTION_MARKERS + ALLOWED_NOTE_MARKERS
+        self.debug.log(
+            session_id, turn, "answer_curation",
+            dropped_report_caveats=[c for c in (deterministic.caveats if deterministic else [])
+                                    if not any(m in c.lower() for m in allowed)],
+            analyst_assumptions_raw=list(specialist.assumptions) if specialist else [],
+            analyst_assumptions_kept=_clamp_analyst_lines(specialist.assumptions) if specialist else [],
+            analyst_caveats_raw=list(specialist.caveats) if specialist else [],
+            analyst_caveats_kept=_clamp_analyst_lines(specialist.caveats) if specialist else [],
+            notes_before_cap=notes_before_cap)
 
         return Answer(plan=plan, plan_line=plan_line, headline=headline, evidence_tables=tables,
                       analyst_view=analyst_view, agreement_line=agreement_line,

@@ -6,7 +6,7 @@ pyproject.toml, uv.lock, .importlinter, .python-version, conftest.py,
 .env (throwaway Gemini key), .env.example, .contracts-frozen, .gitignore.
 No README: docs/DESIGN.md is the reviewer's entry point and carries the quickstart
 (human decision 2026-08-16, known-limitations row 60) — two entry docs drift apart.
-Excluded: .venv, .git, data/raw, data/sessions, caches, .superpowers, *.wal.
+Excluded: .venv, .git, data/raw, data/sessions, data/debug, caches, .superpowers, *.wal.
 """
 from __future__ import annotations
 
@@ -62,8 +62,9 @@ def main() -> int:
         ".claude/ included (hidden dir)": any(n.startswith(".claude/") for n in names),
         "snapshot present": "data/snapshot/airports.duckdb" in names,
         "DESIGN.md present": "docs/DESIGN.md" in names,
-        "no .venv / .git / raw cache / sessions": not any(
-            n.startswith((".venv/", ".git/", "data/raw/", "data/sessions/")) for n in names),
+        "no .venv / .git / raw cache / sessions / debug log": not any(
+            n.startswith((".venv/", ".git/", "data/raw/", "data/sessions/", "data/debug/"))
+            for n in names),
         "no .wal": not any(n.endswith(".wal") for n in names),
     }
     ok = True

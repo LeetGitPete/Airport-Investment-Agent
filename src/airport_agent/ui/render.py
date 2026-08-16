@@ -8,7 +8,6 @@ the `Answer` (values passed straight into a `pandas.DataFrame`; `None` stays `No
 """
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 from typing import Any
 
@@ -153,21 +152,21 @@ def render_answer(
 
     if not answer.tool_trace:  # QA task 19: nothing ran, so there is no work to show
         return
+    # Rows 65-66: the trace shows user-facing columns only — the raw tool id and args live in the
+    # debug log (and ToolCallTrace keeps carrying them for the archive), never on this surface.
     with st.expander("Show work"):
         trace_df = pd.DataFrame(
             [
                 {
                     "step": tool_label(t.tool),
-                    "tool": t.tool,
-                    "args": json.dumps(t.args, default=str),
                     "rows": t.rows,
-                    "provider": t.provider,
-                    "latency_ms": t.latency_ms,
+                    "source": t.provider,
+                    "time (ms)": t.latency_ms,
                     "note": t.note,
                 }
                 for t in answer.tool_trace
             ],
-            columns=["tool", "args", "rows", "provider", "latency_ms", "note"],
+            columns=["step", "rows", "source", "time (ms)", "note"],
         )
         st.dataframe(trace_df, hide_index=True)
 

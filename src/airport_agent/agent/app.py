@@ -12,6 +12,7 @@ from typing import Any
 
 from airport_agent.agent.compaction import Compactor
 from airport_agent.agent.concierge import Concierge
+from airport_agent.agent.debuglog import DebugLog
 from airport_agent.agent.planner import PRESET_NAMES, SAMPLE_QUESTIONS, Planner
 from airport_agent.agent.sessions import SessionStore
 from airport_agent.agent.specialists.runner import SpecialistRunnerImpl
@@ -106,8 +107,15 @@ def build_app(data_service: DataService | None = None, analyst: DeterministicAna
     specs = load_registry()
     registry = build_registry(data, deterministic)
     planner = Planner(client, registry, specs, list(PRESET_NAMES))
+    # Dev-time debug log (design 2026-08-16): JSONL per session, gitignored, never user-facing.
+    # The debug log lives NEXT TO the session store (data/debug beside data/sessions), so a test
+    # that isolates sessions in tmp_path isolates its debug output too instead of writing into the
+    # repo's data/ directory.
+    sessions_path = sessions_dir or default_sessions_dir()
+    debug = DebugLog(sessions_path.parent / "debug")
     concierge = Concierge(llm=client, registry=registry, analyst=deterministic,
                           specialists=SpecialistRunnerImpl(client, registry, specs), planner=planner,
-                          synthesizer=Synthesizer(client, specs), compactor=Compactor(client))
+                          synthesizer=Synthesizer(client, specs, debug=debug),
+                          compactor=Compactor(client, debug=debug), debug=debug)
     return App(data=data, analyst=deterministic, llm=client, registry=registry, concierge=concierge,
-               sessions=SessionStore(sessions_dir or default_sessions_dir()))
+               sessions=SessionStore(sessions_path))

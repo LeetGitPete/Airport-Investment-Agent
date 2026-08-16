@@ -50,6 +50,28 @@ def test_pointer_table_renders_as_a_caption_not_a_grid():
     assert any("already shown earlier in this chat (answer 2)" in c.value for c in at.main.caption)
 
 
+def _trace_script():
+    from airport_agent.contracts import load_registry, registry_by_id
+    from airport_agent.ui.render import render_answer
+    from tests.ui.fake_app import make_answer
+
+    render_answer(make_answer("compare"), registry_by_id(load_registry()), key="k")
+
+
+def test_show_work_trace_has_user_facing_columns_and_no_raw_tool_or_args():
+    """Rows 65-66: Show work keeps step/rows/source/time (ms)/note; the raw tool id and args
+    columns are gone (they stay on ToolCallTrace for the debug log and archive)."""
+    from streamlit.testing.v1 import AppTest
+
+    at = AppTest.from_function(_trace_script, default_timeout=30)
+    at.run()
+    assert not at.exception
+    trace = next(d.value for d in at.main.dataframe if "step" in d.value.columns)
+    assert list(trace.columns) == ["step", "rows", "source", "time (ms)", "note"]
+    assert "get_feature_matrix" not in trace.to_string()  # fake's raw tool id never rendered
+    assert "horizon" not in trace.to_string()  # no args dump
+
+
 def test_minimal_mode_keeps_new_tables_behind_a_data_expander():
     from streamlit.testing.v1 import AppTest
 

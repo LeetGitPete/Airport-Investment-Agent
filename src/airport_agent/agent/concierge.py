@@ -16,6 +16,7 @@ from collections.abc import Callable
 from typing import Any
 
 from airport_agent.agent.compaction import Compactor
+from airport_agent.agent.debuglog import DebugLog, NullDebugLog
 from airport_agent.agent.planner import NEEDS_DIRECTION, OFF_TOPIC, PlanFilters, Planner, session_context
 from airport_agent.agent.sessions import NEW_CHAT_TITLE
 from airport_agent.agent.synthesis import Synthesizer
@@ -86,6 +87,23 @@ def diagnostic(exc: Exception, limit: int = 160) -> str:
     return chosen[:limit].rstrip(" ,;")
 
 
+def stop_reason(detail: str) -> str:
+    """Plain user-facing sentence for a "Why I stopped" diagnostic (rows 65-66).
+
+    The raw detail is validator/pydantic prose — dev-facing, captured verbatim by the debug log.
+    The user surface gets one deterministic sentence, matched on distinctive fragments of the
+    known validation messages; anything unrecognized falls back to the generic sentence.
+    """
+    lowered = detail.lower()
+    if "needs airports or a filter" in lowered:
+        return "I couldn't work out which airports to analyze."
+    if "unknown scoring preset" in lowered:
+        return "The requested focus isn't one of the built-in ones."
+    if "unknown engines" in lowered or "more than one specialist" in lowered:
+        return "The plan wasn't executable as drawn up."
+    return "The request couldn't be turned into a runnable analysis."
+
+
 def _and(items: list[str]) -> str:
     """'a', 'a and b', 'a, b and c' — argument names read to a user, not a Python list."""
     if not items:
@@ -126,7 +144,8 @@ class Concierge:
 
     def __init__(self, *, llm: LLMClient, registry: ToolRegistry, analyst: DeterministicAnalyst,
                  specialists: SpecialistRunner, planner: Planner, synthesizer: Synthesizer,
-                 compactor: Compactor | None = None) -> None:
+                 compactor: Compactor | None = None,
+                 debug: DebugLog | NullDebugLog | None = None) -> None:
         self.llm = llm
         self.registry = registry
         self.analyst = analyst
@@ -135,6 +154,8 @@ class Concierge:
         self.synthesizer = synthesizer
         #: History compaction (contracts-v3). Optional so one-shot callers (CLI, tests) pay nothing.
         self.compactor = compactor
+        #: Dev-time JSONL mirror of the raw data the user surface no longer shows (debuglog design).
+        self.debug = debug if debug is not None else NullDebugLog()
         self.provider_name: str = getattr(llm, "provider_name", None) or "llm"
 
     # plan
@@ -160,9 +181,12 @@ class Concierge:
         Only the transcript is touched — `last_reports`, `last_airports` and `last_preset` keep the previous
         turn's analysis, because nothing new was computed.
 
-        `detail` is why the turn could not run. It goes to the uncertainty notes, condensed: the
-        headline stays a plain question and the reason is still recorded rather than swallowed.
+        `detail` is why the turn could not run. It reaches the uncertainty notes as a plain
+        sentence (`stop_reason`): the headline stays a plain question, the reason is still
+        recorded rather than swallowed, and the verbatim diagnostic goes to the debug log only.
         """
+        if detail:
+            self.debug.log(state.session_id, self._turn_number(state), "error", detail=detail)
         # QA task 19: a conversational turn is a clarify with a flavour. Off-topic answers with the
         # fixed decline; a question that needs direction keeps the model's reply and hands over three
         # things this agent can actually do, which the UI renders as clickable questions.
@@ -171,7 +195,7 @@ class Concierge:
         plan = self._clarify_plan(filters, text)
         answer = Answer(plan=plan, plan_line=Planner.plan_line(plan, filters), headline=text,
                         evidence_tables=[], analyst_view=None, agreement_line=None, assumptions=[],
-                        uncertainty_notes=[f"Why I stopped: {detail}"] if detail else [],
+                        uncertainty_notes=[f"Why I stopped: {stop_reason(detail)}"] if detail else [],
                         citations=[], follow_ups=follow_ups, tool_trace=[])
         state.messages.append(ChatMessage(role="user", content=message))
         state.messages.append(ChatMessage(role="assistant", content=text, answer=answer))
@@ -186,22 +210,25 @@ class Concierge:
             return [(call.tool, call.args()) for call in filters.tool_calls]
         return [(tool, {}) for tool in plan.tools_to_call]
 
-    def _run_tools(self, plan: Plan, filters: PlanFilters,
-                   message: str = "") -> tuple[list[tuple[str, dict, dict]], list[ToolCallTrace]]:
+    def _run_tools(self, plan: Plan, filters: PlanFilters, message: str = "", *,
+                   session_id: str = "", turn: int = 0,
+                   ) -> tuple[list[tuple[str, dict, dict]], list[ToolCallTrace]]:
         results: list[tuple[str, dict, dict]] = []
         trace: list[ToolCallTrace] = []
         for tool, args in self._planned_calls(plan, filters):
             started = time.perf_counter()
             out = self.registry.call(tool, args, engine=CONCIERGE)
             if str(out.get("error", "")).startswith(INVALID_ARGS):
-                args, out = self._recover_tool_args(tool, args, out, message)
+                args, out = self._recover_tool_args(tool, args, out, message,
+                                                    session_id=session_id, turn=turn)
             trace.append(ToolCallTrace(tool=tool, args=args, rows=_rows(out), provider=None,
                                        latency_ms=_ms(started), note=out.get("error")))
             results.append((tool, args, out))
         return results, trace
 
     def _recover_tool_args(self, tool: str, args: dict[str, Any], out: dict[str, Any],
-                           message: str) -> tuple[dict[str, Any], dict[str, Any]]:
+                           message: str, *, session_id: str = "",
+                           turn: int = 0) -> tuple[dict[str, Any], dict[str, Any]]:
         """A rejected tool call gets one LLM repair, then a deterministic prune.
 
         The user asked a real question; an argument the tool does not have is our problem, not theirs.
@@ -211,6 +238,8 @@ class Concierge:
         """
         error = str(out.get("error", ""))
         fixed = self.planner.repair_tool_args(tool, args, error, message)
+        self.debug.log(session_id, turn, "tool_repair", tool=tool, args=args, error=error,
+                       repaired=fixed)
         if fixed is not None and fixed != args:
             repaired = self.registry.call(tool, fixed, engine=CONCIERGE)
             if not repaired.get("error"):
@@ -308,9 +337,12 @@ class Concierge:
         # the model plans against a settled summary, never a moving one.
         if self.compactor is not None:
             self.compactor.collect(state)
+        turn = self._turn_number(state)
         history = session_context(state)
         emit("Reading the question and planning the approach…")
         plan, filters = self._plan(message, state, defaults)
+        self.debug.log(state.session_id, turn, "plan_raw", plan=plan.model_dump(),
+                       filters=filters.model_dump())
         if on_plan is not None:
             on_plan(plan)
         if plan.intent == "clarify":
@@ -320,7 +352,14 @@ class Concierge:
         if calls:
             names = ", ".join(dict.fromkeys(tool_label(t) for t, _ in calls))
             emit(f"Looking up data: {names}…")
-        tool_results, trace = self._run_tools(plan, filters, message)
+        tool_results, trace = self._run_tools(plan, filters, message,
+                                              session_id=state.session_id, turn=turn)
+        for (tool, args, out), entry in zip(tool_results, trace, strict=True):
+            self.debug.log(state.session_id, turn, "tool_call", tool=tool, args=args,
+                           rows=_rows(out), coverage=out.get("coverage"),
+                           truncated=out.get("truncated"), limitation=out.get("limitation"),
+                           error=out.get("error"), data_quality_notes=out.get("data_quality_notes"),
+                           latency_ms=entry.latency_ms)
         req: AnalysisRequest | None = None
         deterministic: DeterministicReport | None = None
         specialist: SpecialistReport | None = None
@@ -343,18 +382,32 @@ class Concierge:
                 emit(f"Asking the {tool_label(plan.specialist)} to interpret the numbers…")
                 specialist, entry = self._run_specialist(req, deterministic)
                 trace.append(entry)
+                # The runner records the lens and every dropped evidence ref as caveats; the raw
+                # payload is mirrored here so the report can stay curated on the user surface.
+                self.debug.log(
+                    state.session_id, turn, "specialist_result",
+                    specialist=specialist.specialist, confidence=specialist.confidence,
+                    lens=next((c.removeprefix("lens: ") for c in specialist.caveats
+                               if c.startswith("lens: ")), None),
+                    disagreements=specialist.disagreements,
+                    dropped_evidence_refs=sum(1 for c in specialist.caveats
+                                              if c.startswith("dropped unresolved evidence ref")),
+                    hint_truncated=specialist.hint_truncated)
                 emit("Analyst view received")
         elif plan.intent == "followup" and not plan.engines and not tool_results:
             emit("Reusing the analysis from earlier in this chat…")
             deterministic, specialist, entry = self._from_memory(state, filters.source_turn)
             trace.append(entry)
+            self.debug.log(state.session_id, turn, "memory", source_turn=filters.source_turn,
+                           hit="archive" if "turn" in (entry.note or "") else "last_reports")
 
         emit("Writing the answer…")
         answer = self.synthesizer.synthesize(
             message=message, plan=plan, plan_line=Planner.plan_line(plan, filters, req), req=req,
             deterministic=deterministic, specialist=specialist, tool_results=tool_results, trace=trace,
             defaults=defaults, extra_notes=_live_budget_note(budget),
-            shown_tables=state.shown_tables, turn=self._turn_number(state), history=history)
+            shown_tables=state.shown_tables, turn=turn, history=history,
+            session_id=state.session_id)
         self._remember(state, message, answer, plan, req, deterministic, specialist)
         if self.compactor is not None:
             self.compactor.schedule(state)  # background; applied by collect() on the next turn

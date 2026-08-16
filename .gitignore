@@ -11,6 +11,10 @@ __pycache__/
 data/raw/
 data/cache/
 data/sessions/
+
+# Dev-time debug log (runtime-debug-log design 2026-08-16): structured JSONL per session,
+# mirrors the raw errors/coverage the user surface no longer shows. Never in git or the zip.
+data/debug/
 # os/ide
 .DS_Store
 Thumbs.db

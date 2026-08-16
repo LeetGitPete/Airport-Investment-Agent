@@ -159,7 +159,16 @@ def test_tool_error_becomes_a_table(registry, by_id):
     tables = tool_result_tables("get_profile", out, by_id)
     assert tables[0].title == "Tool error" and tables[0].columns == ["step", "error"]
     assert "get_" not in tables[0].rows[0][0]  # user-facing step name, never the raw tool id
-    assert "KeyError" in tables[0].rows[0][1]
+    # Rows 65-66: the cell is a plain sentence; the raw error lives only in the trace note + debug log.
+    assert tables[0].rows[0][1] in ("No data found for that request.", "That lookup couldn't be completed.")
+    assert "KeyError" not in str(tables[0].columns) + str(tables[0].rows)
+
+
+def test_registry_validation_error_maps_to_the_generic_sentence(by_id):
+    out = {"error": "invalid arguments: domestic_only; allowed arguments for get_route_stats: iata, top_n"}
+    tables = tool_result_tables("get_route_stats", out, by_id)
+    assert tables[0].rows[0][1] == "That lookup couldn't be completed."
+    assert "get_route_stats" not in str(tables[0].rows)  # no registry prose, no raw tool id
 
 
 def test_other_tool_results_render(registry, by_id):

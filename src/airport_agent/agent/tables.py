@@ -105,6 +105,22 @@ def rank_legend(preset: str | None) -> str:
     return PRESET_LEGENDS.get(preset or "", DEFAULT_LEGEND)
 
 
+#: Rows 65–66: a failed tool call shows one of these plain sentences, never the raw error text
+#: (KeyError reprs, registry validation prose). The verbatim error stays on `ToolCallTrace.note`
+#: (Show work) and in the debug log.
+TOOL_ERROR_NO_DATA = "No data found for that request."
+TOOL_ERROR_GENERIC = "That lookup couldn't be completed."
+
+
+def tool_error_text(error: str) -> str:
+    """Deterministic plain sentence for a raw tool error: missing-data shapes read as "no data",
+    everything else (validation, type errors) as a lookup that couldn't be completed."""
+    lowered = error.lower()
+    if "keyerror" in lowered or "no data" in lowered:
+        return TOOL_ERROR_NO_DATA
+    return TOOL_ERROR_GENERIC
+
+
 #: Unit display: "pct" is the registry's unit for PERCENT (not percentile) — shown as "%".
 UNIT_DISPLAY: dict[str, str] = {"pct": "%"}
 
@@ -427,8 +443,8 @@ def tool_result_tables(tool: str, result: dict[str, Any],
                        specs_by_id: dict[str, MetricSpec]) -> list[Table]:
     """Render one tool result as tables. An error is shown as an error table, never dropped."""
     if result.get("error"):
-        return [Table(title="Tool error", columns=["step", "error"], rows=[[tool_label(tool), result["error"]]],
-                      footnotes=[])]
+        return [Table(title="Tool error", columns=["step", "error"],
+                      rows=[[tool_label(tool), tool_error_text(str(result["error"]))]], footnotes=[])]
     if tool in REPORT_TOOLS:
         report = _report_from_dict(result)
         tables = [ranking_table(report)] if report.rows else []

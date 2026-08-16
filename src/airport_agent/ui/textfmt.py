@@ -9,7 +9,7 @@ Never re-interprets, recomputes or reformats numbers beyond display: table cells
 """
 from __future__ import annotations
 
-from airport_agent.agent.tables import score_summary
+from airport_agent.agent.tables import score_summary, tool_label
 from airport_agent.contracts import Answer, Table
 
 _ANALYST_TABLE_PREFIX = "Analyst ranking"
@@ -102,9 +102,11 @@ def answer_to_text(a: Answer) -> str:
     _section("ASSUMPTIONS:", list(a.assumptions))
     _section("UNCERTAINTY:", list(a.uncertainty_notes))
     _section("FOLLOW-UPS:", list(a.follow_ups))
+    # Rows 65-66: the trace prints user-facing fields only (step, rows, source, time, note) — the
+    # raw tool id and args stay on ToolCallTrace for the debug log and archive, off this surface.
     _section("TOOL TRACE:", [
-        f"{t.tool} {t.args} rows={_cell(t.rows)} provider={_cell(t.provider)} "
-        f"latency_ms={t.latency_ms} note={_cell(t.note)}"
+        f"{tool_label(t.tool)} rows={_cell(t.rows)} source={_cell(t.provider)} "
+        f"time_ms={t.latency_ms} note={_cell(t.note)}"
         for t in a.tool_trace
     ])
     return "\n".join(lines).rstrip() + "\n"
