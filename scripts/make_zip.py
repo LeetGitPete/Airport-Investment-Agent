@@ -2,8 +2,10 @@
 
 Usage: uv run python scripts/make_zip.py [out.zip]
 Included: src/, config/, data/snapshot/, data/curated/, tests/, docs/, .claude/,
-pyproject.toml, uv.lock, .importlinter, .python-version, conftest.py, README.md,
+pyproject.toml, uv.lock, .importlinter, .python-version, conftest.py,
 .env (throwaway Gemini key), .env.example, .contracts-frozen, .gitignore.
+No README: docs/DESIGN.md is the reviewer's entry point and carries the quickstart
+(human decision 2026-08-16, known-limitations row 60) — two entry docs drift apart.
 Excluded: .venv, .git, data/raw, data/sessions, caches, .superpowers, *.wal.
 """
 from __future__ import annotations
@@ -15,7 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 INCLUDE_DIRS = ["src", "config", "data/snapshot", "data/curated", "tests", "docs", ".claude", "scripts"]
 INCLUDE_FILES = ["pyproject.toml", "uv.lock", ".importlinter", ".python-version", "conftest.py",
-                 "README.md", ".env", ".env.example", ".contracts-frozen", ".gitignore", "CLAUDE.md",
+                 ".env", ".env.example", ".contracts-frozen", ".gitignore", "CLAUDE.md",
                  "project-description.txt"]
 EXCLUDE_PARTS = {"__pycache__", ".pytest_cache", ".ruff_cache", ".import_linter_cache", ".superpowers"}
 EXCLUDE_SUFFIX = {".wal", ".pyc"}
