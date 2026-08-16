@@ -1,9 +1,8 @@
 """Obtain the `App` object used by the CLI and Streamlit app.
 
-Real usage: lazily imports `airport_agent.agent.build_app` (never at module import time, since `ui/`
-must not depend on `agent/` being importable at collection time — the agent workstream may be built
-in a parallel worktree). Tests inject a fake App via the `AIRPORT_AGENT_APP_FACTORY` env var
-(format `"module:callable"`), e.g. `"tests.ui.fake_app:make_app"`.
+Real usage: lazily imports `airport_agent.agent.build_app`, never at module import time, so `ui/`
+does not require `agent/` to be importable at collection time. Tests inject a fake App via the
+`AIRPORT_AGENT_APP_FACTORY` env var (format `"module:callable"`), e.g. `"tests.ui.fake_app:make_app"`.
 """
 from __future__ import annotations
 

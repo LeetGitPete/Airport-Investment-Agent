@@ -1,18 +1,17 @@
-"""Sidebar: conversations (new/switch/rename/delete), provider status, data vintages, per-chat
-defaults, sample questions (design 04 §Layout — Sidebar). `app` is the `App` object (real or fake);
-`ss` is `st.session_state` (passed explicitly so this module never imports `streamlit` state directly).
+"""Sidebar: conversations (new/switch/rename/delete) and the sample questions (design 04 §Layout).
+
+`app` is the `App` object (real or fake); `ss` is `st.session_state`, passed explicitly so this module
+never reaches into Streamlit's state directly.
+
+Provider status, data vintages and the per-chat default pickers are deliberately NOT rendered — see
+`render_sidebar` for what replaced them.
 """
 from __future__ import annotations
 
 from collections import Counter
 from typing import Any
 
-import pandas as pd
 import streamlit as st
-
-HORIZON_OPTIONS = ["12m", "3y", "5y", "10y"]
-PRESET_OPTIONS = ["balanced", "terminal_expansion", "congestion_relief", "market_entry"]
-PEER_GROUP_OPTIONS = ["hub_class", "region", "all"]
 
 DEFAULT_HORIZON = "5y"
 DEFAULT_PRESET = "balanced"
@@ -110,45 +109,6 @@ def _render_conversations(app: Any, ss: dict) -> None:
         st.rerun()
 
 
-def _render_provider(app: Any) -> None:
-    st.subheader("Provider")
-    for row in app.provider_status():
-        name = row.get("name", "?")
-        model = row.get("model", "?")
-        status = row.get("status", "?")
-        st.markdown(f"{name} · {model} · **{status}**")
-        st.caption(row.get("detail", ""))
-
-
-def _render_vintages(app: Any) -> None:
-    st.subheader("Data vintages")
-    vintages = app.data.source_vintages()
-    df = pd.DataFrame(
-        [{"source_id": v.source_id, "period_end": v.period_end, "fetched_at": v.fetched_at} for v in vintages],
-        columns=["source_id", "period_end", "fetched_at"],
-    )
-    st.dataframe(df, hide_index=True)
-    st.caption("staleness hint: refresh with `python -m airport_agent.data refresh --check`")
-
-
-def _render_defaults(ss: dict) -> None:
-    st.subheader("Defaults for this chat")
-    current = ss.get("defaults", {})
-    horizon = st.selectbox(
-        "Horizon", HORIZON_OPTIONS,
-        index=HORIZON_OPTIONS.index(current.get("horizon", DEFAULT_HORIZON)), key="sidebar_horizon",
-    )
-    preset = st.selectbox(
-        "Scoring preset", PRESET_OPTIONS,
-        index=PRESET_OPTIONS.index(current.get("scoring_preset", DEFAULT_PRESET)), key="sidebar_preset",
-    )
-    peer_group = st.selectbox(
-        "Peer group", PEER_GROUP_OPTIONS,
-        index=PEER_GROUP_OPTIONS.index(current.get("peer_group", DEFAULT_PEER_GROUP)), key="sidebar_peer_group",
-    )
-    ss["defaults"] = {"horizon": horizon, "scoring_preset": preset, "peer_group": peer_group}
-
-
 def _render_samples(app: Any, ss: dict) -> None:
     st.subheader("Sample questions")
     for i, question in enumerate(app.sample_questions()):
@@ -157,10 +117,9 @@ def _render_samples(app: Any, ss: dict) -> None:
 
 
 def render_sidebar(app: Any, ss: dict) -> None:
-    # QA task 11 (2026-08-16): provider status, data vintages and the per-chat defaults widgets
-    # are gone from the sidebar. The defaults still apply — set silently here, overridable by
-    # asking (e.g. "over 10 years", "use the market entry preset"); vintages stay visible per
-    # answer ("data as of") and via the list_sources tool.
+    # Provider status, data vintages and the per-chat default pickers are not shown. The defaults
+    # still apply — set silently here and overridable by asking ("over 10 years", "use the market
+    # entry preset"); vintages stay visible per answer ("data as of") and via the list_sources tool.
     ss.setdefault("defaults", {"horizon": DEFAULT_HORIZON, "scoring_preset": DEFAULT_PRESET,
                                "peer_group": DEFAULT_PEER_GROUP})
     with st.sidebar:

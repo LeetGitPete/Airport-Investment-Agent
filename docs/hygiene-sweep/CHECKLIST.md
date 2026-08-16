@@ -8,7 +8,7 @@ Total files: **182**
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `src/airport_agent/__init__.py` | 2 | pending | |
+| `src/airport_agent/__init__.py` | 2 | done | |
 
 ## 1. src/contracts (READ-ONLY, log only)
 
@@ -133,13 +133,13 @@ Total files: **182**
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `src/airport_agent/ui/__init__.py` | 1 | pending | |
-| `src/airport_agent/ui/bootstrap.py` | 28 | pending | |
-| `src/airport_agent/ui/cli.py` | 70 | pending | |
-| `src/airport_agent/ui/render.py` | 164 | pending | |
-| `src/airport_agent/ui/sidebar.py` | 171 | pending | |
-| `src/airport_agent/ui/streamlit_app.py` | 76 | pending | |
-| `src/airport_agent/ui/textfmt.py` | 100 | pending | |
+| `src/airport_agent/ui/__init__.py` | 1 | done | |
+| `src/airport_agent/ui/bootstrap.py` | 28 | done | |
+| `src/airport_agent/ui/cli.py` | 70 | done | |
+| `src/airport_agent/ui/render.py` | 164 | done | |
+| `src/airport_agent/ui/sidebar.py` | 171 | done | |
+| `src/airport_agent/ui/streamlit_app.py` | 76 | done | |
+| `src/airport_agent/ui/textfmt.py` | 100 | done | |
 
 ## 7. config
 

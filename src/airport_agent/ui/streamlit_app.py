@@ -1,9 +1,9 @@
-"""Streamlit multi-chat entry point (design 04): sidebar (conversations, provider status, data vintages,
-per-chat defaults, sample questions) + the current conversation rendered via `render.render_answer`.
+"""Streamlit multi-chat entry point (design 04): sidebar (conversations, sample questions) + the
+current conversation rendered via `render.render_answer`.
 
 The `App` object is obtained once per process via `bootstrap.get_app()` and cached with
-`st.cache_resource` (allowed only for the `App` itself — never for LLM answers, design 2d Global
-Constraints). If obtaining it fails, the error is shown loudly and the script stops.
+`st.cache_resource` — allowed for the `App` itself, never for LLM answers. If obtaining it fails,
+the error is shown loudly and the script stops.
 """
 from __future__ import annotations
 

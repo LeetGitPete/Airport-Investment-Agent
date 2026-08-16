@@ -46,7 +46,7 @@ def answer_to_text(a: Answer) -> str:
     lines.append("")
     computed = [t for t in a.evidence_tables if not t.title.startswith(_ANALYST_TABLE_PREFIX)]
     analyst_tables = [t for t in a.evidence_tables if t.title.startswith(_ANALYST_TABLE_PREFIX)]
-    # QA task 10: the deterministic score leads, with a one-line formula statement.
+    # The deterministic score leads, with a one-line formula statement.
     summary = score_summary(computed)
     if summary:
         strip = " · ".join(f"{iata} {score:.0f}" if isinstance(score, int | float)
@@ -56,7 +56,7 @@ def answer_to_text(a: Answer) -> str:
         lines.append(f"SCORE: {strip} — {summary['label']} (0-100){more}")
         lines.append(summary["caption"])
         lines.append("")
-    # QA task 6 layout: headline -> analyst view -> computed scores & data.
+    # Layout: headline -> analyst view -> computed scores & data.
     if analyst_tables or a.analyst_view:
         lines.append("== ANALYST VIEW (AI specialist interpretation) ==")
         lines.append("")
