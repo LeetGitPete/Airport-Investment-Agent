@@ -8,7 +8,9 @@ prioritize clarity, reasoning and honest uncertainty over completeness.
 ## Source of truth
 - `docs/design/00–06` are the design. If code and design disagree, stop and escalate (see below).
 - `docs/design/known-limitations-and-tradeoffs.md` MUST be updated whenever a constraint or decision is made.
-- `docs/process-log.md` is maintained by the process-scribe; hooks append raw events to `docs/process-log.raw.jsonl`.
+- `docs/DESIGN.md` is the deliverable entry point (there is no README — design 06). `docs/process-log.md` is
+  maintained by the process-scribe from `docs/process-log.raw.jsonl` (hook-appended); both are dev-time only,
+  gitignored and excluded from the zip.
 - Research evidence: `docs/research/`.
 
 ## Method (why things are shaped this way)

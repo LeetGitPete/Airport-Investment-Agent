@@ -33,7 +33,12 @@ def _sidebar_script() -> None:
 
 
 def _run() -> AppTest:
-    at = AppTest.from_function(_sidebar_script)
+    # `default_timeout=30`, matching `test_streamlit_smoke.py`: AppTest's own default is 3s, which is a
+    # budget for a whole script execution, not for an assertion. Every test here reruns the script at
+    # least twice (`.click().run()`), and a rerun on a cold or loaded machine can exceed 3s and raise
+    # `RuntimeError: AppTest script run timed out` — a failure about the host, not about the sidebar.
+    # The value is carried on the instance, so it applies to those later `.run()` calls too.
+    at = AppTest.from_function(_sidebar_script, default_timeout=30)
     at.run()
     assert not at.exception
     return at

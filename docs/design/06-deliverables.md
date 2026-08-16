@@ -46,6 +46,8 @@ A `scripts/make_zip.py` (or `/make-zip`) produces it and prints a checklist: hid
 - `/eval-samples` green: four sample questions + ≥6 scripted follow-ups produce structurally valid answers with
   correct key numbers against golden files.
 - App runs from the extracted zip on a clean machine with only the shipped `.env`.
-- DESIGN.md exists and the three standalone docs (SCORING-METHODOLOGY, KEY-TRADEOFFS, WHERE-HOW-AI-IS-USED) exist and match its sections 3–5; limitations log has no `Open` row without an outcome; process log
-  has entries through the final milestone; `.claude/` contains CLAUDE.md, agents, hooks, skills as designed.
+- DESIGN.md exists and the three standalone docs (SCORING-METHODOLOGY, KEY-TRADEOFFS, WHERE-HOW-AI-IS-USED) exist
+  and its sections 1–3 summarise them without contradicting them; limitations log has no `Open` row without an
+  outcome; `.claude/` contains CLAUDE.md, agents, hooks, skills as designed.
+- `uv run python scripts/make_zip.py` exits 0 with every checklist line ticked.
 - Pushed to GitHub `main` (backup); zip produced by the script.

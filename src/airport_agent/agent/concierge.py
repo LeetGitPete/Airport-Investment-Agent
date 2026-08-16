@@ -268,7 +268,7 @@ class Concierge:
 
     def answer(self, message: str, state: SessionState, *, defaults: dict[str, str] | None = None,
                on_plan: Callable[[Plan], None] | None = None) -> Answer:
-        """One user turn, under one live-call ceiling (QA task 20).
+        """One user turn, under one live-call ceiling.
 
         The budget binds by context rather than by signature, so every path inside this turn is
         capped — tools, specialists, and anything added later — without each of them having to
