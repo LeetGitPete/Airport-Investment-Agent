@@ -102,32 +102,32 @@ Total files: **182**
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `src/airport_agent/agent/tools/__init__.py` | 1 | pending | |
-| `src/airport_agent/agent/tools/analysis_tools.py` | 144 | pending | |
-| `src/airport_agent/agent/tools/data_tools.py` | 231 | pending | |
-| `src/airport_agent/agent/tools/provenance.py` | 111 | pending | |
-| `src/airport_agent/agent/tools/registry.py` | 148 | pending | |
+| `src/airport_agent/agent/tools/__init__.py` | 1 | done | |
+| `src/airport_agent/agent/tools/analysis_tools.py` | 144 | done | |
+| `src/airport_agent/agent/tools/data_tools.py` | 231 | done | |
+| `src/airport_agent/agent/tools/provenance.py` | 111 | done | |
+| `src/airport_agent/agent/tools/registry.py` | 148 | done | |
 
 ## 5b. src/agent/specialists
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `src/airport_agent/agent/specialists/__init__.py` | 20 | pending | |
-| `src/airport_agent/agent/specialists/loader.py` | 97 | pending | |
-| `src/airport_agent/agent/specialists/runner.py` | 257 | pending | |
-| `src/airport_agent/agent/specialists/schema.py` | 79 | pending | |
+| `src/airport_agent/agent/specialists/__init__.py` | 20 | done | |
+| `src/airport_agent/agent/specialists/loader.py` | 97 | done | |
+| `src/airport_agent/agent/specialists/runner.py` | 257 | done | |
+| `src/airport_agent/agent/specialists/schema.py` | 79 | done | |
 
 ## 5c. src/agent (core)
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `src/airport_agent/agent/__init__.py` | 35 | pending | |
-| `src/airport_agent/agent/app.py` | 110 | pending | |
-| `src/airport_agent/agent/concierge.py` | 300 | pending | |
-| `src/airport_agent/agent/planner.py` | 532 | pending | |
-| `src/airport_agent/agent/sessions.py` | 56 | pending | |
-| `src/airport_agent/agent/synthesis.py` | 404 | pending | |
-| `src/airport_agent/agent/tables.py` | 431 | pending | |
+| `src/airport_agent/agent/__init__.py` | 35 | done | |
+| `src/airport_agent/agent/app.py` | 110 | done | |
+| `src/airport_agent/agent/concierge.py` | 300 | done | |
+| `src/airport_agent/agent/planner.py` | 532 | done | |
+| `src/airport_agent/agent/sessions.py` | 56 | done | |
+| `src/airport_agent/agent/synthesis.py` | 404 | done | |
+| `src/airport_agent/agent/tables.py` | 431 | done | |
 
 ## 6. src/ui
 

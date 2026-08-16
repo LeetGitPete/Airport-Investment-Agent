@@ -91,7 +91,7 @@ class RefreshReport:
     @property
     def ok(self) -> bool:
         """True if every requested source refreshed cleanly (exit-code use only — the CLI
-        itself always exits 0 for per-source failures, per the plan)."""
+        itself always exits 0 for per-source failures)."""
         return not self.failed
 
 

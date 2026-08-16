@@ -16,6 +16,7 @@ from collections.abc import Callable
 from typing import Any
 
 from airport_agent.agent.planner import PlanFilters, Planner
+from airport_agent.agent.sessions import NEW_CHAT_TITLE
 from airport_agent.agent.synthesis import Synthesizer
 from airport_agent.agent.tools.registry import ToolRegistry
 from airport_agent.contracts import (
@@ -33,16 +34,15 @@ from airport_agent.contracts import (
 )
 
 CONCIERGE = "concierge"
-NEW_CHAT_TITLE = "New chat"
 TITLE_CHARS = 60
 CLARIFY_TEXT = ("I couldn't determine what to analyse. Which airports or region, and which horizon "
                 "(12m/3y/5y/10y)?")
 ROW_KEYS = ("rows", "airports", "top_routes", "series", "sources")
-#: QA task 14 (2026-08-16): the registry's prefix for an argument the tool does not accept.
+#: The registry's error prefix for an argument the tool does not accept.
 INVALID_ARGS = "invalid arguments"
-#: QA task 16 (2026-08-16): a clarify headline is a question addressed to the user. The planner
-#: sometimes writes it in instruction voice ("Ask the user to specify which airports..."), which read
-#: as stage directions when shown verbatim. Such a note is dropped for the well-formed default.
+#: A clarify headline is a question addressed to the user. The planner sometimes writes it in
+#: instruction voice ("Ask the user to specify which airports..."), which reads as a stage direction
+#: when shown verbatim; such a note is dropped in favour of the well-formed default.
 _INSTRUCTION_VOICE = re.compile(r"^\s*(?:please\s+)?(?:ask|tell|prompt|request|instruct|clarify\s+with)\b"
                                 r".*?\b(?:user|them|they)\b", re.IGNORECASE | re.DOTALL)
 #: Pydantic decorates every validation error with a docs URL and a `[type=..., input_value=...]`
@@ -54,7 +54,7 @@ ANALYSIS_FAILED_TEXT = ("I couldn't run that analysis on the data I have. Try na
 
 
 def clarify_text(note: str | None) -> str:
-    """The question actually shown when the agent asks something back (QA task 16)."""
+    """The question actually shown when the agent asks something back."""
     text = (note or "").strip()
     if not text or _INSTRUCTION_VOICE.match(text):
         return CLARIFY_TEXT
@@ -136,8 +136,8 @@ class Concierge:
         Only the transcript is touched — `last_reports`, `last_airports` and `last_preset` keep the previous
         turn's analysis, because nothing new was computed.
 
-        `detail` is why the turn could not run. It goes to the uncertainty notes, condensed (QA task 16):
-        the headline stays a plain question, and the reason is still recorded rather than swallowed.
+        `detail` is why the turn could not run. It goes to the uncertainty notes, condensed: the
+        headline stays a plain question and the reason is still recorded rather than swallowed.
         """
         text = clarify_text(text)
         plan = self._clarify_plan(filters, text)
@@ -174,7 +174,7 @@ class Concierge:
 
     def _recover_tool_args(self, tool: str, args: dict[str, Any], out: dict[str, Any],
                            message: str) -> tuple[dict[str, Any], dict[str, Any]]:
-        """A rejected tool call gets one LLM repair, then a deterministic prune (QA task 14).
+        """A rejected tool call gets one LLM repair, then a deterministic prune.
 
         The user asked a real question; an argument the tool does not have is our problem, not theirs.
         So we try to re-express the intent, fall back to running the call without the unsupported keys,
@@ -254,7 +254,6 @@ class Concierge:
             try:
                 req = self.planner.to_analysis_request(plan, filters, defaults)
             except ValueError as exc:
-                # QA task 16: the raw pydantic dump used to be pasted into the headline.
                 return self._clarify_answer(state, message, filters, CLARIFY_TEXT, diagnostic(exc))
             if "deterministic" in plan.engines:
                 try:

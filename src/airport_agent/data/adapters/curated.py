@@ -30,10 +30,10 @@ from airport_agent.data.paths import curated_dir
 
 FACTS_FILE = "airport_facts.yaml"
 
-#: The keys `curated_inputs` may hold (plan 2a store schema).
+#: The keys `curated_inputs` may hold.
 ALLOWED_INPUT_KEYS = {"gates", "declared_rate_vmc", "declared_rate_imc", "slot_or_cap_flag"}
 
-#: The fact categories the design allows (plan 2a Task 12).
+#: The fact categories the design allows.
 ALLOWED_CATEGORIES = {"slot_level", "constraint", "project"}
 
 FACTS_COLUMNS = ("iata", "category", "text", "value", "source_url", "as_of", "expires")

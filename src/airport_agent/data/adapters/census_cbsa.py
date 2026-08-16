@@ -15,10 +15,9 @@ the keyed Census/BEA APIs):
   `https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/2024_Gaz_cbsa_national.zip`
   (`GEOID, NAME, CBSA_TYPE, INTPTLAT, INTPTLONG`).
 
-**RESCOPE (2026-08-16): population + centroids only, no BEA.** `catchment.
-gdp_real_usd` is always `None`; only the `cbsa_population`/`cbsa_pop_cagr_5y`
-metrics are computable from this source, not `msa_gdp_per_capita`/
-`msa_gdp_cagr_5y`.
+**Population + centroids only, no BEA.** `catchment.gdp_real_usd` is always
+`None`; only the `cbsa_population`/`cbsa_pop_cagr_5y` metrics are computable from
+this source, not `msa_gdp_per_capita`/`msa_gdp_cagr_5y`.
 
 Verified 2026-08-16 against the real files:
 
@@ -89,13 +88,12 @@ _POP_YEAR_RE = re.compile(r"^POPESTIMATE(\d{4})$")
 #: Gazetteer `CBSA_TYPE` code for a true metropolitan (as opposed to micropolitan) area.
 METRO_CBSA_TYPE = 1
 
-#: Default airport -> CBSA join radius (design 01 / plan Task 10).
+#: Default airport -> CBSA join radius (design 01).
 DEFAULT_MAX_DISTANCE_MI = 100.0
 
 CBSA_POPULATION_COLUMNS: tuple[str, ...] = ("cbsa_code", "cbsa_name", "year", "population", "source_id", "vintage")
 CBSA_CENTROID_COLUMNS: tuple[str, ...] = ("cbsa_code", "cbsa_name", "lat", "lon", "source_id", "vintage")
-#: `catchment` columns in store order (see plan Store schema). `gdp_real_usd` is always None
-#: (no BEA source in this RESCOPE).
+#: `catchment` columns in store order. `gdp_real_usd` is always None (no BEA source).
 CATCHMENT_COLUMNS: tuple[str, ...] = (
     "iata",
     "cbsa_code",
@@ -297,7 +295,7 @@ class CensusCbsaAdapter:
             source_id=self.id,
             description=(
                 "Census Bureau CBSA population estimates (2010-2019 + 2020-2025 vintages) and "
-                "Gazetteer CBSA centroids — population + geography only, no BEA (RESCOPE)"
+                "Gazetteer CBSA centroids — population + geography only, no BEA"
             ),
             period_start=self._period_start,
             period_end=self._period_end,

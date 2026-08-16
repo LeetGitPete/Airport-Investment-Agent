@@ -65,7 +65,7 @@ _FY_IN_FILENAME_RE = re.compile(r"FY(\d{4})", re.IGNORECASE)
 #: `LocID` prefix marking a state/regional block grant, not a single airport (dropped).
 BLOCK_GRANT_PREFIX = "*"
 
-#: `aip_grants` columns in store order (see plan Store schema).
+#: `aip_grants` columns in store order.
 AIP_GRANTS_COLUMNS: tuple[str, ...] = ("faa_locid", "fy", "amount_usd", "source_id", "vintage")
 
 

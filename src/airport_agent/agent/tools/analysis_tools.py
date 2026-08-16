@@ -81,10 +81,9 @@ class DiagnoseArgs(_Args):
 
 def _report_dict(report: DeterministicReport) -> dict[str, Any]:
     out = report.model_dump(mode="json")
-    # QA task 18: cite only sources that actually supplied a number. Every registry metric carries a
-    # nominal source_id even when it has no value, so citing the evidence wholesale would claim BEA
-    # metro GDP and BTS DB1B — sources the RESCOPE cut and the snapshot has zero rows of. A citation
-    # for data we never had is worse than a missing one.
+    # Cite only sources that actually supplied a number. Every registry metric carries a nominal
+    # source_id even when it has no value, so citing the evidence wholesale would claim sources the
+    # snapshot has zero rows of. A citation for data we never had is worse than a missing one.
     out["provenance"] = prov([m for m in report.evidence if m.value is not None])
     # design 03: every tool result carries coverage. For a report it is the mean metric coverage of its rows.
     out["coverage"] = (sum(r.coverage for r in report.rows) / len(report.rows)) if report.rows else None
@@ -94,8 +93,8 @@ def _report_dict(report: DeterministicReport) -> dict[str, Any]:
 def build_analysis_tools(analyst: DeterministicAnalyst) -> list[tuple[ToolSpec, ProvenanceSpec]]:
     """Build the rank / compare / diagnose tools bound to a Deterministic Analyst.
 
-    Each is paired with its declared provenance (QA task 18). All three are `derived`: which sources
-    they cite depends on which metrics the query actually scored, so a static list would be a lie.
+    Each is paired with its declared provenance. All three are `derived`: which sources they cite
+    depends on which metrics the query actually scored, so a static list would be a lie.
     """
 
     def score_airports(p: ScoreAirportsArgs) -> dict[str, Any]:

@@ -76,7 +76,7 @@ CAPACITY_LABELS: tuple[tuple[str, int], ...] = (
 )
 NO_CAPACITY_LABEL = (0, "none")
 
-#: `npias` columns in store order (see plan Store schema).
+#: `npias` columns in store order.
 NPIAS_COLUMNS: tuple[str, ...] = (
     "faa_locid",
     "hub",

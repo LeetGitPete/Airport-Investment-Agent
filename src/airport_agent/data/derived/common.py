@@ -114,7 +114,7 @@ def partial_window_flag(coverage: dict[str, int], iata: str, nominal_months: int
 def annual_enplanements(con, year: int, latest_period: str) -> pd.DataFrame:
     """Annual enplanements for `year`: columns `iata, value, source_id, quality_code`.
 
-    Priority (plan "Derived metric definitions", `annual_enplanements`): a complete Socrata
+    Priority (`derived/common.py::annual_enplanements`): a complete Socrata
     year first; for an incomplete year, TAF actual if present, else trailing-12m. In
     practice a genuine TAF *actual* (`taf_history`, `scenario=0`) essentially never exists
     for the current year under a live TAF edition (its base year is `>=` the current year,

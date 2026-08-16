@@ -4,7 +4,7 @@ Two pieces live here. `prov()` turns whatever a tool holds — metrics, route ta
 into `[{source_id, vintage, period_start?, period_end?}]`. `ProvenanceSpec` is the *declaration* a tool
 makes at registration: which sources it reads, or an explicit statement that it reads none.
 
-Why a declaration and not just the returned list (QA task 18, 2026-08-16): a sweep of every tool found
+Why a declaration and not just the returned list: a sweep of every tool found
 `find_airports` returning provenance that was silently empty — the key was never set, and the registry's
 `setdefault` filled in `[]`, so 50 airports shipped with no source at all. A returned list can only
 describe the call that happened; it cannot promise anything about the call that returns no rows, and it
@@ -50,8 +50,8 @@ def _period(item: ProvItem) -> dict[str, str]:
 def prov(items: Iterable[ProvItem]) -> list[dict[str, str]]:
     """Return unique [{"source_id", "vintage", ...}] in first-seen order; items without a source id are skipped.
 
-    The period keys are added when the item carries them (QA task 18) so a provenance table can show the
-    span a source covers, not only when we fetched it. Consumers read by key, so the extra keys are inert
+    The period keys are added when the item carries them, so a provenance table can show the span a
+    source covers, not only when we fetched it. Consumers read by key, so the extra keys are inert
     for anything that only wants source_id and vintage.
     """
     seen: set[tuple[str, str]] = set()

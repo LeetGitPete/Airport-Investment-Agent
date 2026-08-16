@@ -26,7 +26,7 @@ RUNWAYS_URL = f"{BASE_URL}/runways.csv"
 #: Airport types kept — everything that can plausibly carry scheduled service.
 KEPT_TYPES: tuple[str, ...] = ("large_airport", "medium_airport", "small_airport")
 
-#: `airports` columns in store order (see plan Store schema).
+#: `airports` columns in store order.
 AIRPORT_COLUMNS: tuple[str, ...] = (
     "iata",
     "icao",

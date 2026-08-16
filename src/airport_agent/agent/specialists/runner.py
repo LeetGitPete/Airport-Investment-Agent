@@ -86,11 +86,12 @@ def _cap_lists(node: Any, cap: int, path: tuple[str, ...], trimmed: list[str]) -
 
 
 def fit_tool_result(out: dict[str, Any], limit: int = MAX_TOOL_RESULT_CHARS) -> str:
-    """Serialize a tool result into at most `limit` characters of **valid** JSON.
+    """Serialize a tool result into `limit` characters of **valid** JSON where possible.
 
     A raw string slice would hand the model broken JSON, so oversized results are shortened structurally:
-    lists are capped (shortest cap that fits) and the message says what was cut, so the model can ask for a
-    narrower call instead of assuming it saw everything.
+    lists are capped (the largest cap that fits) and the message says what was cut, so the model can ask for
+    a narrower call instead of assuming it saw everything. A result still over `limit` with every list cut to
+    one element is returned oversized rather than corrupted — valid JSON matters more than the budget.
     """
     text = json.dumps(out)
     if len(text) <= limit:

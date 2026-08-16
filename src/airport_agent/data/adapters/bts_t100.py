@@ -34,13 +34,13 @@ Verified 2026-08-16 by scripting the real form:
   out — verified: ANC 2026-04 has 247 of 488 origin rows with `SEATS=0.00`,
   all-cargo carriers like Everts Air Cargo and Northern Air Cargo).
 
-**International Segment table: not landed.** A ~15-minute probe (per the
-2026-08-15 RESCOPE decision) tried `FIL`/`FIH`/`FIS`/`FIT`/`FIN`/`FIQ`/`FIP`/
+**International Segment table: not landed.** A timeboxed probe tried
+`FIL`/`FIH`/`FIS`/`FIT`/`FIN`/`FIQ`/`FIP`/
 `FIO`/`FIC`/`FIB`/`FID`/`FGH`/`FGJ`..`FGQ`/`FMG` — every one 302-redirects to
 `/Homepage.asp` (an invalid `gnoyr_VQ` code), unlike `FIM` which is a direct 200.
 The TranStats database-index pages (`Tables.asp?DB_ID=111`, `DatabaseInfo.asp`)
-did not surface the international segment table's code either. Per the RESCOPE
-decision this is `is_international=False`-only for `routes_month`; international
+did not surface the international segment table's code either, so `routes_month`
+is `is_international=False`-only; international
 totals (not route-level) remain available from `bts_socrata`
 (`intl_out_passengers`/`intl_in_passengers`). See known-limitations row 2 update.
 """
@@ -85,7 +85,7 @@ SOURCE_COLUMNS: tuple[str, ...] = (
     "MONTH",
 )
 
-#: `routes_month` columns in store order (see plan Store schema).
+#: `routes_month` columns in store order.
 ROUTES_MONTH_COLUMNS: tuple[str, ...] = (
     "iata",
     "dest",

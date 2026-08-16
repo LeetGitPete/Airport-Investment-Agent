@@ -28,7 +28,7 @@ def _otp_latest_period(con, table: str = "airport_month", measure: str | None = 
 def _is_otp_current_year(con, ref_year: int, table: str = "airport_month", measure: str | None = "dep_count") -> str | None:
     """OTP's own latest period, if it falls in `ref_year`; else `None` (nothing to compute).
 
-    OTP is RESCOPEd to only the trailing 12 months (no multi-year history), so there is
+    OTP is ingested for the trailing 12 months only (no multi-year history), so there is
     exactly one meaningful window — this gates every OTP-sourced 12m function to compute it
     only once, under whichever `ref_year` it actually belongs to.
     """

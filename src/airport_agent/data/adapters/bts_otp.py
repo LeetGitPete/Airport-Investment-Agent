@@ -49,11 +49,10 @@ zero-filled over every (day, hour) covered by the file (so quiet overnight
 hours count as zero, not "missing") — `p95`/`max` taken over that grid per
 airport-month.
 
-**RESCOPE (2026-08-16, supersedes the plan's 36-month window):** `otp_months`
-in `config/sources.yaml` is **12**, not 36 — OTP covers only the trailing 12
-months, so the `3y`/`5y` delay horizons (`pct_arr_delay_gt15`,
-`avg_dep_delay_min`) are `None` beyond `12m`. This keeps the OTP download to
-~12 months (~360 MB raw) instead of ~1.1 GB.
+**Trailing window:** `otp_months` in `config/sources.yaml` is **12**, so OTP
+covers only the trailing 12 months and the `3y`/`5y` delay horizons
+(`pct_arr_delay_gt15`, `avg_dep_delay_min`) are `None` beyond `12m` rather than
+dishonestly labelled. This keeps the OTP download to ~360 MB raw instead of ~1.1 GB.
 """
 from __future__ import annotations
 
@@ -115,7 +114,7 @@ AIRPORT_MONTH_COLUMNS: tuple[str, ...] = ("iata", "period", "measure", "value", 
 TAXI_HIST_COLUMNS: tuple[str, ...] = ("iata", "period", "minute_bucket", "n", "source_id", "vintage")
 OTP_PEAK_COLUMNS: tuple[str, ...] = ("iata", "period", "p95_hourly_ops", "max_hourly_ops", "source_id", "vintage")
 
-#: TaxiOut minutes above this are folded into the top bucket (see plan Store schema).
+#: TaxiOut minutes above this are folded into the top bucket.
 MAX_TAXI_BUCKET = 180
 
 HOURS_IN_DAY = tuple(range(24))

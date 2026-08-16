@@ -63,7 +63,7 @@ OPERATION_COMPONENTS: tuple[str, ...] = ("itn_Ac", "itn_at", "itn_ga", "itn_mil"
 #: FAA numeric hub class → the `airports.hub_size` vocabulary.
 HUB_SIZE_MAP: dict[int, str] = {3: "large", 2: "medium", 1: "small", 0: "nonhub"}
 
-#: `taf_history` / `taf_forecast` columns in store order (see plan Store schema).
+#: `taf_history` / `taf_forecast` columns in store order.
 TAF_COLUMNS: tuple[str, ...] = (
     "faa_locid",
     "year",

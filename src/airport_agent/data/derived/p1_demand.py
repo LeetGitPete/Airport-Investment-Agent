@@ -1,7 +1,7 @@
 """P1 Demand Pressure derived metrics: enpl_cagr_{3y,5y,10y}, taf_cagr_10y, taf_vs_actual_gap,
 load_factor, spill_proxy, seats_per_dep_trend, pax_per_capita.
 
-See plan "Derived metric definitions" table and `derived/common.py` for the window/CAGR rules.
+See `derived/common.py` for the window/CAGR rules.
 """
 from __future__ import annotations
 

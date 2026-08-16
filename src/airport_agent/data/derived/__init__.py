@@ -18,22 +18,21 @@ from airport_agent.data.store import Store
 
 MetricFn = Callable[..., pd.DataFrame]
 
-#: Tier A/B ids whose source was cut by the 2026-08-16 RESCOPE (human decision, Option A
-#: Core-6) — no adapter landed the data, so the function below always returns zero rows.
-#: `od_share` predates the RESCOPE (BTS DB1B timeboxed attempt, design 01 open item) but is
-#: documented the same way. See docs/design/known-limitations-and-tradeoffs.md.
+#: Tier A/B ids whose source never landed, so the function below always returns zero rows.
+#: Each reason is the durable one — why the data does not exist here, not when it was dropped.
+#: See docs/design/known-limitations-and-tradeoffs.md for the decisions behind them.
 MISSING_REASONS: dict[str, str] = {
-    "nas_delay_share": "BTS Delay Cause cut by RESCOPE 2026-08-16 (Option A Core-6): no NAS-attributed delay source.",
-    "cpe_usd": "FAA CATS Form 127 cut by RESCOPE 2026-08-16 (Option A Core-6).",
-    "nonaero_rev_per_enpl": "FAA CATS Form 127 cut by RESCOPE 2026-08-16 (Option A Core-6).",
-    "od_share": "BTS DB1B timeboxed attempt did not land (design 01 open item; predates the RESCOPE).",
+    "nas_delay_share": "No BTS Delay Cause adapter: nothing in the snapshot attributes delay minutes to the NAS.",
+    "cpe_usd": "No FAA CATS Form 127 adapter: airport financials were never ingested.",
+    "nonaero_rev_per_enpl": "No FAA CATS Form 127 adapter: airport financials were never ingested.",
+    "od_share": "The BTS DB1B adapter did not land (design 01 open item), so O&D share is unknown.",
     "msa_gdp_per_capita": (
-        "feature/data-extras (2026-08-16) confirmed BEA publishes no keyless-bulk MSA real-GDP "
-        "table (MARPP is MSA personal income/price parity, not GDP; only State/County GDP zips exist)."
+        "BEA publishes no keyless-bulk MSA real-GDP table (MARPP is MSA personal income/price parity, "
+        "not GDP; only State and County GDP zips exist)."
     ),
     "msa_gdp_cagr_5y": (
-        "feature/data-extras (2026-08-16) confirmed BEA publishes no keyless-bulk MSA real-GDP "
-        "table (MARPP is MSA personal income/price parity, not GDP; only State/County GDP zips exist)."
+        "BEA publishes no keyless-bulk MSA real-GDP table (MARPP is MSA personal income/price parity, "
+        "not GDP; only State and County GDP zips exist)."
     ),
 }
 
@@ -48,7 +47,7 @@ def _missing(reason: str) -> MetricFn:
     return _fn
 
 
-#: One function per tier A/B registry id (see plan "Derived metric definitions").
+#: One function per tier A/B registry id.
 METRIC_FUNCS: dict[str, MetricFn] = {
     # P1 Demand Pressure
     "enpl_cagr_3y": p1_demand.enpl_cagr_3y,
@@ -105,7 +104,7 @@ _AIRPORT_METRICS_COLUMNS: tuple[str, ...] = (
     "vintage",
 )
 
-#: `ref_year` sentinel meaning "the current/latest value" (see plan Store schema).
+#: `ref_year` sentinel meaning "the current/latest value".
 CURRENT_REF_YEAR = 9999
 
 #: First calendar year in the derived series (Socrata's earliest complete history).
@@ -140,7 +139,7 @@ def build_derived(store: Store, years: range | None = None) -> dict[str, int]:
     For each id, runs its function at every horizon the registry declares. Horizon-scoped
     ids (12m/3y/5y/10y) are computed for every `ref_year` in `years` (default
     `range(2016, latest_year+1)`); the latest `ref_year` that produced any rows is also
-    written again at `ref_year=9999` ("current" — see plan Store schema). Horizon-invariant
+    written again at `ref_year=9999` ("current"). Horizon-invariant
     ids (static/forecast) are computed once and written only at `ref_year=9999` (no time
     series: `get_metric_series` returns `[]` for these per the contract).
     """
