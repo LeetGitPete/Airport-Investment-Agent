@@ -339,7 +339,7 @@ def test_load_sources_faa_nasstatus_is_live() -> None:
 
 def test_load_sources_bts_otp_has_otp_months() -> None:
     sources = load_sources()
-    # RESCOPE 2026-08-16: trailing 12 months only (not 36) — see config/sources.yaml notes.
+    # Trailing 12 months only — see the otp_months note in config/sources.yaml.
     assert sources["bts_otp"].otp_months == 12
 
 

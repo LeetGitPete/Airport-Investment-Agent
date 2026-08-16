@@ -122,7 +122,7 @@ def test_q2_compares_lax_and_sna_with_the_reported_delays(session):
     answer = app.answer(QUESTIONS[1], state, on_plan=None)
     comparison = next(t for t in answer.evidence_tables if t.title.startswith("Comparison"))
     assert "LAX" in comparison.columns and "SNA" in comparison.columns
-    # rows carry user-facing metric names (presentation standard, QA 2026-08-16)
+    # rows carry user-facing metric names, never internal ids
     row = next(r for r in comparison.rows if r[comparison.columns.index("metric")] == "Mean departure delay")
     assert row[comparison.columns.index("LAX")] == pytest.approx(12.9)
     assert row[comparison.columns.index("SNA")] == pytest.approx(13.9)
@@ -145,7 +145,7 @@ def test_q4_diagnose_runs_both_engines_without_the_footnote_explanation(session)
     app, _llm, registry = session(3)
     state = app.sessions.new()
     answer = app.answer(QUESTIONS[3], state, on_plan=None)
-    # QA 2026-08-16: the templated explanation is no longer appended below tables; it still
+    # The templated explanation is not appended below the tables; it still
     # feeds the synthesis prompt and the fallback headline, so the answer must not lose it silently.
     rendered = [note for table in answer.evidence_tables for note in table.footnotes]
     assert not any("Signals of unmet demand" in text for text in rendered)

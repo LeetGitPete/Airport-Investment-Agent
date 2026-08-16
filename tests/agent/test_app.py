@@ -62,7 +62,7 @@ def test_provider_status_uses_the_client_when_available(tmp_path, fake_data, fak
 
 
 def test_missing_snapshot_fails_with_an_actionable_error(tmp_path, monkeypatch):
-    # The data layer exists since Phase 3; the loud failure mode is now a missing snapshot.
+    # The data layer is present, so the loud failure mode is a missing snapshot.
     import airport_agent.data.paths as data_paths
     monkeypatch.setattr(data_paths, "default_snapshot_path", lambda: tmp_path / "absent.duckdb")
     with pytest.raises(RuntimeError, match="refresh"):

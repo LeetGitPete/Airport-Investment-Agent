@@ -65,7 +65,7 @@ class TestOtpAnchoredOnItsOwnLatestPeriod:
         assert df.empty
 
     def test_3y_horizon_is_always_empty(self, store: Store) -> None:
-        # RESCOPE 2026-08-16: OTP ingests 12 trailing months only.
+        # OTP is ingested for 12 trailing months only.
         df = p2_congestion.pct_arr_delay_gt15(store.con, "3y", 2026, "2026-04")
         assert df.empty
 

@@ -27,7 +27,7 @@ def test_rank_new_england_terminal_expansion(analyst):
 
 
 def test_rank_single_airport_expands_to_hub_size_peers(analyst, fake):
-    # QA task 8 (human decision 2026-08-16): one airport cannot be ranked — it is ranked
+    # One airport cannot be ranked on its own — it is ranked
     # within its hub-size class instead, with the expansion disclosed as a caveat.
     rep = analyst.rank(AnalysisRequest(question_type="rank", airports=["SFO"], horizons=["12m"]))
     iatas = [r.ref.iata for r in rep.rows]

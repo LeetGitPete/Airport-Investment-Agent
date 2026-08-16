@@ -70,7 +70,7 @@ class FakeAnalyst:
 
     def rank(self, req: AnalysisRequest) -> DeterministicReport:
         rows, evidence, curated_facts, percentiles, horizon, peer_group, by_metric = self._build(req)
-        # mirrors the real Analyst.rank (QA task 5): rank reports carry per-airport raw values too
+        # mirrors the real Analyst.rank: rank reports carry per-airport raw values too
         comparison = {mid: dict(vals) for mid, vals in by_metric.items()}
         return DeterministicReport(question_type=req.question_type, preset=req.scoring_preset, weights=_WEIGHTS,
                                     horizon=horizon, peer_group=peer_group, rows=rows, comparison=comparison,

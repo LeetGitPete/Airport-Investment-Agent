@@ -12,7 +12,7 @@ def _m(source_id: str, vintage: str) -> Metric:
 def test_prov_dedups_and_preserves_order():
     items = [_m("bts_t100", "2026-04"), _m("faa_opsnet", "2026-03"), _m("bts_t100", "2026-04"),
              _m("bts_t100", "2026-01")]
-    # QA task 18: entries also carry the period when the item knows one, so the provenance table can
+    # Entries also carry the period when the item knows one, so the provenance table can
     # show what the data covers and not only when it was fetched.
     assert [(e["source_id"], e["vintage"]) for e in prov(items)] == [
         ("bts_t100", "2026-04"), ("faa_opsnet", "2026-03"), ("bts_t100", "2026-01")]

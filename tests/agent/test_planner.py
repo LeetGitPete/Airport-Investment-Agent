@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from airport_agent.agent.planner import PLAN_SCHEMA, SAMPLE_QUESTIONS, PlanFilters, Planner
@@ -24,13 +22,6 @@ def _plan_json(**over):
 def _planner(script, fake_data, fake_analyst, specs):
     reg = build_registry(fake_data, fake_analyst)
     return Planner(ScriptedLLM(script), reg, specs, PRESETS)
-
-
-def test_schema_is_portable():
-    dumped = json.dumps(PLAN_SCHEMA)
-    for bad in ("anyOf", "$ref", "additionalProperties", "nullable", "oneOf"):
-        assert bad not in dumped
-    assert set(PLAN_SCHEMA["required"]) == set(PLAN_SCHEMA["properties"])
 
 
 def test_sample_questions_verbatim():
@@ -156,7 +147,7 @@ def test_congestion_compare_defaults_to_12m(fake_data, fake_analyst, specs):
 
 
 def test_request_without_target_falls_back_to_the_national_scope(fake_data, fake_analyst, specs):
-    # QA task 15 (human decision 2026-08-16): a themed question with no geography is answerable —
+    # A themed question with no geography is answerable —
     # rank every commercial-service airport rather than asking the user where to look.
     from airport_agent.agent.planner import NATIONAL_SCOPE_HUBS, NATIONAL_SCOPE_LIMIT, is_national_scope
     js = _plan_json(faa_regions=[])

@@ -3,6 +3,7 @@
 `live=False` status, and the service-owned pieces the generic suite doesn't probe."""
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 
 import duckdb
@@ -21,8 +22,10 @@ class TestConstruction:
     def test_defaults_to_the_snapshot_path(self) -> None:
         from airport_agent.data.paths import default_snapshot_path
 
-        # Just checks the default wiring, not that the file exists.
-        assert DuckDBDataService.__init__.__defaults__ == (None, True)
+        # The default wiring only — the snapshot file itself need not exist here.
+        params = inspect.signature(DuckDBDataService.__init__).parameters
+        assert params["path"].default is None
+        assert params["live"].default is True
         assert default_snapshot_path().name == "airports.duckdb"
 
     def test_read_only_connection_rejects_writes(self, service: DuckDBDataService) -> None:

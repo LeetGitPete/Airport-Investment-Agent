@@ -40,8 +40,8 @@ def test_ranking_table_row_per_report_row_with_pillar_columns(fake_analyst):
     rep = _rank_report(fake_analyst)
     table = ranking_table(rep)
     assert table.title.startswith("Ranking") and "balanced" in table.title and "12m" in table.title
-    assert "preset" not in table.title  # internal word, never shown (QA task 12)
-    # only pillars the preset actually weights appear (QA task 6), under user-facing names (task 12)
+    assert "preset" not in table.title  # internal word, never shown
+    # only pillars the preset actually weights appear, under user-facing names
     from airport_agent.contracts import PILLAR_NAMES
     expected = [PILLAR_NAMES[p] for p in ("P1", "P2", "P3", "P4", "P5") if rep.weights.get(p)]
     assert [c for c in table.columns if c in PILLAR_NAMES.values()] == expected
@@ -101,7 +101,7 @@ def test_every_preset_has_a_rank_legend():
 
 
 def test_data_matrix_covers_rank_reports_with_airport_columns(fake_analyst, by_id):
-    # Rank reports carry per-airport raw values too (QA task 5): one row per metric,
+    # Rank reports carry per-airport raw values too: one row per metric,
     # one value column per airport — never unlabeled per-airport rows.
     rep = _rank_report(fake_analyst)
     table = data_matrix(rep, by_id)

@@ -63,7 +63,7 @@ def test_clarify_makes_no_extra_calls(fake_data, fake_analyst, specs):
 
 
 def test_analytical_without_targets_ranks_the_nation_and_says_so(fake_data, fake_analyst, specs):
-    # QA task 15: this used to become a clarify ("which airports?"), stalling an answerable question.
+    # A themed question with no geography must not become a clarify — it is answerable nationally.
     js = _plan_json(faa_regions=[], airports=[])
     c, _ = _concierge([js, LLMResult(text="ok", provider="f", model="m"), FINAL, SYN],
                       fake_data, fake_analyst, specs)
@@ -141,7 +141,7 @@ def test_unparseable_plan_becomes_a_clarify_without_further_calls(fake_data, fak
     assert state.last_reports == {} and state.last_airports == []
 
 
-# --- QA task 16: a clarify answer never leaks internals ---------------------------------------------------
+# A clarify answer never leaks internals.
 
 def test_clarify_headline_is_never_a_raw_validation_dump(fake_data, fake_analyst, specs):
     # the plan asks to rank with a preset the analyst rejects -> ValueError deep in the engine
@@ -191,7 +191,7 @@ def test_the_reason_is_recorded_even_though_it_left_the_headline():
     assert "pydantic.dev" not in note and "\n" not in note
 
 
-# --- QA task 14: an argument the tools do not have never costs the user their answer ---------------------
+# An argument the tools do not have never costs the user their answer.
 
 def _invented_arg_plan():
     """The real QA case: 'domestic flights out of ANC' planned with a filter the tool has no key for."""

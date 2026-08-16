@@ -1,4 +1,4 @@
-"""Every tool declares where its data comes from, and honours the declaration (QA task 18).
+"""Every tool declares where its data comes from, and honours the declaration.
 
 This is the sweep that found the bug, kept as a guard. On 2026-08-16 a manual pass over every tool
 found `find_airports` shipping 50 airports with no provenance at all — the key was never set and the
@@ -104,7 +104,7 @@ def test_the_provenance_table_merges_periods_and_names_its_users():
 
 
 def test_a_source_that_supplied_no_number_is_never_cited(fake_data, fake_analyst):
-    """The RESCOPE-cut sources keep a nominal source_id on their empty metrics — never cite them.
+    """Sources that never landed keep a nominal source_id on their empty metrics — never cite them.
 
     Found by this sweep on 2026-08-16: score_airports was citing bea_msa, bts_db1b, faa_cats and
     bts_delay_cause, none of which have a single row in the snapshot.

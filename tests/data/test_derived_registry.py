@@ -1,4 +1,4 @@
-"""Registry-level tests for `build_derived`/`assert_registry_covered` — the plan Task 13
+"""Registry-level tests for `build_derived`/`assert_registry_covered` — the
 checklist, run against the fixture-built test snapshot (`snapshot_con`, session-scoped, see
 `tests/data/conftest.py` and `tests/data/build_test_snapshot.py`)."""
 from __future__ import annotations
@@ -32,10 +32,10 @@ class TestRegistryCoverage:
         ab_ids = {s.id for s in load_registry() if s.tier in ("A", "B")}
         assert set(MISSING_REASONS) <= ab_ids
 
-    def test_missing_reasons_matches_the_rescope_cut_sources(self) -> None:
-        # `aip_per_enpl_10y` was un-cut on branch `feature/data-extras` (2026-08-16) once
-        # `faa_aip` landed; `msa_gdp_per_capita`/`msa_gdp_cagr_5y` remain missing — BEA
-        # publishes no keyless-bulk MSA-level real-GDP table (verified on the same branch).
+    def test_missing_reasons_is_the_expected_set(self) -> None:
+        # `aip_per_enpl_10y` is computed for real (the `faa_aip` adapter landed);
+        # `msa_gdp_per_capita`/`msa_gdp_cagr_5y` stay missing because BEA publishes no
+        # keyless-bulk MSA-level real-GDP table.
         assert set(MISSING_REASONS) == {
             "nas_delay_share", "cpe_usd", "nonaero_rev_per_enpl",
             "od_share", "msa_gdp_per_capita", "msa_gdp_cagr_5y",
@@ -58,7 +58,7 @@ class TestCutSourcesYieldNoRows:
 
 class Test12mTierACoverage:
     """Every tier-A 12m metric (excluding cut sources and the OTP 3y-only ids, which the
-    RESCOPE explicitly leaves None beyond 12m) is non-None for BOS/SFO/ANC."""
+    deliberately left None beyond 12m) is non-None for BOS/SFO/ANC."""
 
     IDS_12M = [
         "taf_vs_actual_gap", "load_factor", "pax_per_capita",
@@ -75,7 +75,7 @@ class Test12mTierACoverage:
 
 class Test5yDeclaredCoverage:
     """5y-declared metrics non-None for BOS/SFO/ANC. Excludes `nas_delay_share` and
-    `msa_gdp_cagr_5y` (RESCOPE-cut sources) and `seats_per_dep_trend`: its 5-years-ago
+    `msa_gdp_cagr_5y` (sources that never landed) and `seats_per_dep_trend`: its 5-years-ago
     comparison needs Socrata data 5 years before `ref_year`, and the committed fixture
     (`tests/fixtures/bts_socrata/sample.json`) only spans 2022-2026 (~4 years) — a real
     fixture-depth limit, not a bug. `test_derived_p1.py::TestSeatsPerDepTrend` proves the
@@ -94,7 +94,7 @@ class Test5yDeclaredCoverage:
 
 
 class Test10yDeclaredCoverage:
-    """`aip_per_enpl_10y` — un-cut on `feature/data-extras`; non-None for BOS/SFO/ANC at its
+    """`aip_per_enpl_10y` — computed from real grant data; non-None for BOS/SFO/ANC at its
     only declared horizon (10y) once `faa_aip`'s fixture (FY2016-2025) is in the snapshot."""
 
     @pytest.mark.parametrize("iata", CHECK_AIRPORTS)
