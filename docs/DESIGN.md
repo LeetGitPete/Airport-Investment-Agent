@@ -191,34 +191,26 @@ calls per turn behind a 3-second per-host pacer.
 
 ## How AI was used, and how this was built
 
-### 1. Research first — questions before metrics, metrics before data
+### 1. Research — questions before metrics, metrics before data
 
-No metric was chosen because the data existed. The order was deliberately the reverse.
+**Research agents were sent out first**, to find how professionals actually underwrite airports rather than
+guessing: Moody's *Publicly Managed Airports* scorecard (reconstructed from a public credit opinion — the
+methodology itself is gated), Fitch's transportation criteria, S&P's risk matrix, FAA capacity planning
+(NPIAS 2025–29, FACT3, Airport Capacity Profiles), ACI/ACRP benchmarking.
 
-**Started from how professionals actually underwrite airports**, not from intuition: Moody's *Publicly Managed
-Airports* scorecard (reconstructed from a public credit opinion, since the methodology itself is gated),
-Fitch's five-attribute transportation criteria verified against the PHL rating report, S&P's enterprise ×
-financial risk matrix, FAA capacity-planning practice (NPIAS 2025–29, FACT3, the Airport Capacity Profiles),
-and ACI/ACRP benchmarking.
+That produced **22 questions an analyst actually asks**, which clustered into the five pillars:
 
-**That produced 22 questions an analyst actually asks** — is the growth structural or post-pandemic recovery;
-is the binding constraint runway, gate, terminal or legal; is delay endogenous or weather-driven; is traffic
-leaking to a competitor nearby; what is leverage per O&D passenger.
+**P1** Demand Pressure · **P2** Congestion & Physical Constraint · **P3** Market Quality ·
+**P4** Economic Base · **P5** Financeability & Pipeline
 
-**The 22 condensed into the 5 pillars** above — P1 Demand Pressure, P2 Congestion & Physical Constraint,
-P3 Market Quality, P4 Economic Base, P5 Financeability & Pipeline — which is simply where the questions
-clustered.
+**Only then agents went hunting for data** that could answer those questions, verifying every source by
+actually fetching it — so the source registry carries field reports, not descriptions (the T-100 ASP.NET
+session cookie must be replayed on the POST; FAA headers contain embedded newlines; Socrata stringifies every
+number regardless of cast). Dead ends were logged too, not quietly dropped.
 
-**Only then the hunt for data**, one source at a time, each verified by actually fetching it. That produced a
-source registry where every entry carries a field report rather than a description: *the T-100 ASP.NET session
-cookie must be replayed on the POST or the form silently re-renders*; *NPIAS headers contain embedded newlines*;
-*Socrata serializes every number as a string regardless of cast*; *a Census Metropolitan Division sub-row shares
-its parent's LSAD and CBSA code, so filtering on LSAD alone double-counts*. Negative results were logged too — a
-15-minute timeboxed probe of every candidate T-100 international table code, all of which 302'd to the homepage.
-
-**Metrics were then derived backwards** from what the questions needed and the data could actually support —
-which is what produced the A/B/C tiering. A question with no computable metric became a tier-C entry rather than
-disappearing.
+**Metrics were derived backwards** from what the questions needed and the data could actually support. That is
+what produced the A/B/C tiering: a question with no computable metric became a documented tier-C gap instead of
+disappearing. No metric was chosen because the data happened to exist.
 
 ### 2. Design — separation of concerns, so it could be built in parallel
 
