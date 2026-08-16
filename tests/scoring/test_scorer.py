@@ -160,6 +160,32 @@ def test_absent_pillars_reports_structurally_missing_weighted_pillars(scorer):
     assert res.absent_pillars == ["P1", "P3", "P4", "P5"]
 
 
+def test_dead_weighted_metrics_names_an_upweighted_metric_with_no_data_anywhere(scorer):
+    """terminal_expansion puts 3.0 on the gate metrics; with no gate data its focus silently
+    inverts, because renormalization hands that weight to the metrics it damped to 0.5."""
+    te = load_presets()["terminal_expansion"]
+    ids = ["pax_per_gate", "taxi_out_p80_min"]
+    fm = _fm(["BOS", "LAX"], ids, [[None, 10.0], [None, 20.0]])
+    res = scorer.score(fm, te)
+    assert res.dead_weighted_metrics == ["pax_per_gate"]
+    # it is scoreable, so absent_pillars cannot see it — that is why this signal is separate
+    assert "P2" not in res.absent_pillars
+    assert all(r.metric_contrib.get("pax_per_gate") is None for r in res.rows)
+
+
+def test_a_metric_with_data_for_some_airports_is_not_dead_weight(scorer):
+    """One airport's gap is per-airport coverage, not a defeated preset — must not fire."""
+    te = load_presets()["terminal_expansion"]
+    fm = _fm(["BOS", "LAX"], ["pax_per_gate"], [[400000.0], [None]])
+    assert scorer.score(fm, te).dead_weighted_metrics == []
+
+
+def test_dead_weight_ignores_metrics_the_preset_never_upweighted(scorer, balanced):
+    """balanced weights pax_per_gate at the 1.0 default: absent, but no stated emphasis is lost."""
+    fm = _fm(["BOS", "LAX"], ["pax_per_gate", "taxi_out_p80_min"], [[None, 10.0], [None, 20.0]])
+    assert scorer.score(fm, balanced).dead_weighted_metrics == []
+
+
 def test_absent_pillars_empty_when_full_matrix(scorer, balanced):
     ids = ["load_factor", "avg_dep_delay_min", "carrier_hhi", "cbsa_population", "cpe_usd"]
     fm = _fm(["BOS", "LAX"], ids, [[0.80, 10.0, 1000.0, 1e6, 10.0], [0.90, 20.0, 2000.0, 2e6, 20.0]])

@@ -20,6 +20,10 @@ class ScoringResult(BaseModel):
     pillar_scores: dict[str, dict[str, float]] = Field(default_factory=dict)
     scored_metric_ids: list[str] = Field(default_factory=list)
     absent_pillars: list[str] = Field(default_factory=list)
+    #: Metrics the preset deliberately up-weighted that hold no value for ANY airport scored here.
+    #: Renormalization silently redistributes their weight, so without this the preset's stated
+    #: emphasis can be entirely absent from the result with nothing saying so.
+    dead_weighted_metrics: list[str] = Field(default_factory=list)
 
 
 class Scorer:
@@ -53,6 +57,12 @@ class Scorer:
         # pillars with preset weight > 0 that have no scoreable metric in this matrix at all (structural, not
         # per-airport availability) -- surfaced so callers can caveat "forgone preset weight" (human decision).
         absent_pillars = [p for p in PILLAR_IDS if preset.pillars[p] > 0 and not by_pillar[p]]
+        # The metric-level analogue: an up-weighted metric with no value for any airport here. It is
+        # scoreable (so it never trips `absent_pillars`) but contributes nothing, and renormalization
+        # hands its weight to the metrics the preset meant to de-emphasise. Silent by construction
+        # otherwise -- `coverage` counts it as one missing metric among many.
+        dead_weighted = [m for m in ids
+                         if preset.metric_weight(m) > 1.0 and all(v is None for v in pct[m])]
         # 3) per-airport effective weights and contributions
         rows: list[ScoreRow] = []
         pillar_scores: dict[str, dict[str, float]] = {}
@@ -97,4 +107,5 @@ class Scorer:
         rows = [r.model_copy(update={"rank": k + 1}) for k, r in enumerate(rows)]
         percentiles = {m: dict(zip(iatas, pct[m], strict=True)) for m in ids}
         return ScoringResult(rows=rows, weights=weights, percentiles=percentiles, pillar_scores=pillar_scores,
-                             scored_metric_ids=ids, absent_pillars=absent_pillars)
+                             scored_metric_ids=ids, absent_pillars=absent_pillars,
+                             dead_weighted_metrics=dead_weighted)

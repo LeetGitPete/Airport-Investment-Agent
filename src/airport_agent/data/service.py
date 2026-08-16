@@ -304,7 +304,11 @@ class DuckDBDataService:
             WHERE iata = ? AND period BETWEEN ? AND ?
               AND (? IS NULL OR is_international = ?)
             GROUP BY dest
-            ORDER BY departures DESC
+            -- `dest` breaks the tie so the order is TOTAL: the caller slices to top_n, which makes
+            -- ordering decide MEMBERSHIP, not just position. Without it, which routes an airport
+            -- shows would come from DuckDB's execution order (252 airports have a tie straddling
+            -- the default top_n=10). Matches `_airport_universe` and `Scorer.score`.
+            ORDER BY departures DESC, dest ASC
             """,
             [iata, start, end, international, international],
         ).df()

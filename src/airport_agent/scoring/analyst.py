@@ -136,7 +136,28 @@ class Analyst:
         sub = {i: s for i, s in res.pillar_scores.items() if i in keep}
         return ScoringResult(rows=rows, weights=res.weights, percentiles=pcts, pillar_scores=sub,
                              scored_metric_ids=res.scored_metric_ids,
-                             absent_pillars=res.absent_pillars), len(uni_iatas)
+                             absent_pillars=res.absent_pillars,
+                             dead_weighted_metrics=res.dead_weighted_metrics), len(uni_iatas)
+
+    def _dead_weight_caveats(self, preset: Preset, res: ScoringResult) -> list[str]:
+        """Say so when the preset's up-weighted metrics contributed nothing.
+
+        `coverage` reports how much data an airport had, but it cannot say that the *emphasis the
+        preset is named for* landed on metrics with no data anywhere. Renormalization then hands that
+        weight to the very metrics the preset meant to de-emphasise, so the result can be close to the
+        opposite of the stated intent with every individual number still correct. This is the one
+        place that can see it, because it is a property of the scored set, not of any airport.
+        """
+        if not res.dead_weighted_metrics:
+            return []
+        names = ", ".join(self.by_id[m].name if m in self.by_id else m
+                          for m in res.dead_weighted_metrics)
+        weights = {preset.metric_weight(m) for m in res.dead_weighted_metrics}
+        weight = f"{next(iter(weights)):g}x" if len(weights) == 1 else "above the default"
+        return [f"The {preset.name.replace('_', ' ')} focus up-weights {names} ({weight}), but no airport "
+                f"scored here has data for {'it' if len(res.dead_weighted_metrics) == 1 else 'them'}, "
+                "so that emphasis did not apply — the weight was renormalized onto the other metrics "
+                "in the same pillar."]
 
     def _caveats(self, metric_ids: list[str], peer_group: PeerGroup, n_universe: int) -> list[str]:
         out = [f"Percentiles computed within {peer_group} peer groups across {n_universe} airports; "
@@ -191,6 +212,7 @@ class Analyst:
             absent_weight = sum(preset.pillars[p] for p in res.absent_pillars)
             caveats.append(f"Pillars {', '.join(res.absent_pillars)} not scored (no metric in the scored set; "
                            f"forgone preset weight {absent_weight:.2f}); other pillars renormalized.")
+        caveats.extend(self._dead_weight_caveats(preset, res))
 
         return DeterministicReport(
             question_type=req.question_type, preset=preset.name, weights=res.weights, horizon=horizon,

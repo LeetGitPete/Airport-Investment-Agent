@@ -79,6 +79,24 @@ class TestRoutesWindow:
         deps = [r.departures for r in rt.rows]
         assert deps == sorted(deps, reverse=True)
 
+    def test_equal_departures_are_broken_by_dest_so_the_order_is_total(
+        self, service: DuckDBDataService
+    ) -> None:
+        """Ties must not leave membership to DuckDB: top_n slices, so order decides who appears."""
+        rt = service.get_routes("BOS", top_n=100)
+        keys = [(-r.departures, r.dest) for r in rt.rows]
+        assert keys == sorted(keys)
+
+    def test_a_truncated_route_table_is_reproducible_across_calls(
+        self, service: DuckDBDataService
+    ) -> None:
+        """The property that was actually broken: the same top_n twice gives the same routes."""
+        first = [r.dest for r in service.get_routes("BOS", top_n=5).rows]
+        second = [r.dest for r in service.get_routes("BOS", top_n=5).rows]
+        assert first == second
+        # and the truncated table is the genuine prefix of the full one
+        assert first == [r.dest for r in service.get_routes("BOS", top_n=100).rows][:5]
+
 
 class TestLiveFalseFallback:
     def test_get_live_status_never_touches_the_network(self, service: DuckDBDataService) -> None:
