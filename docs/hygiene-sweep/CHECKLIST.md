@@ -30,7 +30,7 @@ Total files: **182**
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `conftest.py` | 10 | pending | |
+| `conftest.py` | 10 | done |  |
 
 ## 2a. src/data/adapters
 
@@ -145,20 +145,20 @@ Total files: **182**
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `config/metrics.yaml` | 119 | pending | |
-| `config/providers.yaml` | 14 | pending | |
-| `config/scoring_presets.yaml` | 39 | pending | |
-| `config/sources.yaml` | 138 | pending | |
-| `config/specialists/capacity_analyst.md` | 60 | pending | |
-| `config/specialists/expansion_analyst.md` | 54 | pending | |
-| `config/specialists/general_analyst.md` | 58 | pending | |
-| `config/specialists/market_analyst.md` | 55 | pending | |
+| `config/metrics.yaml` | 119 | done | frozen; comments clean, no findings |
+| `config/providers.yaml` | 14 | done |  |
+| `config/scoring_presets.yaml` | 39 | done |  |
+| `config/sources.yaml` | 138 | done |  |
+| `config/specialists/capacity_analyst.md` | 60 | done |  |
+| `config/specialists/expansion_analyst.md` | 54 | done |  |
+| `config/specialists/general_analyst.md` | 58 | done |  |
+| `config/specialists/market_analyst.md` | 55 | done |  |
 
 ## 8. scripts
 
 | file | lines | status | notes |
 |---|---|---|---|
-| `scripts/make_zip.py` | 74 | pending | |
+| `scripts/make_zip.py` | 74 | done |  |
 
 ## 9a. tests/contracts
 

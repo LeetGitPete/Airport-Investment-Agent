@@ -107,3 +107,78 @@ recommendation:  Option 1: the schema is the stated contract and 3 is what the f
                  user can see, so it is logged rather than applied.
 blocked:         nothing.
 
+### F-005 — `terminal_expansion` up-weights two metrics that have no data for any airport   [severity: medium] [config/scoring_presets.yaml:11]
+what:            `terminal_expansion` is the preset behind the assignment's first sample question
+                 ("Which airports in New England are strong candidates for terminal expansion?").
+                 It up-weights the gate metrics hardest:
+
+                     pax_per_gate: 3.0
+                     deps_per_gate_day: 3.0
+
+                 Both are absent for every airport in the shipped snapshot (0 rows each) because no
+                 public gate-count source was secured (known-limitations rows 5 and 42). Measured
+                 against the snapshot, the share of each pillar's nominal metric weight that sits on
+                 zero-row metrics is:
+
+                     terminal_expansion  P2 (weight .30): 48%  [nas_delay_share, pax_per_gate, deps_per_gate_day]
+                                         P4 (weight .10): 50%  [msa_gdp_per_capita, msa_gdp_cagr_5y]
+                                         P5 (weight .10): 67%  [cpe_usd, nonaero_rev_per_enpl]
+                     congestion_relief   P2 (weight .50): 19%
+                     balanced            P2 (weight .25): 27%
+
+                 The scorer is not wrong: it renormalizes within-pillar weights over the metrics an
+                 airport actually has, reports `coverage`, and caveats tier-B gaps. No number is
+                 miscomputed.
+why it matters:  What the preset DOES no longer matches what it SAYS. Its description reads "gate and
+                 passenger-side metrics up-weighted vs runway/delay", but after renormalization the
+                 gate emphasis is gone entirely and P2 reduces to the delay/runway metrics the
+                 description says are de-emphasised — close to the opposite of the stated intent.
+                 `taxi_out_p80_min` and `ops_per_runway` are deliberately damped to 0.5, so the
+                 surviving P2 signal is skewed by a choice made on the assumption that the 3.0-weighted
+                 gate metrics would carry the pillar. A reader comparing the preset table in design 02
+                 with the answer cannot see this; the per-answer caveat says only that tier-B metrics
+                 contribute where curated data exists.
+options:         1) Documentation only: state in the preset description (and in the answer's caveats)
+                    that the gate metrics are unavailable, so the terminal focus rests on load factor,
+                    upgauging and peak-hour ratio. No scoring change.
+                 2) Re-tune `terminal_expansion` for the metrics that exist — e.g. drop the 0.5 damping
+                    on taxi_out/ops_per_runway and raise load_factor / seats_per_dep_trend /
+                    peak_hour_ops_ratio — so the weights express the intent using available data.
+                 3) Have the Scorer surface it: when a metric with an explicit `metric_weights` entry
+                    resolves to zero rows for every airport in the matrix, add a caveat naming it.
+recommendation:  Option 3 plus option 1. Option 3 is the general fix — it catches the same class of
+                 problem for any future preset and keeps the report honest without re-tuning weights
+                 that were derived from the research note. Re-tuning (option 2) is a methodology
+                 change and should be a deliberate, human decision, not a hygiene edit.
+blocked:         nothing — rankings today are internally consistent and coverage is reported. This is
+                 about the preset meaning what it claims.
+
+### F-006 — `docs/DESIGN.md` does not exist, but the packaging script, the UI and design 06 all require it   [severity: high] [docs/]
+what:            `docs/` contains SCORING-METHODOLOGY.md, KEY-TRADEOFFS.md, WHERE-HOW-AI-IS-USED.md
+                 and process-log.md. There is no `DESIGN.md`. Five places assume there is:
+
+                   scripts/make_zip.py:57      checklist entry "DESIGN.md present" -> fails, main() returns 1
+                   src/airport_agent/ui/sidebar.py:130  st.caption("Design: docs/DESIGN.md") — a dead pointer in the app
+                   docs/design/06-deliverables.md:31    "`docs/DESIGN.md` — the required short design/architecture document"
+                   docs/design/06-deliverables.md:43    the release check: "DESIGN.md exists and the three standalone docs ... match its sections 3-5"
+                   docs/design/04-ui.md:18              the sidebar must "Link to `docs/DESIGN.md`"
+
+                 So `uv run python scripts/make_zip.py` builds the deliverable zip and exits 1 with an
+                 unticked checklist line, and the shipped Streamlit app shows the user a path to a file
+                 that is not in the zip.
+why it matters:  Design 06 names DESIGN.md as *the* required design/architecture deliverable for the
+                 assignment ("deliver source + short design doc"), with the three standalone docs
+                 embedded as its sections 3-5. Its absence is a missing deliverable, not a tidiness
+                 problem, and the one automated check that would have caught it (make_zip's checklist)
+                 is advisory output rather than something CI runs.
+options:         1) Assemble `docs/DESIGN.md` from `docs/design/00-06`, the limitations log and the three
+                    standalone docs — this is exactly the `doc-assembler` subagent's job per design 05.
+                 2) Drop DESIGN.md from the plan: point the sidebar caption and make_zip at
+                    `docs/design/` and the three standalone docs, and amend design 04/06 to match.
+                 3) Ship as-is and fix the dangling references only.
+recommendation:  Option 1. The three standalone docs exist, so the content largely does; what is missing
+                 is the assembled overview the assignment asks for. Writing it is authoring work well
+                 outside a hygiene sweep, so I did not attempt it — but nothing else in this report is
+                 as likely to matter at delivery.
+blocked:         the deliverable zip: `scripts/make_zip.py` exits non-zero until this is resolved either way.
+

@@ -1,11 +1,11 @@
-# Runtime LLM providers (LiteLLM model strings). Decision 2026-08-15: Gemini free tier ONLY for now.
-# Add Groq / NVIDIA NIM later by appending entries; the first entry is primary, later ones are fallbacks.
+# Runtime LLM providers (LiteLLM model strings). Gemini free tier only for now; add Groq / NVIDIA NIM
+# later by appending entries. The first entry is primary, later ones are fallbacks.
 providers:
   - name: gemini
-    # gemini-2.5-flash was retired for new accounts (404, verified 2026-08-16); the -latest
-    # aliases are Google-maintained and always point at a currently-served model.
-    # QA 2026-08-16: flash-LITE — the most generous free-tier limits of the Gemini family
-    # (higher RPM/RPD than flash), so interactive QA doesn't trip 429s as fast.
+    # A `-latest` alias, because gemini-2.5-flash was retired for new accounts (404): the aliases are
+    # Google-maintained and always resolve to a currently-served model. flash-LITE specifically, for the
+    # most generous free-tier limits of the family (higher RPM/RPD than flash), so interactive use is
+    # slower to trip a 429.
     model: gemini/gemini-flash-lite-latest
     api_key_env: GEMINI_API_KEY
     rpm: 15
